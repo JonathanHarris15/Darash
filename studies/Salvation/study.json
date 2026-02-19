@@ -1,0 +1,59 @@
+{
+    "symbols": {},
+    "marks": [
+        {
+            "type": "underline",
+            "book": "Jeremiah",
+            "chapter": "10",
+            "verse_num": "15",
+            "start": 44,
+            "length": 31,
+            "color": "#FFFF00"
+        }
+    ],
+    "notes": {
+        "Jeremiah|10|9|0": "# This is a title\n## This is a subheading\n\n**bold text**\n\n- list 1\n- list 2\n\ntest\n\n[Also look at Mark 4](Bible:Mark+4)",
+        "Jeremiah|10|13|13": "# Title\n\n## Subheading\n\n[Go to Mark!](Bible:Mark+6)"
+    },
+    "bookmarks": [
+        {
+            "ref": "Jeremiah 10:20",
+            "book": "Jeremiah",
+            "chapter": "10",
+            "verse": "20",
+            "color": "#0078D7",
+            "title": ""
+        },
+        {
+            "ref": "Jeremiah 11:4",
+            "book": "Jeremiah",
+            "chapter": "11",
+            "verse": "4",
+            "color": "#0078D7",
+            "title": ""
+        }
+    ],
+    "arrows": {
+        "Jeremiah|10|13|9": [
+            {
+                "end_dx": 124.46875,
+                "end_dy": -90.78125,
+                "color": "#99ffffff"
+            }
+        ],
+        "Jeremiah|10|13|11": [
+            {
+                "end_dx": -1.1171875,
+                "end_dy": 176.21875,
+                "color": "#99ffffff"
+            }
+        ],
+        "Jeremiah|10|11|13": [
+            {
+                "end_dx": 3.140625,
+                "end_dy": 84.21875,
+                "color": "#99ffffff"
+            }
+        ]
+    }
+}
