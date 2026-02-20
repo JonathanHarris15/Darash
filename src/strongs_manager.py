@@ -76,27 +76,50 @@ class StrongsManager:
             print(f"Error parsing Strong's dictionary: {e}")
 
     def index_usages(self, loader):
-        """Indexes usages of Strongs numbers across all verses."""
+        """Indexes usages of Strongs numbers across all verses with snippets."""
         start_t = time.time()
-        print("Indexing Strong's usages...")
+        print("Indexing Strong's usages with snippets...")
         self.usages = {}
         for verse in loader.flat_verses:
             ref = verse['ref']
-            for token in verse['tokens']:
+            tokens = verse['tokens']
+            
+            for i, token in enumerate(tokens):
                 if len(token) > 1:
                     strongs_str = token[1]
-                    # Strongs can be space-separated "H123 H456"
                     s_nums = strongs_str.split()
                     for sn in s_nums:
                         if sn not in self.usages:
                             self.usages[sn] = []
-                        # Avoid duplicates in same verse if multiple words map to same sn
-                        if not self.usages[sn] or self.usages[sn][-1] != ref:
-                            self.usages[sn].append(ref)
+                        
+                        # Avoid duplicates in same verse
+                        if self.usages[sn] and self.usages[sn][-1].get('ref') == ref:
+                            continue
+                            
+                        # Create Snippet: 3 words before, target word, 3 words after
+                        start_idx = max(0, i - 3)
+                        end_idx = min(len(tokens), i + 4)
+                        
+                        snippet_parts = []
+                        for j in range(start_idx, end_idx):
+                            word = tokens[j][0]
+                            if j == i:
+                                snippet_parts.append(f"<b>{word}</b>")
+                            else:
+                                snippet_parts.append(word)
+                        
+                        snippet = " ".join(snippet_parts)
+                        if start_idx > 0: snippet = "... " + snippet
+                        if end_idx < len(tokens): snippet = snippet + " ..."
+                        
+                        self.usages[sn].append({
+                            "ref": ref,
+                            "snippet": snippet
+                        })
         print(f"Indexed Strong's usages in {time.time() - start_t:.2f}s")
 
     def get_entry(self, sn: str) -> Optional[Dict[str, str]]:
         return self.dictionary.get(sn)
 
-    def get_usages(self, sn: str) -> List[str]:
+    def get_usages(self, sn: str) -> List[Dict[str, str]]:
         return self.usages.get(sn, [])

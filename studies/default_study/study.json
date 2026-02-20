@@ -1,24 +1,18 @@
 {
     "symbols": {},
     "marks": [],
-    "notes": {
-        "standalone_1771563982796": {
-            "title": "New Note 1",
-            "text": "",
-            "folder": ""
-        }
-    },
-    "bookmarks": [
-        {
-            "ref": "Genesis 1:14",
-            "book": "Genesis",
-            "chapter": "1",
-            "verse": "14",
-            "color": "#0078D7",
-            "title": ""
-        }
-    ],
+    "notes": {},
+    "bookmarks": [],
     "arrows": {},
     "note_folders": [],
-    "settings": {}
+    "settings": {
+        "font_size": 18,
+        "line_spacing": 1.5,
+        "font_family": "Times New Roman",
+        "verse_num_size": 10,
+        "side_margin": 40,
+        "text_color": "#dcdcdc",
+        "ref_color": "#64c8ff",
+        "bg_color": "#1e1e1e"
+    }
 }

@@ -1,18 +1,56 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QDialog, QScrollArea, QPushButton,
-    QHBoxLayout, QFrame, QTextEdit, QListWidget, QListWidgetItem
+    QHBoxLayout, QFrame, QTextEdit, QListWidget, QListWidgetItem,
+    QStyledItemDelegate, QStyle
 )
-from PySide6.QtCore import Qt, QPoint, Signal
-from PySide6.QtGui import QFont, QColor, QPalette
+from PySide6.QtCore import Qt, QPoint, Signal, QRect, QSize
+from PySide6.QtGui import (
+    QFont, QColor, QPalette, QTextDocument, QAbstractTextDocumentLayout,
+    QPainter
+)
 from src.constants import APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR
+
+class HTMLItemDelegate(QStyledItemDelegate):
+    """Custom delegate to render HTML in QListWidget items with word wrap."""
+    def paint(self, painter, option, index):
+        options = option
+        self.initStyleOption(options, index)
+
+        painter.save()
+
+        doc = QTextDocument()
+        doc.setTextWidth(options.rect.width())
+        # Set text color based on selection state
+        color = "white" if options.state & QStyle.State_Selected else "#aaa"
+        # Combine ref and snippet if it was stored that way, or just use the text
+        html = f"<div style='color:{color}; font-size: 13px;'>{options.text}</div>"
+        doc.setHtml(html)
+
+        # Remove selection background highlight (delegate will handle it)
+        options.text = ""
+        self.parent().style().drawControl(QStyle.CE_ItemViewItem, options, painter)
+
+        painter.translate(options.rect.left(), options.rect.top())
+        clip = QRect(0, 0, options.rect.width(), options.rect.height())
+        doc.drawContents(painter, clip)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        # Calculate dynamic height based on text wrapping
+        doc = QTextDocument()
+        doc.setTextWidth(option.rect.width())
+        doc.setHtml(index.data(Qt.DisplayRole))
+        return QSize(option.rect.width(), int(doc.size().height()) + 10)
 
 class StrongsTooltip(QFrame):
     """Small hover popup for Strong's entries."""
     def __init__(self, parent=None):
-        # Use Qt.ToolTip which is better for these types of windows
         super().__init__(parent, Qt.ToolTip | Qt.WindowTransparentForInput | Qt.NoDropShadowWindowHint)
         self.setFrameShape(QFrame.StyledPanel)
-        self.setFixedWidth(320)
+        self.setFixedWidth(350) # Slightly wider for better text flow
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        
         self.setStyleSheet(f"""
             StrongsTooltip {{
                 background-color: #2a2a25;
@@ -22,38 +60,31 @@ class StrongsTooltip(QFrame):
             QLabel {{
                 color: #e0e0e0;
                 background: transparent;
-                padding: 2px;
             }}
         """)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(4)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
         
         self.header_label = QLabel()
         self.header_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #888;")
         layout.addWidget(self.header_label)
         
         self.word_label = QLabel()
-        self.word_label.setStyleSheet("font-size: 26px; color: #ffcc00; margin-top: 2px;")
+        self.word_label.setStyleSheet("font-size: 28px; color: #ffcc00;")
         self.word_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.word_label)
         
         self.translit_label = QLabel()
-        self.translit_label.setStyleSheet("font-style: italic; color: #aaa; font-size: 14px;")
+        self.translit_label.setStyleSheet("font-style: italic; color: #aaa; font-size: 15px;")
         self.translit_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.translit_label)
         
-        # Separator line
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        line.setStyleSheet("background-color: #444;")
-        layout.addWidget(line)
-        
         self.def_label = QLabel()
         self.def_label.setWordWrap(True)
-        self.def_label.setStyleSheet("font-size: 14px; line-height: 1.3; color: #ddd;")
+        self.def_label.setStyleSheet("font-size: 14px; line-height: 1.4; color: #ddd;")
+        self.def_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.def_label)
 
     def show_entry(self, sn, entry, pos):
@@ -61,23 +92,28 @@ class StrongsTooltip(QFrame):
         self.word_label.setText(entry['word'])
         self.translit_label.setText(f"{{{entry['translit']}}}")
         
-        full_def = entry['description']
+        desc = entry['description']
         if entry['kjv_def']:
-            # Truncate KJV def for tooltip if too long
             kjv = entry['kjv_def']
-            if len(kjv) > 100:
-                kjv = kjv[:97] + "..."
-            full_def += f"\n\nKJV: {kjv}"
+            if len(kjv) > 120:
+                kjv = kjv[:117] + "..."
+            desc += f"<br><br><span style='color:#888;'>KJV: {kjv}</span>"
         
-        self.def_label.setText(full_def)
+        self.def_label.setText(desc)
         
-        # Ensure the window size is updated for the new content before showing
+        # Reset geometry to minimum first to force a clean growth
+        self.resize(self.width(), 50)
+        
+        # Move first
+        self.move(pos + QPoint(15, 15))
+        
+        # Show and then adjust
+        self.show()
         self.adjustSize()
         
-        # Prevent tooltip from going off-screen (basic check)
-        self.move(pos + QPoint(15, 15))
-        if not self.isVisible():
-            self.show()
+        # Safety check: if adjustSize failed to give us enough height
+        if self.height() < 100:
+            self.adjustSize()
 
 class StrongsVerboseDialog(QDialog):
     """Detailed window for Strong's entries and usage list."""
@@ -151,8 +187,18 @@ class StrongsVerboseDialog(QDialog):
         layout.addWidget(QLabel("<small><i>Double-click a reference to jump to it</i></small>"))
         
         self.usage_list = QListWidget()
-        for ref in usages:
-            self.usage_list.addItem(ref)
+        self.usage_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.usage_list.setItemDelegate(HTMLItemDelegate(self.usage_list))
+        for usage_data in usages:
+            ref = usage_data['ref']
+            snippet = usage_data['snippet']
+            item = QListWidgetItem(self.usage_list)
+            # Combine ref and snippet into a single string for display
+            # We'll use a data role to store the clean reference for jumping
+            item.setText(f"{ref} - {snippet}")
+            item.setData(Qt.UserRole, ref)
+            self.usage_list.addItem(item)
+            
         self.usage_list.itemDoubleClicked.connect(self._on_item_clicked)
         layout.addWidget(self.usage_list)
         
@@ -161,7 +207,7 @@ class StrongsVerboseDialog(QDialog):
         layout.addWidget(close_btn)
 
     def _on_item_clicked(self, item):
-        ref = item.text()
+        ref = item.data(Qt.UserRole)
         # Parse ref "Book Chap:Verse"
         parts = ref.rsplit(' ', 1)
         book = parts[0]

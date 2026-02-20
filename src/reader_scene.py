@@ -365,9 +365,10 @@ class ReaderScene(QGraphicsScene):
         doc = self.main_text_item.document()
         layout = doc.documentLayout()
         
-        # Hit test at top and bottom of view to find range of positions
-        start_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y), Qt.FuzzyHit)
-        end_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y + self.view_height), Qt.FuzzyHit)
+        # Hit test with a buffer to ensure we catch verses slightly off screen
+        buffer = 100
+        start_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, max(0, self.scroll_y - buffer)), Qt.FuzzyHit)
+        end_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y + self.view_height + buffer), Qt.FuzzyHit)
         
         if start_pos == -1: start_pos = 0
         if end_pos == -1: end_pos = doc.characterCount()
@@ -376,13 +377,35 @@ class ReaderScene(QGraphicsScene):
         start_ref = self._get_ref_from_pos(start_pos)
         end_ref = self._get_ref_from_pos(end_pos)
         
-        if not start_ref or not end_ref: return
+        if not start_ref:
+            # Fallback to very first verse if we're at the top
+            if self.loader.flat_verses:
+                start_ref = self.loader.flat_verses[0]['ref']
+            else:
+                return
+                
+        if not end_ref:
+            # Fallback to very last verse if we're at the bottom
+            if self.loader.flat_verses:
+                end_ref = self.loader.flat_verses[-1]['ref']
+            else:
+                return
         
         # Find indices in flat_verses
-        # (This could be optimized with binary search if flat_verses was large, 
-        # but it's okay for now since we have the ref strings)
+        # Using binary search for efficiency on the large list
+        import bisect
+        
+        # Create a temporary list of references for binary searching
+        ref_list = [v['ref'] for v in self.loader.flat_verses]
+        
+        # Since references aren't strictly alphabetical (Gen 1 comes before Gen 10), 
+        # but flat_verses IS sequential, we can just find them by index.
         start_idx = -1
         end_idx = -1
+        
+        # Quick linear scan for indices (usually small search space once in chapter)
+        # But we need them for the full bible. 
+        # Actually, let's just find them once.
         for i, v in enumerate(self.loader.flat_verses):
             if v['ref'] == start_ref: start_idx = i
             if v['ref'] == end_ref: end_idx = i
@@ -390,6 +413,9 @@ class ReaderScene(QGraphicsScene):
             
         if start_idx == -1: start_idx = 0
         if end_idx == -1: end_idx = len(self.loader.flat_verses) - 1
+        
+        # Ensure correct order
+        if start_idx > end_idx: start_idx, end_idx = end_idx, start_idx
         
         # Slightly more noticeable underline: Gray with 120 opacity and 1.5 width
         pen = QPen(QColor(120, 120, 120, 120), 1.5) 
@@ -919,14 +945,15 @@ class ReaderScene(QGraphicsScene):
             if sn_str:
                 # If we moved significantly or to a different word, reset timer
                 dist = (event.scenePos() - self.last_strongs_pos).manhattanLength()
-                if dist > 5:
+                if dist > 10: # Increased for better stability
                     self.strongs_hover_timer.stop()
                     self.strongs_tooltip.hide()
                     self.last_strongs_pos = event.scenePos()
                     self.strongs_hover_timer.start()
             else:
-                self.strongs_hover_timer.stop()
-                self.strongs_tooltip.hide()
+                if self.strongs_hover_timer.isActive() or self.strongs_tooltip.isVisible():
+                    self.strongs_hover_timer.stop()
+                    self.strongs_tooltip.hide()
 
         super().mouseMoveEvent(event)
 
