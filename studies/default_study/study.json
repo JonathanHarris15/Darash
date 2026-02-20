@@ -1,8 +1,24 @@
 {
     "symbols": {},
     "marks": [],
-    "notes": {},
-    "bookmarks": [],
+    "notes": {
+        "standalone_1771563982796": {
+            "title": "New Note 1",
+            "text": "",
+            "folder": ""
+        }
+    },
+    "bookmarks": [
+        {
+            "ref": "Genesis 1:14",
+            "book": "Genesis",
+            "chapter": "1",
+            "verse": "14",
+            "color": "#0078D7",
+            "title": ""
+        }
+    ],
     "arrows": {},
-    "note_folders": []
+    "note_folders": [],
+    "settings": {}
 }

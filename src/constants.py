@@ -62,7 +62,7 @@ BIBLE_SECTIONS = [
     {"name": "Torah", "books": ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy"], "color": QColor(255, 100, 100, 150)},
     {"name": "History", "books": ["Joshua", "Judges", "Ruth", "I Samuel", "II Samuel", "I Kings", "II Kings", "I Chronicles", "II Chronicles", "Ezra", "Nehemiah", "Esther"], "color": QColor(100, 255, 100, 150)},
     {"name": "Poetry", "books": ["Job", "Psalms", "Proverbs", "Ecclesiastes", "Song of Solomon"], "color": QColor(255, 255, 100, 150)},
-    {"name": "Projects", "books": ["Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi"], "color": QColor(100, 100, 255, 150)},
+    {"name": "Prophets", "books": ["Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi"], "color": QColor(100, 100, 255, 150)},
     {"name": "Gospels", "books": ["Matthew", "Mark", "Luke", "John", "Acts"], "color": QColor(255, 100, 255, 150)},
     {"name": "Letters", "books": ["Romans", "I Corinthians", "II Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians", "I Thessalonians", "II Thessalonians", "I Timothy", "II Timothy", "Titus", "Philemon", "Hebrews", "James", "I Peter", "II Peter", "I John", "II John", "III John", "Jude", "Revelation of John"], "color": QColor(100, 255, 255, 150)}
 ]

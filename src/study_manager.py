@@ -16,7 +16,8 @@ class StudyManager:
             "notes": {},    # key: {"title": title, "text": markdown_text, "folder": "path"}
             "note_folders": [], # List of folder paths
             "bookmarks": [], # List of {ref, color, book, chapter, verse}
-            "arrows": {}    # start_key: [{"end_dx": float, "end_dy": float, "color": str}]
+            "arrows": {},    # start_key: [{"end_dx": float, "end_dy": float, "color": str}]
+            "settings": {}   # Persistent appearance settings
         }
         self.undo_stack = [] # Stack of (symbols_dict, marks_list, arrows_dict) snapshots
         
@@ -62,6 +63,8 @@ class StudyManager:
                     self.data["arrows"] = {}
                 if "note_folders" not in self.data:
                     self.data["note_folders"] = []
+                if "settings" not in self.data:
+                    self.data["settings"] = {}
                 print(f"Loaded study: {name}")
             except Exception as e:
                 print(f"Error loading study {name}: {e}")

@@ -10,6 +10,7 @@ from src.search_bar import SearchBar
 from src.symbol_dialog import SymbolDialog
 from src.bookmark_ui import BookmarkSidebar
 from src.study_panel import StudyPanel
+from src.appearance_panel import AppearancePanel
 from src.constants import (
     HUD_BACKGROUND_COLOR, TEXT_COLOR, OVERLAY_BACKGROUND_COLOR,
     RESIZE_DEBOUNCE_INTERVAL, SEARCH_HIGHLIGHT_COLOR, SELECTION_COLOR
@@ -172,6 +173,7 @@ class ReaderWidget(QWidget):
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setFrameShape(QGraphicsView.NoFrame)
         self.view.setFocusPolicy(Qt.StrongFocus)
+        self.view.setMouseTracking(True)
         self.view.setStyleSheet("QGraphicsView { outline: none; border: none; background: transparent; }")
         
         # Set selection color on view palette
@@ -365,11 +367,15 @@ class MainWindow(QMainWindow):
         self.study_panel.setFixedWidth(250)
         self.main_layout.addWidget(self.study_panel, 0, 2, 2, 1)
         
+        # Appearance Dialog (Standalone window)
+        self.appearance_dialog = AppearancePanel(self.reader_widget.scene, self)
+        
         # Menu Bar
         self.setup_menu()
         
         # Connections
         self.nav_dock.jumpRequested.connect(self.reader_widget.scene.jump_to)
+        self.nav_dock.strongsToggled.connect(self.reader_widget.scene.set_strongs_enabled)
         self.bookmark_sidebar.bookmarkJumpRequested.connect(self.reader_widget.scene.jump_to)
         self.bookmark_sidebar.bookmarksChanged.connect(self.study_panel.refresh)
         self.reader_widget.scene.bookmarksUpdated.connect(self.bookmark_sidebar.refresh_bookmarks)
@@ -401,6 +407,11 @@ class MainWindow(QMainWindow):
         edit_menu = menubar.addMenu("&Edit")
         symbols_menu = menubar.addMenu("&Symbols")
         
+        appearance_act = QAction("Appearance Settings", self)
+        appearance_act.triggered.connect(self._show_appearance_settings)
+        edit_menu.addAction(appearance_act)
+
+        file_menu.addSeparator()
         new_study_act = QAction("New Study", self)
         new_study_act.triggered.connect(self._on_new_study)
         file_menu.addAction(new_study_act)
@@ -423,6 +434,7 @@ class MainWindow(QMainWindow):
         name, ok = QInputDialog.getText(self, "New Study", "Enter study name:")
         if ok and name:
             self.reader_widget.scene.study_manager.load_study(name)
+            self.reader_widget.scene.load_settings()
             self.reader_widget.scene.recalculate_layout(self.reader_widget.scene.last_width)
             self.reader_widget.scene._render_study_overlays()
             self.bookmark_sidebar.refresh_bookmarks()
@@ -440,6 +452,7 @@ class MainWindow(QMainWindow):
         if study_dir:
             name = os.path.basename(study_dir)
             self.reader_widget.scene.study_manager.load_study(name)
+            self.reader_widget.scene.load_settings()
             self.reader_widget.scene.recalculate_layout(self.reader_widget.scene.last_width)
             self.reader_widget.scene._render_study_overlays()
             self.bookmark_sidebar.refresh_bookmarks()
@@ -450,6 +463,11 @@ class MainWindow(QMainWindow):
         dialog = SymbolDialog(self.reader_widget.scene.symbol_manager, self)
         dialog.symbolsChanged.connect(self.reader_widget.scene._render_study_overlays)
         dialog.exec()
+
+    def _show_appearance_settings(self):
+        self.appearance_dialog.show()
+        self.appearance_dialog.raise_()
+        self.appearance_dialog.activateWindow()
 
     def _update_scrollbar_matches(self, count):
         scene = self.reader_widget.scene

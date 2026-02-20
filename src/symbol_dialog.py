@@ -93,57 +93,48 @@ class SymbolDialog(QDialog):
         self.lib_tree.clear()
         symbols = self.manager.list_symbols()
         
-        # Grouping logic
-        groups = {} # {group_name: [filenames]}
-        for s in symbols:
+        for s_file in sorted(symbols):
             # Skip if it's not an image file
-            if not s.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+            if not s_file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
                 continue
             
-            # Extract type: split by - or _
-            parts = s.replace('_', '-').split('-')
-            if len(parts) > 1:
-                group_name = parts[0].title()
-            else:
-                group_name = "General"
+            # Use the manager to get the display name
+            display_name = self.manager.get_symbol_name(s_file)
             
-            if group_name not in groups:
-                groups[group_name] = []
-            groups[group_name].append(s)
-            
-        for g_name in sorted(groups.keys()):
-            g_item = QTreeWidgetItem(self.lib_tree, [g_name])
-            g_item.setExpanded(True)
-            # Make group items look different
-            g_item.setFlags(g_item.flags() & ~Qt.ItemIsSelectable)
-            
-            for s_file in sorted(groups[g_name]):
-                display_name = os.path.splitext(s_file)[0]
-                # If name is "Group-Name", just show "Name"
-                if "-" in display_name or "_" in display_name:
-                    display_parts = display_name.replace('_', '-').split('-')
-                    if len(display_parts) > 1:
-                        display_name = " ".join(display_parts[1:])
-                
-                item = QTreeWidgetItem(g_item, [display_name])
-                path = self.manager.get_symbol_path(s_file)
-                item.setIcon(0, QIcon(path))
-                item.setData(0, Qt.UserRole, s_file)
+            # Migration logic (if name is missing, use the old 'group type' logic)
+            if s_file not in self.manager.config.get("names", {}):
+                parts = s_file.replace('_', '-').split('-')
+                if len(parts) > 1:
+                    display_name = parts[0].title()
+                else:
+                    display_name = os.path.splitext(s_file)[0]
+                # Store the migrated name
+                self.manager.config["names"][s_file] = display_name
+                self.manager.save_config()
+
+            item = QTreeWidgetItem(self.lib_tree, [display_name])
+            path = self.manager.get_symbol_path(s_file)
+            item.setIcon(0, QIcon(path))
+            item.setData(0, Qt.UserRole, s_file)
 
     def _refresh_bindings(self):
         for n, label in self.binding_labels.items():
             bound = self.manager.get_binding(n)
             if bound:
-                # Show without extension
-                label.setText(os.path.splitext(bound)[0])
+                # Show the display name from the manager
+                label.setText(self.manager.get_symbol_name(bound))
             else:
                 label.setText("None")
 
     def _add_to_library(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
         if path:
-            self.manager.add_symbol_to_library(path)
-            self._refresh_library()
+            from PySide6.QtWidgets import QInputDialog
+            default_name = os.path.splitext(os.path.basename(path))[0]
+            name, ok = QInputDialog.getText(self, "Symbol Name", "Enter a name for this symbol:", text=default_name)
+            if ok and name:
+                self.manager.add_symbol_to_library(path, name)
+                self._refresh_library()
 
     def _remove_from_library(self):
         current = self.lib_tree.currentItem()

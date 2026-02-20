@@ -17,6 +17,8 @@ from src.reader_utils import (
     get_ref_from_pos, get_word_idx_from_pos, get_text_rects, 
     get_word_offset_in_verse
 )
+from src.strongs_manager import StrongsManager
+from src.strongs_ui import StrongsTooltip, StrongsVerboseDialog
 from src.constants import (
     APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR,
     DEFAULT_FONT_FAMILY, VERSE_FONT_FAMILY, DEFAULT_FONT_SIZE, 
@@ -53,18 +55,35 @@ class ReaderScene(QGraphicsScene):
         self.target_scroll_y = 0.0
         self.font_size = DEFAULT_FONT_SIZE
         self.line_spacing = LINE_SPACING_DEFAULT
+        self.font_family = VERSE_FONT_FAMILY
+        self.verse_num_font_size = DEFAULT_FONT_SIZE - 4
+        self.side_margin = SIDE_MARGIN
+        
         self.scroll_sens = SCROLL_SENSITIVITY
         self.last_emitted_ref = ""
         
         self.loader = VerseLoader()
         self.study_manager = StudyManager()
         self.symbol_manager = SymbolManager()
+        self.strongs_manager = StrongsManager()
+        self.strongs_manager.index_usages(self.loader)
         self.pixmap_cache = {} # Cache for symbol pixmaps
         
         # Unified Text Item
         self.main_text_item = NoFocusTextItem()
+        self.main_text_item.setAcceptHoverEvents(True)
         self.main_text_item.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.addItem(self.main_text_item)
+        
+        # Strongs UI
+        self.strongs_enabled = False
+        self.strongs_tooltip = StrongsTooltip()
+        self.strongs_overlay_items = []
+        self.strongs_hover_timer = QTimer(self)
+        self.strongs_hover_timer.setSingleShot(True)
+        self.strongs_hover_timer.setInterval(500)
+        self.strongs_hover_timer.timeout.connect(self._on_strongs_hover_timeout)
+        self.last_strongs_pos = QPointF()
         
         # Popups
         self.mark_popup = MarkPopup()
@@ -94,15 +113,47 @@ class ReaderScene(QGraphicsScene):
         # Timer Management
         self._init_timers()
         
-        # Appearance Initialization
+        # Appearance Initialization (Load from study if available)
+        self.load_settings()
+        
         self._update_fonts()
-        self.text_color = TEXT_COLOR
-        self.ref_color = REFERENCE_COLOR
-        self.setBackgroundBrush(APP_BACKGROUND_COLOR)
+        self.text_color = QColor(self.study_manager.data["settings"].get("text_color", TEXT_COLOR.name()))
+        self.ref_color = QColor(self.study_manager.data["settings"].get("ref_color", REFERENCE_COLOR.name()))
+        bg_color = QColor(self.study_manager.data["settings"].get("bg_color", APP_BACKGROUND_COLOR.name()))
+        self.setBackgroundBrush(bg_color)
         
         self.last_width = 800
         self.view_height = 600
         self.total_height = 0
+
+    def load_settings(self):
+        """Loads appearance settings from study manager or defaults."""
+        settings = self.study_manager.data.get("settings", {})
+        self.font_size = settings.get("font_size", DEFAULT_FONT_SIZE)
+        self.line_spacing = settings.get("line_spacing", LINE_SPACING_DEFAULT)
+        self.font_family = settings.get("font_family", VERSE_FONT_FAMILY)
+        self.verse_num_font_size = settings.get("verse_num_size", self.font_size - 4)
+        self.side_margin = settings.get("side_margin", SIDE_MARGIN)
+        
+        # Targets for smooth transitions/delayed apply
+        self.target_font_size = self.font_size
+        self.target_line_spacing = self.line_spacing
+        self.target_font_family = self.font_family
+        self.target_verse_num_size = self.verse_num_font_size
+        self.target_side_margin = self.side_margin
+
+    def save_settings(self):
+        """Saves current appearance settings to study manager."""
+        settings = self.study_manager.data["settings"]
+        settings["font_size"] = self.font_size
+        settings["line_spacing"] = self.line_spacing
+        settings["font_family"] = self.font_family
+        settings["verse_num_size"] = self.verse_num_font_size
+        settings["side_margin"] = self.side_margin
+        settings["text_color"] = self.text_color.name()
+        settings["ref_color"] = self.ref_color.name()
+        settings["bg_color"] = self.backgroundBrush().color().name()
+        self.study_manager.save_study()
 
     def _init_timers(self):
         """Initializes all scene timers with their default settings."""
@@ -126,9 +177,10 @@ class ReaderScene(QGraphicsScene):
 
     def _update_fonts(self):
         """Updates the internal font objects based on current size settings."""
-        self.font = QFont(VERSE_FONT_FAMILY, self.font_size)
+        self.font = QFont(self.font_family, self.font_size)
         self.header_font = QFont(DEFAULT_FONT_FAMILY, HEADER_FONT_SIZE, QFont.Bold)
         self.chapter_font = QFont(DEFAULT_FONT_FAMILY, CHAPTER_FONT_SIZE, QFont.Bold)
+        self.verse_num_font = QFont(self.font_family, self.verse_num_font_size)
 
     def _is_rect_visible(self, r):
         # Slightly larger buffer to prevent flickering
@@ -211,7 +263,7 @@ class ReaderScene(QGraphicsScene):
         
         doc = self.main_text_item.document()
         doc.clear()
-        doc.setDocumentMargin(SIDE_MARGIN)
+        doc.setDocumentMargin(self.side_margin)
         
         doc.setTextWidth(width)
         self.main_text_item.setTextWidth(width)
@@ -240,6 +292,9 @@ class ReaderScene(QGraphicsScene):
         verse_char_fmt = QTextCharFormat()
         verse_char_fmt.setFont(self.font); verse_char_fmt.setForeground(self.text_color)
         
+        verse_num_char_fmt = QTextCharFormat()
+        verse_num_char_fmt.setFont(self.verse_num_font); verse_num_char_fmt.setForeground(self.ref_color)
+        
         for verse in self.loader.flat_verses:
             if verse['book'] != last_book:
                 cursor.insertBlock(header_fmt)
@@ -257,7 +312,13 @@ class ReaderScene(QGraphicsScene):
             cursor.setCharFormat(verse_char_fmt)
             self.verse_pos_map[verse['ref']] = cursor.position()
             self.pos_verse_map.append((cursor.position(), verse['ref']))
-            cursor.insertText(f"{verse['verse_num']}  {verse['text']}")
+            
+            # Separately format verse number
+            cursor.setCharFormat(verse_num_char_fmt)
+            cursor.insertText(f"{verse['verse_num']}  ")
+            # Then main text
+            cursor.setCharFormat(verse_char_fmt)
+            cursor.insertText(verse['text'])
 
         layout = doc.documentLayout()
         doc_height = layout.documentSize().height()
@@ -278,6 +339,90 @@ class ReaderScene(QGraphicsScene):
             if ref and ref != self.last_emitted_ref:
                 self.last_emitted_ref = ref
                 self.currentReferenceChanged.emit(ref)
+        
+        if self.strongs_enabled:
+            self._render_strongs_overlays()
+
+    def set_strongs_enabled(self, enabled: bool):
+        self.strongs_enabled = enabled
+        if not enabled:
+            self._clear_strongs_overlays()
+            self.strongs_tooltip.hide()
+        else:
+            self.render_verses()
+
+    def _clear_strongs_overlays(self):
+        for it in self.strongs_overlay_items:
+            if it.scene() == self:
+                self.removeItem(it)
+        self.strongs_overlay_items.clear()
+
+    def _render_strongs_overlays(self):
+        """Renders feint underlines for words with Strongs numbers in visible area."""
+        self._clear_strongs_overlays()
+        
+        # Find visible verses
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        
+        # Hit test at top and bottom of view to find range of positions
+        start_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y), Qt.FuzzyHit)
+        end_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y + self.view_height), Qt.FuzzyHit)
+        
+        if start_pos == -1: start_pos = 0
+        if end_pos == -1: end_pos = doc.characterCount()
+        
+        # Get refs for this range
+        start_ref = self._get_ref_from_pos(start_pos)
+        end_ref = self._get_ref_from_pos(end_pos)
+        
+        if not start_ref or not end_ref: return
+        
+        # Find indices in flat_verses
+        # (This could be optimized with binary search if flat_verses was large, 
+        # but it's okay for now since we have the ref strings)
+        start_idx = -1
+        end_idx = -1
+        for i, v in enumerate(self.loader.flat_verses):
+            if v['ref'] == start_ref: start_idx = i
+            if v['ref'] == end_ref: end_idx = i
+            if start_idx != -1 and end_idx != -1: break
+            
+        if start_idx == -1: start_idx = 0
+        if end_idx == -1: end_idx = len(self.loader.flat_verses) - 1
+        
+        # Slightly more noticeable underline: Gray with 120 opacity and 1.5 width
+        pen = QPen(QColor(120, 120, 120, 120), 1.5) 
+        
+        for i in range(start_idx, end_idx + 1):
+            verse = self.loader.flat_verses[i]
+            v_start = self.verse_pos_map[verse['ref']]
+            
+            for word_idx, token in enumerate(verse['tokens']):
+                if len(token) > 1: # Has Strongs
+                    start_pos_in_v = self._get_word_offset_in_verse(verse, word_idx)
+                    rects = self._get_text_rects(v_start + start_pos_in_v, len(token[0]))
+                    for r in rects:
+                        line = QGraphicsLineItem(r.left(), r.bottom() + 1, r.right(), r.bottom() + 1)
+                        line.setPen(pen)
+                        line.setZValue(-1)
+                        line.setAcceptedMouseButtons(Qt.NoButton)
+                        self.addItem(line)
+                        self.strongs_overlay_items.append(line)
+
+    def _get_strongs_at_pos(self, scene_pos):
+        pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(scene_pos), Qt.FuzzyHit)
+        if pos != -1:
+            ref = self._get_ref_from_pos(pos)
+            if ref:
+                verse_data = next((v for v in self.loader.flat_verses if v['ref'] == ref), None)
+                if verse_data:
+                    word_idx = self._get_word_idx_from_pos(verse_data, pos - self.verse_pos_map[ref])
+                    if word_idx != -1 and word_idx < len(verse_data['tokens']):
+                        token = verse_data['tokens'][word_idx]
+                        if len(token) > 1:
+                            return token[1], ref # Strongs number(s)
+        return None, None
 
     def _render_search_overlays(self):
         for it in self.search_overlay_items: self.removeItem(it)
@@ -690,12 +835,32 @@ class ReaderScene(QGraphicsScene):
             self._start_arrow_drawing()
             return
 
+        if key == Qt.Key_Q:
+            self._handle_strongs_lookup()
+            return
+
         if Qt.Key_1 <= key <= Qt.Key_9:
             self._apply_symbol_at_mouse(str(key - Qt.Key_0))
         elif event.text().isdigit() and event.text() != '0':
             self._apply_symbol_at_mouse(event.text())
             
         super().keyPressEvent(event)
+
+    def _handle_strongs_lookup(self):
+        """Handles verbose Strongs lookup when 'Q' is pressed."""
+        view = self.views()[0]
+        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        sn_str, _ = self._get_strongs_at_pos(mouse_pos)
+        if sn_str:
+            self.strongs_tooltip.hide()
+            # Handle multiple strongs (take first)
+            sn = sn_str.split()[0]
+            entry = self.strongs_manager.get_entry(sn)
+            if entry:
+                usages = self.strongs_manager.get_usages(sn)
+                dialog = StrongsVerboseDialog(sn, entry, usages, view)
+                dialog.jumpRequested.connect(self.jump_to)
+                dialog.show()
 
     def _handle_delete_key(self):
         """Deletes study items under the mouse cursor."""
@@ -747,7 +912,36 @@ class ReaderScene(QGraphicsScene):
     def mouseMoveEvent(self, event):
         if self.is_drawing_arrow:
             self._draw_temp_arrow(event.scenePos())
+        
+        # Strongs Hover logic
+        if self.strongs_enabled:
+            sn_str, _ = self._get_strongs_at_pos(event.scenePos())
+            if sn_str:
+                # If we moved significantly or to a different word, reset timer
+                dist = (event.scenePos() - self.last_strongs_pos).manhattanLength()
+                if dist > 5:
+                    self.strongs_hover_timer.stop()
+                    self.strongs_tooltip.hide()
+                    self.last_strongs_pos = event.scenePos()
+                    self.strongs_hover_timer.start()
+            else:
+                self.strongs_hover_timer.stop()
+                self.strongs_tooltip.hide()
+
         super().mouseMoveEvent(event)
+
+    def _on_strongs_hover_timeout(self):
+        """Called when mouse has hovered over a Strong's word for 500ms."""
+        if not self.strongs_enabled: return
+        
+        sn_str, _ = self._get_strongs_at_pos(self.last_strongs_pos)
+        if sn_str:
+            sn = sn_str.split()[0]
+            entry = self.strongs_manager.get_entry(sn)
+            if entry:
+                view = self.views()[0]
+                screen_pos = view.viewport().mapToGlobal(view.mapFromScene(self.last_strongs_pos))
+                self.strongs_tooltip.show_entry(sn, entry, screen_pos)
 
     def _draw_temp_arrow(self, end_pos):
         """Renders a temporary arrow following the mouse."""
@@ -810,8 +1004,14 @@ class ReaderScene(QGraphicsScene):
         event.accept()
 
     def apply_layout_changes(self) -> None:
-        self.font_size, self.line_spacing = self.target_font_size, self.target_line_spacing
+        self.font_size = self.target_font_size
+        self.line_spacing = self.target_line_spacing
+        self.font_family = self.target_font_family
+        self.verse_num_font_size = self.target_verse_num_size
+        self.side_margin = self.target_side_margin
+        
         self._update_fonts()
+        self.save_settings()
         self.recalculate_layout(self.last_width)
         super().setSceneRect(QRectF(0, self.scroll_y, self.last_width, self.view_height))
         self._render_study_overlays()

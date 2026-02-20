@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from typing import List
 
@@ -9,6 +9,7 @@ class NavigationDock(QWidget):
     Styled to match the Study Panel.
     """
     jumpRequested = Signal(str, str, str) # book, chapter, verse
+    strongsToggled = Signal(bool)
 
     def __init__(self, loader, parent=None):
         """
@@ -23,9 +24,40 @@ class NavigationDock(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
+        # Header with Title and Strongs Toggle
+        header_layout = QHBoxLayout()
         title = QLabel("BIBLE NAVIGATION")
-        title.setStyleSheet("font-weight: bold; color: #aaa; margin-bottom: 5px;")
-        layout.addWidget(title)
+        title.setStyleSheet("font-weight: bold; color: #aaa;")
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        
+        self.btn_strongs = QPushButton("א") # Aleph
+        self.btn_strongs.setCheckable(True)
+        self.btn_strongs.setToolTip("Toggle Strong's Underlines")
+        self.btn_strongs.setFixedSize(28, 28)
+        self.btn_strongs.setStyleSheet("""
+            QPushButton {
+                background-color: #333;
+                color: #888;
+                border: 1px solid #444;
+                border-radius: 4px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #444;
+                color: #bbb;
+            }
+            QPushButton:checked {
+                background-color: #2a2a25;
+                color: #ffcc00;
+                border-color: #665500;
+            }
+        """)
+        self.btn_strongs.toggled.connect(self.strongsToggled.emit)
+        header_layout.addWidget(self.btn_strongs)
+        
+        layout.addLayout(header_layout)
         
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)

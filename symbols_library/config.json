@@ -10,5 +10,14 @@
         "8": null,
         "9": null
     },
-    "opacity": 0.5
+    "opacity": 0.5,
+    "names": {
+        "Christ-Symbol.png": "Christ",
+        "Church-Symbol.png": "Church",
+        "Covenant-Symbol.png": "Covenant",
+        "Faith-Symbol.png": "Faith",
+        "Father-Symbol.png": "Father",
+        "Ghost-Symbol.png": "Ghost",
+        "Peace-Symbol.png": "Peace"
+    }
 }

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem, 
-    QLabel, QMenu, QColorDialog, QInputDialog, QMessageBox, QStyle
+    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, 
+    QLabel, QMenu, QColorDialog, QInputDialog, QMessageBox, QStyle,
+    QPushButton
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
@@ -26,6 +27,7 @@ class StudyPanel(QWidget):
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(15)
+        self.tree.setSelectionMode(QTreeWidget.ExtendedSelection)
         self.tree.setStyleSheet("""
             QTreeWidget {
                 background-color: #222;
@@ -37,6 +39,10 @@ class StudyPanel(QWidget):
             }
             QTreeWidget::item:hover {
                 background-color: #333;
+            }
+            QTreeWidget::item:selected {
+                background-color: #444;
+                color: white;
             }
         """)
         layout.addWidget(self.tree)
@@ -52,6 +58,44 @@ class StudyPanel(QWidget):
         self.tree.itemDoubleClicked.connect(self._on_item_clicked)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_context_menu)
+        
+        # Bottom Action Menu
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(0, 5, 0, 0)
+        
+        self.add_note_btn = QPushButton()
+        self.add_note_btn.setIcon(self.style().standardIcon(QStyle.SP_FileIcon))
+        self.add_note_btn.setToolTip("New Standalone Note")
+        self.add_note_btn.clicked.connect(lambda: self._add_standalone_note(""))
+        
+        self.add_outline_btn = QPushButton()
+        self.add_outline_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.add_outline_btn.setToolTip("New Outline (Coming Soon)")
+        # Placeholder for future outline logic
+        self.add_outline_btn.clicked.connect(lambda: QMessageBox.information(self, "Coming Soon", "The Outline feature is currently under development."))
+        
+        # Style the buttons
+        btn_style = """
+            QPushButton {
+                background-color: #333;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: #444;
+                border-color: #555;
+            }
+            QPushButton:pressed {
+                background-color: #222;
+            }
+        """
+        self.add_note_btn.setStyleSheet(btn_style)
+        self.add_outline_btn.setStyleSheet(btn_style)
+        
+        actions_layout.addWidget(self.add_note_btn)
+        actions_layout.addWidget(self.add_outline_btn)
+        layout.addLayout(actions_layout)
         
         self.refresh()
 
@@ -172,32 +216,32 @@ class StudyPanel(QWidget):
         symbols_root = QTreeWidgetItem(self.tree, ["Symbols"])
         symbols_root.setExpanded(True)
         
-        symbol_groups = {} # {type_name: [(key, s_name)]}
-        for key, s_name in self.study_manager.data.get("symbols", {}).items():
-            clean_name = os.path.splitext(s_name)[0]
-            parts = clean_name.replace('_', '-').split('-')
-            type_name = parts[0].title() if len(parts) > 1 else "General"
+        symbol_groups = {} # {display_name: [(key, s_file)]}
+        for key, s_file in self.study_manager.data.get("symbols", {}).items():
+            display_name = self.symbol_manager.get_symbol_name(s_file)
+            if display_name not in symbol_groups:
+                symbol_groups[display_name] = []
+            symbol_groups[display_name].append((key, s_file))
             
-            if type_name not in symbol_groups:
-                symbol_groups[type_name] = []
-            symbol_groups[type_name].append((key, s_name, clean_name))
-
-        for type_name in sorted(symbol_groups.keys()):
-            type_root = QTreeWidgetItem(symbols_root, [type_name])
-            for key, s_name, clean_name in sorted(symbol_groups[type_name], key=lambda x: x[2]):
+        for display_name in sorted(symbol_groups.keys()):
+            group_item = QTreeWidgetItem(symbols_root, [display_name])
+            group_item.setData(0, Qt.UserRole, "symbol_type_group")
+            group_item.setExpanded(True)
+            
+            # Sort by verse reference
+            def sort_ref(item_tuple):
+                k = item_tuple[0].split('|')
+                # book, chap, verse, word
+                return (k[0], int(k[1]), int(k[2]), int(k[3]))
+                
+            for key, s_file in sorted(symbol_groups[display_name], key=sort_ref):
                 parts = key.split('|')
                 ref = f"{parts[0]} {parts[1]}:{parts[2]}"
                 
-                # Further refine display name (strip group prefix if it exists)
-                display_name = clean_name
-                d_parts = display_name.replace('_', '-').split('-')
-                if len(d_parts) > 1:
-                    display_name = " ".join(d_parts[1:])
-                
-                item = QTreeWidgetItem(type_root, [f"{ref} ({display_name})"])
+                item = QTreeWidgetItem(group_item, [ref])
                 item.setData(0, Qt.UserRole, "symbol")
                 item.setData(0, Qt.UserRole + 1, key)
-                item.setData(0, Qt.UserRole + 2, s_name)
+                item.setData(0, Qt.UserRole + 2, s_file)
             
         # 3. Notes
         notes_root = QTreeWidgetItem(self.tree, ["Notes"])
@@ -242,7 +286,16 @@ class StudyPanel(QWidget):
                 # Attached: Show Ref - Title or just Ref
                 parts = key.split('|')
                 ref = f"{parts[0]} {parts[1]}:{parts[2]}"
-                label = f"{ref} - {title}" if title else ref
+                
+                if title:
+                    # Clean up redundant prefixes (common for Symbol List Notes)
+                    # If title already contains the reference, don't repeat it
+                    if ref in title:
+                        label = title
+                    else:
+                        label = f"{ref} - {title}"
+                else:
+                    label = ref
             
             item = QTreeWidgetItem(parent_item, [label])
             item.setData(0, Qt.UserRole, "note")
@@ -304,13 +357,111 @@ class StudyPanel(QWidget):
             parts = key.split('|')
             self.jumpRequested.emit(parts[0], parts[1], parts[2])
 
-    def _on_context_menu(self, pos):
-        item = self.tree.itemAt(pos)
-        if not item: return
+    def _create_symbol_list_note(self, symbol_items):
+        if not symbol_items: return
         
-        itype = item.data(0, Qt.UserRole)
+        # Collect symbol names and references
+        names = set()
+        refs = [] # List of (book, chap, verse)
+        
+        for item in symbol_items:
+            key = item.data(0, Qt.UserRole + 1)
+            s_file = item.data(0, Qt.UserRole + 2)
+            names.add(self.symbol_manager.get_symbol_name(s_file))
+            
+            parts = key.split('|')
+            refs.append({
+                "book": parts[0],
+                "chapter": int(parts[1]),
+                "verse": int(parts[2]),
+                "word_idx": int(parts[3]),
+                "ref_str": f"{parts[0]} {parts[1]}:{parts[2]}"
+            })
+            
+        # Sort references
+        def sort_key(r):
+            # We don't have book order here easily, so we just group by book
+            return (r['book'], r['chapter'], r['verse'], r['word_idx'])
+        
+        sorted_refs = sorted(refs, key=sort_key)
+        
+        # Calculate Range String
+        if len(sorted_refs) == 1:
+            range_str = sorted_refs[0]['ref_str']
+        else:
+            first = sorted_refs[0]
+            last = sorted_refs[-1]
+            if first['book'] == last['book'] and first['chapter'] == last['chapter']:
+                if first['verse'] == last['verse']:
+                    range_str = first['ref_str'] # Genesis 1:1 instead of 1:1-1
+                else:
+                    range_str = f"{first['book']} {first['chapter']}:{first['verse']}-{last['verse']}"
+            else:
+                range_str = f"{first['ref_str']} - {last['ref_str']}"
+
+        # Determine Title
+        if len(names) == 1:
+            title = f"{list(names)[0]} - {range_str}"
+        else:
+            title = f"Symbol List - {range_str}"
+            
+        # Create Markdown Content
+        # No title in content as it's redundant with the title metadata
+        content = "## Symbol List\n"
+        for r in sorted_refs:
+            content += f"- {r['ref_str']} - \n"
+            
+        # Create the note attached to the first symbol's word position
+        # This makes it jumpable from the Study Overview and Reader
+        first = sorted_refs[0]
+        note_key = f"{first['book']}|{first['chapter']}|{first['verse']}|{first['word_idx']}"
+        self.study_manager.add_note(first['book'], str(first['chapter']), str(first['verse']), first['word_idx'], 
+                                   content, title)
+        
+        self.refresh()
+        self._open_note(note_key)
+
+    def _on_context_menu(self, pos):
+        selected_items = self.tree.selectedItems()
+        if not selected_items: return
+        
         menu = QMenu(self)
         menu.setStyleSheet("QMenu { background-color: #333; color: white; } QMenu::item:selected { background-color: #555; }")
+
+        # Handle Multiple Selection Context Menu
+        if len(selected_items) > 1:
+            # Check for symbol list note possibility
+            symbol_items = []
+            for item in selected_items:
+                itype = item.data(0, Qt.UserRole)
+                if itype == "symbol":
+                    symbol_items.append(item)
+                elif itype == "symbol_type_group":
+                    for i in range(item.childCount()):
+                        symbol_items.append(item.child(i))
+            
+            # If everything selected (directly or via group root) is a symbol
+            # and we have at least one symbol...
+            if symbol_items and len(selected_items) > 1:
+                # We need to be careful: if the user selected a group root AND its children, 
+                # we don't want to duplicate symbols in the list.
+                unique_symbol_items = list(set(symbol_items))
+                
+                list_note_act = QAction("Create Symbol List Note", self)
+                list_note_act.triggered.connect(lambda: self._create_symbol_list_note(unique_symbol_items))
+                menu.addAction(list_note_act)
+            
+            # Bulk Delete Action
+            del_act = QAction(f"Delete Selected ({len(selected_items)})", self)
+            del_act.triggered.connect(self._delete_selected_items)
+            menu.addAction(del_act)
+            
+            menu.exec(self.tree.mapToGlobal(pos))
+            return
+
+        # Handle Single Selection (Existing Logic)
+        item = selected_items[0]
+        itype = item.data(0, Qt.UserRole)
         
         if itype == "notes_header":
             add_note_act = QAction("New Standalone Note", self)
@@ -410,24 +561,7 @@ class StudyPanel(QWidget):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
-            item = self.tree.currentItem()
-            if not item: return
-            
-            itype = item.data(0, Qt.UserRole)
-            if itype == "mark":
-                self._delete_mark(item.data(0, Qt.UserRole + 2))
-            elif itype == "mark_group":
-                self._delete_group(item.data(0, Qt.UserRole + 1))
-            elif itype == "symbol":
-                self._delete_symbol(item.data(0, Qt.UserRole + 1))
-            elif itype == "note":
-                self._delete_note(item.data(0, Qt.UserRole + 1))
-            elif itype == "note_folder":
-                self._delete_folder(item.data(0, Qt.UserRole + 1))
-            elif itype == "arrow":
-                self._delete_arrow(item.data(0, Qt.UserRole + 1), item.data(0, Qt.UserRole + 2))
-            elif itype == "bookmark":
-                self._delete_bookmark(item.data(0, Qt.UserRole + 1)['ref'])
+            self._delete_selected_items()
         else:
             super().keyPressEvent(event)
 
@@ -548,3 +682,93 @@ class StudyPanel(QWidget):
             ref = f"{parts[0]} {parts[1]}:{parts[2]}"
             self.jumpRequested.emit(parts[0], parts[1], parts[2])
             self.noteOpenRequested.emit(key, ref)
+
+    def _delete_selected_items(self):
+        selected_items = self.tree.selectedItems()
+        if not selected_items: return
+        
+        # Confirmation for multiple items or folders
+        if len(selected_items) > 5 or any(i.data(0, Qt.UserRole) in ["note_folder", "symbol_type_group"] for i in selected_items):
+            res = QMessageBox.question(self, "Confirm Bulk Deletion", 
+                                      f"Are you sure you want to delete {len(selected_items)} selected items?",
+                                      QMessageBox.Yes | QMessageBox.No)
+            if res != QMessageBox.Yes:
+                return
+
+        self.study_manager.save_state()
+        
+        # Categorize items for bulk deletion
+        to_del = {
+            "marks": [], # indices
+            "symbols": [], # keys
+            "notes": [], # keys
+            "folders": [], # paths
+            "arrows": [], # (key, idx)
+            "bookmarks": [] # refs
+        }
+        
+        # Expand any groups to their children
+        expanded_selected = []
+        for item in selected_items:
+            itype = item.data(0, Qt.UserRole)
+            if itype == "symbol_type_group":
+                for i in range(item.childCount()):
+                    expanded_selected.append(item.child(i))
+            else:
+                expanded_selected.append(item)
+
+        for item in expanded_selected:
+            itype = item.data(0, Qt.UserRole)
+            if itype == "mark":
+                to_del["marks"].append(item.data(0, Qt.UserRole + 2))
+            elif itype == "mark_group":
+                to_del["marks"].extend(item.data(0, Qt.UserRole + 1))
+            elif itype == "symbol":
+                to_del["symbols"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "note":
+                to_del["notes"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "note_folder":
+                to_del["folders"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "arrow":
+                to_del["arrows"].append((item.data(0, Qt.UserRole + 1), item.data(0, Qt.UserRole + 2)))
+            elif itype == "bookmark":
+                to_del["bookmarks"].append(item.data(0, Qt.UserRole + 1)['ref'])
+        
+        # Execute Deletions
+        # Marks (reverse sort indices to pop correctly)
+        if to_del["marks"]:
+            for idx in sorted(list(set(to_del["marks"])), reverse=True):
+                self.study_manager.data["marks"].pop(idx)
+        
+        # Symbols
+        for key in to_del["symbols"]:
+            if key in self.study_manager.data["symbols"]:
+                del self.study_manager.data["symbols"][key]
+        
+        # Notes
+        for key in to_del["notes"]:
+            self.study_manager.delete_note(key)
+        
+        # Folders
+        for path in to_del["folders"]:
+            self.study_manager.delete_folder(path)
+        
+        # Arrows
+        arrow_map = {}
+        for key, idx in to_del["arrows"]:
+            if key not in arrow_map: arrow_map[key] = []
+            arrow_map[key].append(idx)
+        for key, indices in arrow_map.items():
+            if key in self.study_manager.data["arrows"]:
+                for idx in sorted(list(set(indices)), reverse=True):
+                    self.study_manager.data["arrows"][key].pop(idx)
+                if not self.study_manager.data["arrows"][key]:
+                    del self.study_manager.data["arrows"][key]
+        
+        # Bookmarks
+        for ref in to_del["bookmarks"]:
+            self.study_manager.delete_bookmark(ref)
+            
+        self.study_manager.save_study()
+        self.dataChanged.emit()
+        self.refresh()
