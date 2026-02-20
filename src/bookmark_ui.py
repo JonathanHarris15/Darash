@@ -38,6 +38,8 @@ class BookmarkWidget(QFrame):
         self.anim = QPropertyAnimation(self, b"pos")
         self.anim.setDuration(200)
         self.anim.setEasingCurve(QEasingCurve.OutCubic)
+        
+        self._menu_active = False
 
     def _get_display_text(self):
         title = self.data.get('title', '')
@@ -67,6 +69,10 @@ class BookmarkWidget(QFrame):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
+        if self._menu_active:
+            super().leaveEvent(event)
+            return
+            
         self.label.hide()
         self.anim.stop()
         self.anim.setEndValue(QPoint(-150, self.y()))
@@ -81,6 +87,15 @@ class BookmarkWidget(QFrame):
         super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
+        # Ensure sidebar is raised
+        p = self.parent()
+        while p:
+            if isinstance(p, QScrollArea):
+                p.raise_()
+                break
+            p = p.parent()
+
+        self._menu_active = True
         menu = QMenu(self)
         menu.setStyleSheet("QMenu { background-color: #333; color: white; border: 1px solid #555; } QMenu::item:selected { background-color: #555; }")
         
@@ -97,6 +112,11 @@ class BookmarkWidget(QFrame):
         menu.addAction(delete_act)
         
         menu.exec(pos)
+        self._menu_active = False
+        
+        # Trigger leave logic if mouse is no longer over the widget
+        if not self.underMouse():
+            self.leaveEvent(None)
 
     def _set_title(self):
         title, ok = QInputDialog.getText(self, "Bookmark Title", "Enter a title for this bookmark:", text=self.data.get('title', ''))
@@ -168,9 +188,17 @@ class BookmarkSidebar(QScrollArea):
 
     def enterEvent(self, event):
         self.setFixedWidth(160)
+        self.raise_()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
+        # Don't shrink if a child bookmark has an active menu
+        from src.bookmark_ui import BookmarkWidget
+        for bw in self.findChildren(BookmarkWidget):
+            if bw._menu_active:
+                super().leaveEvent(event)
+                return
+
         self.setFixedWidth(15)
         super().leaveEvent(event)
 

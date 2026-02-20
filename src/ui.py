@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QWidget, QScrollBar, QStyle, QStyleOptionSlider, QLabel, QMenuBar, QMenu
 )
 from PySide6.QtGui import QPainter, QColor, QAction, QFont
-from PySide6.QtCore import Qt, QTimer, QRect, Signal
+from PySide6.QtCore import Qt, QTimer, QRect, Signal, QPoint
 from src.reader_scene import ReaderScene
 from src.navigation import NavigationDock
 from src.search_bar import SearchBar
@@ -22,14 +22,37 @@ class ClickableLabel(QLabel):
             self.clicked.emit()
         super().mousePressEvent(event)
 
+    def enterEvent(self, event):
+        self.setStyleSheet(self.styleSheet().replace("background-color: rgba(30, 30, 30, 200)", "background-color: rgba(60, 60, 60, 220)"))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.setStyleSheet(self.styleSheet().replace("background-color: rgba(60, 60, 60, 220)", "background-color: rgba(30, 30, 30, 200)"))
+        super().leaveEvent(event)
+
 class JumpScrollBar(QScrollBar):
     """
     A custom vertical scrollbar that allows clicking on the track to jump 
-    directly to a position and renders search match markers.
+    directly to a position and renders search match markers and bible sections.
     """
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
         self.match_y_positions = [] # Normalized 0.0 to 1.0
+        self.sections = [] # List of {y_start, y_end, color, name} (normalized)
+        self.is_hovered = False
+        self.setMouseTracking(True)
+        
+        # Custom Tooltip that follows mouse smoothly
+        self.floating_label = QLabel(None, Qt.ToolTip | Qt.WindowTransparentForInput)
+        self.floating_label.setStyleSheet("""
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+        """)
+        self.floating_label.hide()
 
     def set_matches(self, y_positions, total_height):
         if total_height > 0:
@@ -38,20 +61,79 @@ class JumpScrollBar(QScrollBar):
             self.match_y_positions = []
         self.update()
 
+    def set_sections(self, section_data, total_height):
+        """Sets the normalized ranges for bible sections."""
+        self.sections = []
+        if total_height > 0:
+            for s in section_data:
+                self.sections.append({
+                    "y_start": s["y_start"] / total_height,
+                    "y_end": s["y_end"] / total_height,
+                    "color": s["color"],
+                    "name": s["name"]
+                })
+        self.update()
+
+    def enterEvent(self, event):
+        self.is_hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.is_hovered = False
+        self.floating_label.hide()
+        self.update()
+        super().leaveEvent(event)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        groove_rect = self.style().subControlRect(QStyle.CC_ScrollBar, opt, QStyle.SC_ScrollBarGroove, self)
+        if groove_rect.isEmpty():
+            groove_rect = self.rect()
+            
+        if groove_rect.contains(event.pos()):
+            rel_y = (event.pos().y() - groove_rect.y()) / max(1, groove_rect.height())
+            for s in self.sections:
+                if s["y_start"] <= rel_y <= s["y_end"]:
+                    self.floating_label.setText(s["name"])
+                    self.floating_label.adjustSize()
+                    # Offset to the left of the scrollbar
+                    self.floating_label.move(event.globalPos().x() - self.floating_label.width() - 20, 
+                                           event.globalPos().y() - self.floating_label.height() // 2)
+                    self.floating_label.show()
+                    return
+        self.floating_label.hide()
+
     def paintEvent(self, event):
         super().paintEvent(event)
-        if not self.match_y_positions:
-            return
-
+        
         painter = QPainter(self)
         opt = QStyleOptionSlider()
         self.initStyleOption(opt)
         groove_rect = self.style().subControlRect(QStyle.CC_ScrollBar, opt, QStyle.SC_ScrollBarGroove, self)
+        if groove_rect.isEmpty():
+            groove_rect = self.rect()
         
-        painter.setPen(SEARCH_HIGHLIGHT_COLOR)
-        for rel_y in self.match_y_positions:
-            y = groove_rect.y() + (rel_y * groove_rect.height())
-            painter.drawLine(groove_rect.left(), int(y), groove_rect.right(), int(y))
+        # 1. Paint Sections (Only when hovering)
+        if self.is_hovered:
+            for s in self.sections:
+                y_start = groove_rect.y() + (s["y_start"] * groove_rect.height())
+                
+                from PySide6.QtGui import QPen
+                color = QColor(s["color"])
+                color.setAlpha(255) 
+                painter.setPen(QPen(color, 2))
+                painter.drawLine(groove_rect.left(), int(y_start), groove_rect.right(), int(y_start))
+
+        # 2. Paint Search Matches (Always visible)
+        if self.match_y_positions:
+            painter.setPen(SEARCH_HIGHLIGHT_COLOR)
+            for rel_y in self.match_y_positions:
+                y = groove_rect.y() + (rel_y * groove_rect.height())
+                painter.drawLine(groove_rect.left(), int(y), groove_rect.right(), int(y))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -105,7 +187,7 @@ class ReaderWidget(QWidget):
         self.ref_label = ClickableLabel(self.view)
         self.ref_label.setCursor(Qt.PointingHandCursor)
         self.ref_label.setToolTip("Click to Bookmark")
-        self.ref_label.setStyleSheet(f"background-color: {HUD_BACKGROUND_COLOR}; color: {TEXT_COLOR.name()}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
+        self.ref_label.setStyleSheet(f"background-color: rgba(30, 30, 30, 200); color: {TEXT_COLOR.name()}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
         self.ref_label.hide()
         
         # --- Professional Loading Overlay ---
@@ -204,9 +286,6 @@ class ReaderWidget(QWidget):
     def _display_overlay(self):
         self.overlay.resize(self.view.size())
         self.overlay.show()
-        # Process events to ensure overlay is painted before layout blocks the thread
-        from PySide6.QtWidgets import QApplication
-        QApplication.processEvents()
 
     def hide_loading(self) -> None:
         self.overlay.hide()
@@ -298,7 +377,7 @@ class MainWindow(QMainWindow):
         
         self.study_panel.jumpRequested.connect(self.reader_widget.scene.jump_to)
         self.study_panel.noteOpenRequested.connect(self.reader_widget.scene.open_note_by_key)
-        self.study_panel.dataChanged.connect(self.reader_widget.scene.render_verses)
+        self.study_panel.dataChanged.connect(self.reader_widget.scene._render_study_overlays)
         self.study_panel.dataChanged.connect(self.bookmark_sidebar.refresh_bookmarks)
         self.reader_widget.scene.studyDataChanged.connect(self.study_panel.refresh)
         
@@ -310,6 +389,7 @@ class MainWindow(QMainWindow):
         
         self.reader_widget.scene.searchStatusUpdated.connect(self.search_bar.set_results_status)
         self.reader_widget.scene.searchStatusUpdated.connect(self._update_scrollbar_matches_v2)
+        self.reader_widget.scene.sectionsUpdated.connect(self.reader_widget.scrollbar.set_sections)
 
     def _update_scrollbar_matches_v2(self, current, total):
         scene = self.reader_widget.scene
@@ -343,7 +423,8 @@ class MainWindow(QMainWindow):
         name, ok = QInputDialog.getText(self, "New Study", "Enter study name:")
         if ok and name:
             self.reader_widget.scene.study_manager.load_study(name)
-            self.reader_widget.scene.render_verses()
+            self.reader_widget.scene.recalculate_layout(self.reader_widget.scene.last_width)
+            self.reader_widget.scene._render_study_overlays()
             self.bookmark_sidebar.refresh_bookmarks()
             self.study_panel.refresh()
             self.setWindowTitle(f"Jehu Reader - {name}")
@@ -359,14 +440,15 @@ class MainWindow(QMainWindow):
         if study_dir:
             name = os.path.basename(study_dir)
             self.reader_widget.scene.study_manager.load_study(name)
-            self.reader_widget.scene.render_verses()
+            self.reader_widget.scene.recalculate_layout(self.reader_widget.scene.last_width)
+            self.reader_widget.scene._render_study_overlays()
             self.bookmark_sidebar.refresh_bookmarks()
             self.study_panel.refresh()
             self.setWindowTitle(f"Jehu Reader - {name}")
 
     def _open_symbols_dialog(self):
         dialog = SymbolDialog(self.reader_widget.scene.symbol_manager, self)
-        dialog.symbolsChanged.connect(self.reader_widget.scene.render_verses)
+        dialog.symbolsChanged.connect(self.reader_widget.scene._render_study_overlays)
         dialog.exec()
 
     def _update_scrollbar_matches(self, count):

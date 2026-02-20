@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QTextEdit, QHBoxLayout, 
-    QPushButton, QLabel, QTabWidget, QTextBrowser
+    QPushButton, QLabel, QTabWidget, QTextBrowser, QLineEdit
 )
 from PySide6.QtCore import Qt, Signal, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -14,7 +14,7 @@ class NoteEditor(QDialog):
     jumpRequested = Signal(str, str, str) # book, chapter, verse
     DELETE_CODE = 10
 
-    def __init__(self, initial_text="", ref="", parent=None):
+    def __init__(self, initial_text="", ref="", parent=None, initial_title=""):
         super().__init__(parent)
         self.setWindowTitle(f"Note - {ref}")
         self.resize(600, 500)
@@ -22,10 +22,24 @@ class NoteEditor(QDialog):
         self.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setModal(False)
         
+        # Local storage to ensure data persists after widgets are potentially gone
+        self.saved_text = initial_text
+        self.saved_title = initial_title
+        
         layout = QVBoxLayout(self)
         self.label = QLabel(f"Note for: {ref}")
         self.label.setStyleSheet("font-weight: bold; color: #ddd;")
         layout.addWidget(self.label)
+
+        # Title Field
+        title_layout = QHBoxLayout()
+        title_layout.addWidget(QLabel("Title:"))
+        self.title_input = QLineEdit()
+        self.title_input.setText(initial_title)
+        self.title_input.setPlaceholderText("Enter note title...")
+        self.title_input.setStyleSheet("background-color: #222; color: #eee; border: 1px solid #444; padding: 4px;")
+        title_layout.addWidget(self.title_input)
+        layout.addLayout(title_layout)
 
         self.tabs = QTabWidget()
         
@@ -56,7 +70,7 @@ class NoteEditor(QDialog):
         self.btn_delete = QPushButton("Delete")
         self.btn_delete.setStyleSheet("color: #ff6666;")
         
-        self.btn_save.clicked.connect(self.accept)
+        self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_delete.clicked.connect(lambda: self.done(self.DELETE_CODE))
         
@@ -71,9 +85,18 @@ class NoteEditor(QDialog):
         if initial_text.strip():
             self.tabs.setCurrentIndex(1)
 
+    def _on_save_clicked(self):
+        # Capture data before closing
+        self.saved_text = self.editor.toPlainText()
+        self.saved_title = self.title_input.text().strip()
+        self.accept()
+
     def _update_preview(self):
         if self.tabs.currentIndex() == 1:
-            self.preview.setMarkdown(self.editor.toPlainText().replace("bible://", "bible:"))
+            title = self.title_input.text().strip()
+            markdown_content = self.editor.toPlainText().replace("bible://", "bible:")
+            full_markdown = f"# {title}\n\n{markdown_content}" if title else markdown_content
+            self.preview.setMarkdown(full_markdown)
 
     def _on_link_activated(self, link):
         full_url_str = link.toString() if isinstance(link, QUrl) else str(link)
@@ -123,4 +146,5 @@ class NoteEditor(QDialog):
         # print(f"DEBUG: Parsed '{ref_str}' -> Book: '{book}', Chap: '{chapter}', Verse: '{verse}'")
         self.jumpRequested.emit(book.strip(), chapter.strip(), verse.strip())
 
-    def get_text(self): return self.editor.toPlainText()
+    def get_text(self): return self.saved_text
+    def get_title(self): return self.saved_title

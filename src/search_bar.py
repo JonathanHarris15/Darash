@@ -1,6 +1,10 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QLabel, QPushButton
 from PySide6.QtCore import Signal, Qt
 import re
+import difflib
+from src.constants import OT_BOOKS, NT_BOOKS
+
+ALL_BOOKS = OT_BOOKS + NT_BOOKS
 
 class SearchBar(QWidget):
     """
@@ -62,6 +66,7 @@ class SearchBar(QWidget):
         self.res_layout.addWidget(self.btn_clear)
         
         self.layout.addWidget(self.input)
+        self.layout.setStretch(0, 1) # Give input all available space
         self.layout.addWidget(self.results_container)
         
         self.results_container.hide() # Hide until results exist
@@ -80,21 +85,61 @@ class SearchBar(QWidget):
             }
         """)
 
+    def _resolve_book(self, book_input: str) -> str:
+        """
+        Attempts to resolve a book name from potentially typo-ridden or abbreviated input.
+        """
+        book_input = book_input.strip()
+        if not book_input:
+            return None
+            
+        # 1. Normalize numeric prefixes (1 -> I, 2 -> II, 3 -> III)
+        prefix_map = {"1": "I", "2": "II", "3": "III"}
+        match = re.match(r"^([123])\s*(.*)$", book_input)
+        if match:
+            num = match.group(1)
+            rest = match.group(2)
+            book_input = f"{prefix_map[num]} {rest}".strip()
+            
+        # 2. Case-insensitive exact match
+        for b in ALL_BOOKS:
+            if b.lower() == book_input.lower():
+                return b
+                
+        # 3. Prefix match (e.g. "Gen" -> "Genesis")
+        prefix_matches = [b for b in ALL_BOOKS if b.lower().startswith(book_input.lower())]
+        if len(prefix_matches) == 1:
+            return prefix_matches[0]
+            
+        # 4. Fuzzy match (e.g. "Genisis" -> "Genesis")
+        matches = difflib.get_close_matches(book_input, ALL_BOOKS, n=1, cutoff=0.5)
+        if matches:
+            return matches[0]
+            
+        return None
+
     def on_search(self):
         text = self.input.text().strip()
         if not text:
             self._on_clear_clicked()
             return
             
-        ref_match = re.match(r"^((?:\d\s|I+\s)?[A-Za-z\s]+)\s(\d+)(?::(\d+))?$", text)
+        # More lenient regex for book, chapter, verse
+        # Supports "John 3:16", "John 3 16", "John3:16", "John 3", etc.
+        ref_match = re.match(r"^\s*((?:\d+|I+)?\s*[A-Za-z\s]+?)\s*(\d+)(?:[\s:]+(\d+))?\s*$", text, re.IGNORECASE)
         if ref_match:
-            book = ref_match.group(1).strip()
+            book_raw = ref_match.group(1).strip()
             chapter = ref_match.group(2)
             verse = ref_match.group(3) or "1"
-            self.jumpToRef.emit(book, chapter, verse)
-            self.results_container.hide()
-        else:
-            self.searchText.emit(text)
+            
+            resolved_book = self._resolve_book(book_raw)
+            if resolved_book:
+                self.jumpToRef.emit(resolved_book, chapter, verse)
+                self.results_container.hide()
+                return
+                
+        # If not a reference or book not found, treat as text search
+        self.searchText.emit(text)
 
     def set_results_status(self, current: int, total: int):
         if total > 0:
@@ -102,7 +147,7 @@ class SearchBar(QWidget):
             self.results_container.show()
         else:
             self.results_label.setText("0 matches")
-            self.results_container.show()
+            self.results_container.hide()
 
     def _on_clear_clicked(self):
         self.input.clear()
