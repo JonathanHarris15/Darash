@@ -28,8 +28,8 @@ from src.constants import (
     HEADER_FONT_SIZE, CHAPTER_FONT_SIZE,
     LINE_SPACING_DEFAULT, SCROLL_SENSITIVITY, SIDE_MARGIN, TOP_MARGIN,
     TAB_SIZE_DEFAULT, ARROW_OPACITY_DEFAULT, VERSE_MARK_SIZE_DEFAULT,
-    LAYOUT_DEBOUNCE_INTERVAL, SEARCH_HIGHLIGHT_COLOR, SELECTION_COLOR,
-    BIBLE_SECTIONS
+    LOGICAL_MARK_OPACITY_DEFAULT, LAYOUT_DEBOUNCE_INTERVAL, SEARCH_HIGHLIGHT_COLOR, SELECTION_COLOR,
+    BIBLE_SECTIONS, LOGICAL_MARK_COLOR
 )
 import bisect
 import os
@@ -132,6 +132,7 @@ class ReaderScene(QGraphicsScene):
         self._update_fonts()
         self.text_color = QColor(self.study_manager.data["settings"].get("text_color", TEXT_COLOR.name()))
         self.ref_color = QColor(self.study_manager.data["settings"].get("ref_color", REFERENCE_COLOR.name()))
+        self.logical_mark_color = QColor(self.study_manager.data["settings"].get("logical_mark_color", LOGICAL_MARK_COLOR.name()))
         bg_color = QColor(self.study_manager.data["settings"].get("bg_color", APP_BACKGROUND_COLOR.name()))
         self.setBackgroundBrush(bg_color)
         
@@ -182,6 +183,7 @@ class ReaderScene(QGraphicsScene):
         settings["logical_mark_opacity"] = self.logical_mark_opacity
         settings["text_color"] = self.text_color.name()
         settings["ref_color"] = self.ref_color.name()
+        settings["logical_mark_color"] = self.logical_mark_color.name()
         settings["bg_color"] = self.backgroundBrush().color().name()
         self.study_manager.save_study()
 
@@ -1023,8 +1025,21 @@ class ReaderScene(QGraphicsScene):
         pass
 
     def _apply_symbol_at_mouse(self, number_key):
-        # Logic moved to SceneInputHandler
-        pass
+        view = self.views()[0]
+        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        
+        # Get word key at mouse position
+        key = self._get_word_key_at_pos(mouse_pos)
+        if not key: return
+        
+        # Get symbol ID from manager using binding
+        symbol_id = self.symbol_manager.get_binding(number_key)
+        if symbol_id:
+            parts = key.split('|')
+            if len(parts) >= 4:
+                self.study_manager.add_symbol(parts[0], parts[1], parts[2], int(parts[3]), symbol_id)
+                self._render_study_overlays()
+                self.studyDataChanged.emit()
 
     def set_scroll_y(self, value: float) -> None:
         self.target_scroll_y = float(value); self.scroll_y = self.target_scroll_y

@@ -88,6 +88,9 @@ class AppearancePanel(QDialog):
         self.ref_color_btn = self._create_color_btn(self.scene.ref_color, self._on_ref_color_changed)
         color_layout.addRow("Ref Color:", self.ref_color_btn)
         
+        self.logical_mark_color_btn = self._create_color_btn(self.scene.logical_mark_color, self._on_logical_mark_color_changed)
+        color_layout.addRow("Logical Marks:", self.logical_mark_color_btn)
+        
         self.form.addRow(color_group)
         
         # --- Layout Group ---
@@ -171,6 +174,9 @@ class AppearancePanel(QDialog):
 
     def _on_ref_color_changed(self, color):
         self.scene.ref_color = color
+
+    def _on_logical_mark_color_changed(self, color):
+        self.scene.logical_mark_color = color
 
     def _on_margin_changed(self, val):
         self.scene.target_side_margin = val

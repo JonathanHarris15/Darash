@@ -58,7 +58,7 @@ class SceneOverlayManager:
                             r = rects[0]
                             symbol_text = LOGICAL_MARKS[mark_type]
                             
-                            item = LogicalMarkItem(key, symbol_text, r, LOGICAL_MARK_COLOR)
+                            item = LogicalMarkItem(key, symbol_text, r, scene.logical_mark_color)
                             item.setZValue(-0.5) # Behind text
                             item.setOpacity(scene.logical_mark_opacity)
                             item.setVisible(scene._is_rect_visible(r))
