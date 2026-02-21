@@ -68,6 +68,7 @@ class ReaderScene(QGraphicsScene):
         self.tab_size = TAB_SIZE_DEFAULT
         self.arrow_opacity = ARROW_OPACITY_DEFAULT
         self.verse_mark_size = VERSE_MARK_SIZE_DEFAULT
+        self.logical_mark_opacity = LOGICAL_MARK_OPACITY_DEFAULT
         
         self.scroll_sens = SCROLL_SENSITIVITY
         self.last_emitted_ref = ""
@@ -114,6 +115,7 @@ class ReaderScene(QGraphicsScene):
         self.search_overlay_items = []
         
         self.heading_rects = [] # (QRectF, "book"|"chapter", text)
+        self._pending_headings = [] # (block_num, type, text)
         
         # Arrow Drawing State
         self.is_drawing_arrow = False
@@ -137,6 +139,10 @@ class ReaderScene(QGraphicsScene):
         self.view_height = 600
         self.total_height = 0
         self.layout_version = 0 # For cache invalidation in pathfinder
+        
+        # Wheel/Zoom accumulators to discretize trackpad input
+        self._wheel_accumulator = 0.0
+        self._zoom_accumulator = 0.0
 
     def load_settings(self):
         """Loads appearance settings from study manager or defaults."""
@@ -149,6 +155,7 @@ class ReaderScene(QGraphicsScene):
         self.tab_size = settings.get("tab_size", TAB_SIZE_DEFAULT)
         self.arrow_opacity = settings.get("arrow_opacity", ARROW_OPACITY_DEFAULT)
         self.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
+        self.logical_mark_opacity = settings.get("logical_mark_opacity", LOGICAL_MARK_OPACITY_DEFAULT)
         
         # Targets for smooth transitions/delayed apply
         self.target_font_size = self.font_size
@@ -159,6 +166,7 @@ class ReaderScene(QGraphicsScene):
         self.target_tab_size = self.tab_size
         self.target_arrow_opacity = self.arrow_opacity
         self.target_verse_mark_size = self.verse_mark_size
+        self.target_logical_mark_opacity = self.logical_mark_opacity
 
     def save_settings(self):
         """Saves current appearance settings to study manager."""
@@ -171,6 +179,7 @@ class ReaderScene(QGraphicsScene):
         settings["tab_size"] = self.tab_size
         settings["arrow_opacity"] = self.arrow_opacity
         settings["verse_mark_size"] = self.verse_mark_size
+        settings["logical_mark_opacity"] = self.logical_mark_opacity
         settings["text_color"] = self.text_color.name()
         settings["ref_color"] = self.ref_color.name()
         settings["bg_color"] = self.backgroundBrush().color().name()
@@ -228,9 +237,11 @@ class ReaderScene(QGraphicsScene):
 
     def _get_heading_at_pos(self, scene_pos):
         """Returns (type, text) of heading at scene_pos, or None."""
+        # Use mapFromScene to ensure we are in document coordinates
+        doc_pos = self.main_text_item.mapFromScene(scene_pos)
         for rect, h_type, h_text in self.heading_rects:
-            if rect.contains(scene_pos):
-                print(f"Clicked on heading: {h_type}, {h_text}") # Debug print
+            if rect.contains(doc_pos):
+                print(f"Detected heading at {doc_pos}: {h_type}, {h_text}") # Debug print
                 return (h_type, h_text)
         return None
 
@@ -331,7 +342,9 @@ class ReaderScene(QGraphicsScene):
         verse_indents = self.study_manager.data.get("verse_indent", {})
 
         # Clear previous heading data
-        self.heading_rects = [] # List of (QRectF, "book"|"chapter", text)
+        self.last_width = width
+        self.heading_rects = []
+        self._pending_headings = [] # (block_num, type, text)
 
         for verse in self.loader.flat_verses:
             if verse['book'] != last_book:
@@ -339,15 +352,8 @@ class ReaderScene(QGraphicsScene):
                 cursor.setCharFormat(header_char_fmt)
                 cursor.insertText(verse['book'])
                 
-                block = cursor.block()
-                # Use block.layout().boundingRect().height() for actual text height
-                # Ensure a minimum height if for some reason layout returns 0 (e.g., empty string)
-                block_height = block.layout().boundingRect().height() if block.layout().lineCount() > 0 else self.header_font.pointSize() * 1.5 
-                block_rect_y = layout.blockBoundingRect(block).y() # Get correct Y position
-                
-                # Expand rect to full width to catch clicks anywhere on the heading line
-                full_width_rect = QRectF(0, block_rect_y, self.last_width, block_height)
-                self.heading_rects.append((full_width_rect, "book", verse['book']))
+                # Store for post-layout resolution
+                self._pending_headings.append((cursor.block().blockNumber(), "book", verse['book']))
                 last_book, last_chap = verse['book'], None
 
             if verse['chapter'] != last_chap:
@@ -355,13 +361,8 @@ class ReaderScene(QGraphicsScene):
                 cursor.setCharFormat(chap_char_fmt)
                 cursor.insertText(f"{verse['book']} {verse['chapter']}")
                 
-                block = cursor.block()
-                block_height = block.layout().boundingRect().height() if block.layout().lineCount() > 0 else self.chapter_font.pointSize() * 1.5
-                block_rect_y = layout.blockBoundingRect(block).y() # Get correct Y position
-                
-                # Expand rect to full width
-                full_width_rect = QRectF(0, block_rect_y, self.last_width, block_height)
-                self.heading_rects.append((full_width_rect, "chapter", f"{verse['book']} {verse['chapter']}"))
+                # Store for post-layout resolution
+                self._pending_headings.append((cursor.block().blockNumber(), "chapter", f"{verse['book']} {verse['chapter']}"))
                 last_chap = verse['chapter']
                 
             indent_level = verse_indents.get(verse['ref'], 0)
@@ -381,13 +382,35 @@ class ReaderScene(QGraphicsScene):
 
         cursor.endEditBlock()
 
-        # layout = doc.documentLayout() # This is already defined
+        # Finalize layout and resolve heading rects
         self.total_height = layout.documentSize().height() + 200
+        self._update_heading_rects()
+        
         self.layoutChanged.emit(int(self.total_height))
         self.layoutFinished.emit()
         self.calculate_section_positions()
         self.render_verses()
         self.layout_version += 1 # Increment layout version
+
+    def _update_heading_rects(self):
+        """Resolves absolute scene rects for headings after layout is stable."""
+        self.heading_rects = []
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        
+        for block_num, h_type, h_text in self._pending_headings:
+            block = doc.findBlockByNumber(block_num)
+            if block.isValid():
+                # Get actual layout height
+                block_height = block.layout().boundingRect().height()
+                if block_height <= 0:
+                    font = self.header_font if h_type == "book" else self.chapter_font
+                    block_height = font.pointSize() * 2.0
+                
+                block_rect = layout.blockBoundingRect(block)
+                # Expand to full width to catch clicks anywhere on the line
+                full_width_rect = QRectF(0, block_rect.y(), self.last_width, block_height)
+                self.heading_rects.append((full_width_rect, h_type, h_text))
 
     def render_verses(self) -> None:
         """Updates transient UI elements (like HUD) and lazy-renders verse numbers."""
@@ -808,6 +831,34 @@ class ReaderScene(QGraphicsScene):
     def _on_mark_selected(self, mark_type, color):
         if not self.current_selection: return
         start, length = self.current_selection
+        
+        if mark_type == "logical_mark":
+            # Logical marks apply to a single word
+            # Find the word key at the start of selection
+            view = self.views()[0]
+            # Map text cursor position to scene position
+            cursor_rect = self.main_text_item.document().documentLayout().blockBoundingRect(self.main_text_item.document().findBlock(start))
+            # This is block rect, not exact char pos. Better to use hitTest or get_word_idx logic
+            
+            # Use existing helper to get key from pos
+            # We need scene pos for _get_word_key_at_pos, but we have text position 'start'
+            # Let's convert text pos to word key
+            ref = self._get_ref_from_pos(start)
+            if ref:
+                verse_data = self.loader.get_verse_by_ref(ref)
+                if verse_data:
+                    v_start = self.verse_pos_map[ref]
+                    rel_pos = start - v_start
+                    word_idx = self._get_word_idx_from_pos(verse_data, rel_pos)
+                    if word_idx != -1:
+                        key = f"{verse_data['book']}|{verse_data['chapter']}|{verse_data['verse_num']}|{word_idx}"
+                        self.study_manager.add_logical_mark(key, color) # color contains the mark type key
+            
+            self._clear_selection()
+            self._render_study_overlays()
+            self.studyDataChanged.emit()
+            return
+
         doc = self.main_text_item.document()
         block = doc.findBlock(start)
         
@@ -995,12 +1046,30 @@ class ReaderScene(QGraphicsScene):
     def wheelEvent(self, event) -> None:
         modifiers = event.modifiers(); delta = event.delta()
         if delta == 0: return
+        
         if modifiers & (Qt.ControlModifier | Qt.AltModifier):
-            if modifiers & Qt.ControlModifier: self.target_font_size = max(8, min(72, self.target_font_size + (2 if delta > 0 else -2)))
-            elif modifiers & Qt.AltModifier: self.target_line_spacing = max(1.0, min(3.0, self.target_line_spacing + (0.1 if delta > 0 else -0.1)))
+            self._zoom_accumulator += delta
+            # Trigger zoom/spacing adjustment for every 120 units (one mouse click)
+            while abs(self._zoom_accumulator) >= 120:
+                step = 120 if self._zoom_accumulator > 0 else -120
+                if modifiers & Qt.ControlModifier: 
+                    self.target_font_size = max(8, min(72, self.target_font_size + (2 if step > 0 else -2)))
+                elif modifiers & Qt.AltModifier: 
+                    self.target_line_spacing = max(1.0, min(3.0, self.target_line_spacing + (0.1 if step > 0 else -0.1)))
+                self._zoom_accumulator -= step
+            
             self.settingsPreview.emit(self.target_font_size, self.target_line_spacing); self.layout_timer.start(); event.accept(); return
-        move = -(delta / 120.0) * self.scroll_sens
-        self.target_scroll_y = max(0, min(self.total_height - self.view_height, self.target_scroll_y + move))
+        
+        # Normal scrolling
+        self._wheel_accumulator += delta
+        # Discretize scroll to prevent tiny deltas from overwhelming the smoothing logic
+        # 30 units (1/4 of a mouse click) is a good balance between responsiveness and discretization
+        while abs(self._wheel_accumulator) >= 30:
+            step = 30 if self._wheel_accumulator > 0 else -30
+            move = -(step / 120.0) * self.scroll_sens
+            self.target_scroll_y = max(0, min(self.total_height - self.view_height, self.target_scroll_y + move))
+            self._wheel_accumulator -= step
+            
         if not self.scroll_timer.isActive(): self.scroll_timer.start()
         event.accept()
 
@@ -1013,6 +1082,7 @@ class ReaderScene(QGraphicsScene):
         self.tab_size = self.target_tab_size
         self.arrow_opacity = self.target_arrow_opacity
         self.verse_mark_size = self.target_verse_mark_size
+        self.logical_mark_opacity = self.target_logical_mark_opacity
         
         self._update_fonts()
         self.save_settings()

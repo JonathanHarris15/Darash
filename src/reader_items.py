@@ -46,8 +46,8 @@ class ArrowItem(QGraphicsPathItem):
         self.update_path()
 
     def update_path(self):
-        path = QPainterPath(self.start_pos)
-        path.lineTo(self.end_pos)
+        self.body_path = QPainterPath(self.start_pos)
+        self.body_path.lineTo(self.end_pos)
         
         # Arrow head calculation
         angle = math.atan2(self.end_pos.y() - self.start_pos.y(), 
@@ -61,18 +61,28 @@ class ArrowItem(QGraphicsPathItem):
         p2 = self.end_pos - QPointF(head_len * math.cos(angle + head_angle),
                                    head_len * math.sin(angle + head_angle))
         
-        arrow_head = QPainterPath(self.end_pos)
-        arrow_head.lineTo(p1)
-        arrow_head.lineTo(p2)
-        arrow_head.closeSubpath()
-        path.addPath(arrow_head)
+        self.head_path = QPainterPath(self.end_pos)
+        self.head_path.lineTo(p1)
+        self.head_path.lineTo(p2)
+        self.head_path.closeSubpath()
         
-        self.setPath(path)
+        full_path = QPainterPath(self.body_path)
+        full_path.addPath(self.head_path)
+        self.setPath(full_path)
+        
         pen = QPen(self.color, 2)
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
         self.setPen(pen)
         self.setBrush(Qt.NoBrush)
+
+    def paint(self, painter, option, widget=None):
+        painter.setPen(self.pen())
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(self.body_path)
+        
+        painter.setBrush(QBrush(self.color))
+        painter.drawPath(self.head_path)
 
 class SnakeArrowItem(QGraphicsPathItem):
     """
@@ -91,9 +101,9 @@ class SnakeArrowItem(QGraphicsPathItem):
         if not self.points or len(self.points) < 2:
             return
 
-        path = QPainterPath()
+        self.body_path = QPainterPath()
         start = self.points[0]
-        path.moveTo(start)
+        self.body_path.moveTo(start)
 
         # Draw segments with rounded corners
         for i in range(1, len(self.points) - 1):
@@ -115,15 +125,16 @@ class SnakeArrowItem(QGraphicsPathItem):
                 start_p = p2 + (v1 / d1) * curr_r
                 end_p = p2 + (v3 / d3) * curr_r
                 
-                path.lineTo(start_p)
-                path.quadTo(p2, end_p)
+                self.body_path.lineTo(start_p)
+                self.body_path.quadTo(p2, end_p)
             else:
-                path.lineTo(p2)
+                self.body_path.lineTo(p2)
 
         # Final segment
         end = self.points[-1]
-        path.lineTo(end)
+        self.body_path.lineTo(end)
 
+        self.head_path = QPainterPath()
         # Arrow head
         if len(self.points) >= 2:
             last_p = self.points[-2]
@@ -137,18 +148,28 @@ class SnakeArrowItem(QGraphicsPathItem):
             p2 = end - QPointF(head_len * math.cos(angle + head_angle),
                                head_len * math.sin(angle + head_angle))
             
-            arrow_head = QPainterPath(end)
-            arrow_head.lineTo(p1)
-            arrow_head.lineTo(p2)
-            arrow_head.closeSubpath()
-            path.addPath(arrow_head)
+            self.head_path.moveTo(end)
+            self.head_path.lineTo(p1)
+            self.head_path.lineTo(p2)
+            self.head_path.closeSubpath()
 
-        self.setPath(path)
+        full_path = QPainterPath(self.body_path)
+        full_path.addPath(self.head_path)
+        self.setPath(full_path)
+        
         pen = QPen(self.color, 2)
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
         self.setPen(pen)
         self.setBrush(Qt.NoBrush)
+
+    def paint(self, painter, option, widget=None):
+        painter.setPen(self.pen())
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(self.body_path)
+        
+        painter.setBrush(QBrush(self.color))
+        painter.drawPath(self.head_path)
 
 class VerseNumberItem(QGraphicsObject):
     """Clickable and draggable verse number item."""
@@ -258,3 +279,44 @@ class VerseNumberItem(QGraphicsObject):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+
+class LogicalMarkItem(QGraphicsObject):
+    """
+    Renders a logical mark symbol (text/icon) centered behind a word.
+    """
+    def __init__(self, key, symbol_text, target_rect, color, font_size=16, parent=None):
+        super().__init__(parent)
+        self.key = key # book|chap|verse|word_idx
+        self.symbol_text = symbol_text
+        self.target_rect = target_rect
+        self.color = color
+        self.font = None
+        self.font_size = font_size
+        self.setAcceptedMouseButtons(Qt.NoButton)
+        self.setZValue(-0.5) # Behind text (0), but above highlights (-1)?
+        # Highlights are Z=-1. This should be behind text.
+        # If highlights are translucent, this behind highlights is fine.
+        # But if highlights are opaque (wait, they are translucent), this should be visible.
+        # Actually, if this is "opaque behind word", it should be Z=-0.5 so it's on top of highlight but behind text.
+
+    def paint(self, painter, option, widget=None):
+        painter.setPen(self.color)
+        if not self.font:
+            self.font = painter.font()
+            self.font.setPixelSize(int(self.target_rect.height() * 1.5)) # Larger size
+            self.font.setBold(True)
+            
+        painter.setFont(self.font)
+        
+        # Draw centered in target_rect
+        metrics = painter.fontMetrics()
+        w = metrics.horizontalAdvance(self.symbol_text)
+        h = metrics.height()
+        
+        x = self.target_rect.center().x() - w / 2
+        y = self.target_rect.center().y() + h / 4 # Baseline offset
+        
+        painter.drawText(x, y, self.symbol_text)
+
+    def boundingRect(self):
+        return self.target_rect

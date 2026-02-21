@@ -217,7 +217,46 @@ class StudyPanel(QWidget):
         for cat in list(mark_categories.values()):
             if cat.childCount() == 0: marks_root.removeChild(cat)
 
-        # 2. Symbols
+        # 2. Logical Marks
+        logical_root = QTreeWidgetItem(self.tree, ["Logical Marks"])
+        logical_marks_data = self.study_manager.data.get("logical_marks", {})
+        if logical_marks_data:
+            # Group by type
+            type_groups = {}
+            for key, m_type in logical_marks_data.items():
+                if m_type not in type_groups: type_groups[m_type] = []
+                type_groups[m_type].append(key)
+            
+            for m_type, keys in type_groups.items():
+                # Get pretty name from constants if possible, or format type
+                pretty_name = m_type.replace("_", " ").title()
+                group_item = QTreeWidgetItem(logical_root, [pretty_name])
+                
+                def sort_key(k):
+                    p = k.split('|')
+                    if len(p) < 4: return (p[0], 0, 0, 0)
+                    return (p[0], int(p[1]), int(p[2]), int(p[3]))
+
+                for key in sorted(keys, key=sort_key):
+                    parts = key.split('|')
+                    if len(parts) >= 3:
+                        ref = f"{parts[0]} {parts[1]}:{parts[2]}"
+                        item = QTreeWidgetItem(group_item, [ref])
+                        item.setData(0, Qt.UserRole, "logical_mark")
+                        item.setData(0, Qt.UserRole + 1, key)
+
+        if logical_root.childCount() == 0:
+            # Remove if empty? The prompt says "should be another subgroup". 
+            # If no marks, maybe don't show root.
+            # self.tree.invisibleRootItem().removeChild(logical_root) # Can't remove directly easily without index
+             pass # TreeWidget handles empty roots fine, but usually we hide empty sections.
+             # Actually, let's hide it if empty to keep UI clean
+             # But first let's see if we added it to the tree. Yes.
+        if logical_root.childCount() == 0:
+            index = self.tree.indexOfTopLevelItem(logical_root)
+            if index != -1: self.tree.takeTopLevelItem(index)
+
+        # 3. Symbols
         symbols_root = QTreeWidgetItem(self.tree, ["Symbols"])
         symbol_groups = {}
         for key, s_file in self.study_manager.data.get("symbols", {}).items():
@@ -303,7 +342,7 @@ class StudyPanel(QWidget):
                     ref = f"{parts[0]} {parts[1]}:{parts[2]}"
                     self.jumpRequested.emit(parts[0], parts[1], parts[2])
                     self.noteOpenRequested.emit(key, ref)
-        elif itype in ["symbol", "arrow"]:
+        elif itype in ["symbol", "arrow", "logical_mark"]:
             key = item.data(0, Qt.UserRole + 1)
             parts = key.split('|')
             if len(parts) >= 3: self.jumpRequested.emit(parts[0], parts[1], parts[2])
@@ -393,6 +432,8 @@ class StudyPanel(QWidget):
             del_act = QAction("Delete Note", self); del_act.triggered.connect(lambda: self._delete_note(key)); menu.addAction(del_act)
         elif itype == "arrow":
             key = item.data(0, Qt.UserRole + 1); idx = item.data(0, Qt.UserRole + 2); del_act = QAction("Delete Arrow", self); del_act.triggered.connect(lambda: self._delete_arrow(key, idx)); menu.addAction(del_act)
+        elif itype == "logical_mark":
+            key = item.data(0, Qt.UserRole + 1); del_act = QAction("Delete Logical Mark", self); del_act.triggered.connect(lambda: self._delete_logical_mark(key)); menu.addAction(del_act)
         elif itype == "verse_mark":
             ref = item.data(0, Qt.UserRole + 1); del_act = QAction("Delete Verse Mark", self); del_act.triggered.connect(lambda: self._delete_verse_mark(ref)); menu.addAction(del_act)
         if menu.actions(): menu.exec(self.tree.mapToGlobal(pos))
@@ -455,7 +496,13 @@ class StudyPanel(QWidget):
 
     def _delete_bookmark(self, ref): self.study_manager.delete_bookmark(ref); self.dataChanged.emit(); self.refresh()
 
-    def _delete_verse_mark(self, ref): self.study_manager.set_verse_mark(ref, None); self.dataChanged.emit(); self.refresh()
+    def _delete_logical_mark(self, key):
+        self.study_manager.save_state()
+        if "logical_marks" in self.study_manager.data and key in self.study_manager.data["logical_marks"]:
+            del self.study_manager.data["logical_marks"][key]
+            self.study_manager.save_study()
+            self.dataChanged.emit()
+            self.refresh()
 
     def _open_note(self, key):
         if key.startswith("standalone_"): self.noteOpenRequested.emit(key, "General Note")
@@ -471,7 +518,7 @@ class StudyPanel(QWidget):
             res = QMessageBox.question(self, "Confirm Bulk Deletion", f"Are you sure you want to delete {len(selected_items)} selected items?", QMessageBox.Yes | QMessageBox.No)
             if res != QMessageBox.Yes: return
         self.study_manager.save_state()
-        to_del = {"marks": [], "symbols": [], "notes": [], "note_folders": [], "arrows": [], "bookmarks": [], "verse_marks": []}
+        to_del = {"marks": [], "symbols": [], "notes": [], "note_folders": [], "arrows": [], "bookmarks": [], "verse_marks": [], "logical_marks": []}
         expanded_selected = []
         for item in selected_items:
             if item.data(0, Qt.UserRole) == "symbol_type_group":
@@ -487,10 +534,14 @@ class StudyPanel(QWidget):
             elif itype == "arrow": to_del["arrows"].append((item.data(0, Qt.UserRole + 1), item.data(0, Qt.UserRole + 2)))
             elif itype == "bookmark": to_del["bookmarks"].append(item.data(0, Qt.UserRole + 1)['ref'])
             elif itype == "verse_mark": to_del["verse_marks"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "logical_mark": to_del["logical_marks"].append(item.data(0, Qt.UserRole + 1))
         if to_del["marks"]:
             for idx in sorted(list(set(to_del["marks"])), reverse=True): self.study_manager.data["marks"].pop(idx)
         for key in to_del["symbols"]:
             if key in self.study_manager.data["symbols"]: del self.study_manager.data["symbols"][key]
+        for key in to_del["logical_marks"]:
+            if "logical_marks" in self.study_manager.data and key in self.study_manager.data["logical_marks"]:
+                del self.study_manager.data["logical_marks"][key]
         for key in to_del["notes"]: self.study_manager.delete_note(key)
         for path in to_del["note_folders"]: self.study_manager.delete_folder(path)
         arrow_map = {}

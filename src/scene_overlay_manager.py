@@ -2,8 +2,9 @@ import os
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsPixmapItem
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QBrush, QPen, QPixmap
-from src.reader_items import NoteIcon, ArrowItem, SnakeArrowItem
+from src.reader_items import NoteIcon, ArrowItem, SnakeArrowItem, LogicalMarkItem
 from src.snake_path_finder import SnakePathFinder
+from src.constants import LOGICAL_MARKS, LOGICAL_MARK_COLOR
 
 class SceneOverlayManager:
     """
@@ -21,6 +22,7 @@ class SceneOverlayManager:
         scene.study_overlay_items.clear()
         
         self._render_marks_layer()
+        self._render_logical_marks_layer()
         self._render_symbols_layer()
         self._render_notes_layer()
         self._render_arrows_layer()
@@ -34,6 +36,34 @@ class SceneOverlayManager:
                 rects = scene._get_text_rects(start_pos, mark['length'])
                 for r in rects:
                     self._add_mark_rect(r, mark['type'], mark.get('color', 'yellow'))
+
+    def _render_logical_marks_layer(self):
+        scene = self.scene
+        # Logical marks are stored in logical_marks dict
+        # key: mark_type (e.g. "arrow_right")
+        for key, mark_type in scene.study_manager.data.get("logical_marks", {}).items():
+            if mark_type not in LOGICAL_MARKS: continue
+            
+            ref_parts = key.split('|')
+            ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
+            if ref in scene.verse_pos_map:
+                v_start = scene.verse_pos_map[ref]
+                verse_data = scene.loader.get_verse_by_ref(ref)
+                if verse_data:
+                    word_idx = int(ref_parts[3])
+                    if word_idx < len(verse_data['tokens']):
+                        start_pos = v_start + scene._get_word_offset_in_verse(verse_data, word_idx)
+                        rects = scene._get_text_rects(start_pos, len(verse_data['tokens'][word_idx][0]))
+                        if rects:
+                            r = rects[0]
+                            symbol_text = LOGICAL_MARKS[mark_type]
+                            
+                            item = LogicalMarkItem(key, symbol_text, r, LOGICAL_MARK_COLOR)
+                            item.setZValue(-0.5) # Behind text
+                            item.setOpacity(scene.logical_mark_opacity)
+                            item.setVisible(scene._is_rect_visible(r))
+                            scene.addItem(item)
+                            scene.study_overlay_items.append(item)
 
     def _render_symbols_layer(self):
         scene = self.scene

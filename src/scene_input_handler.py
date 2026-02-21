@@ -170,6 +170,10 @@ class SceneInputHandler(QObject):
         if key_str in scene.study_manager.data.get("arrows", {}):
             del scene.study_manager.data["arrows"][key_str]
             modified = True
+        if "logical_marks" in scene.study_manager.data and key_str in scene.study_manager.data["logical_marks"]:
+            del scene.study_manager.data["logical_marks"][key_str]
+            modified = True
+            
         if modified:
             scene.study_manager.save_study()
             scene._render_study_overlays()

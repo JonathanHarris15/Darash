@@ -155,6 +155,7 @@ class BookmarkSidebar(QScrollArea):
         self.scroll_timer.timeout.connect(self._update_scroll)
         self.target_scroll_y = 0.0
         self.current_scroll_y = 0.0
+        self._wheel_accumulator = 0.0
 
         self.content = QWidget()
         self.content.setStyleSheet("background: transparent;")
@@ -168,7 +169,13 @@ class BookmarkSidebar(QScrollArea):
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
-        self.target_scroll_y -= delta * 0.8 # Sensitivity
+        self._wheel_accumulator += delta
+        
+        while abs(self._wheel_accumulator) >= 20:
+            step = 20 if self._wheel_accumulator > 0 else -20
+            self.target_scroll_y -= step * 0.8 # Sensitivity
+            self._wheel_accumulator -= step
+            
         max_scroll = self.verticalScrollBar().maximum()
         self.target_scroll_y = max(0, min(max_scroll, self.target_scroll_y))
         

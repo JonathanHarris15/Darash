@@ -19,6 +19,7 @@ class StudyManager:
             "arrows": {},    # start_key: [{"end_dx": float, "end_dy": float, "color": str}]
             "verse_indent": {}, # ref: indent_level
             "verse_marks": {},  # ref: mark_type
+            "logical_marks": {}, # key (book|chap|verse|word_idx): mark_type (e.g. "arrow_right")
             "settings": {}   # Persistent appearance settings
         }
         self.undo_stack = [] # Stack of (symbols_dict, marks_list, arrows_dict) snapshots
@@ -69,6 +70,8 @@ class StudyManager:
                     self.data["verse_indent"] = {}
                 if "verse_marks" not in self.data:
                     self.data["verse_marks"] = {}
+                if "logical_marks" not in self.data:
+                    self.data["logical_marks"] = {}
                 if "settings" not in self.data:
                     self.data["settings"] = {}
                 print(f"Loaded study: {name}")
@@ -253,4 +256,9 @@ class StudyManager:
             "color": color,
             "type": arrow_type
         })
+        self.save_study()
+
+    def add_logical_mark(self, key: str, mark_type: str):
+        self.save_state()
+        self.data["logical_marks"][key] = mark_type
         self.save_study()

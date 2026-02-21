@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QFrame
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QFrame, QGridLayout, QLabel
 from PySide6.QtCore import Qt, Signal, QPoint, QEvent
-from src.constants import HIGHLIGHT_COLORS
+from src.constants import HIGHLIGHT_COLORS, LOGICAL_MARKS
 
 class ColorButton(QPushButton):
     def __init__(self, color_name, hex_code, parent=None):
@@ -9,6 +9,26 @@ class ColorButton(QPushButton):
         self.setFixedSize(24, 24)
         self.setCursor(Qt.PointingHandCursor)
         self.setStyleSheet(f"background-color: {hex_code}; border-radius: 12px; border: 1px solid #555;")
+
+class LogicalMarkButton(QPushButton):
+    def __init__(self, mark_key, symbol_text, parent=None):
+        super().__init__(symbol_text, parent)
+        self.mark_key = mark_key
+        self.setFixedSize(30, 30)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: #444; 
+                color: white; 
+                border-radius: 4px; 
+                border: 1px solid #666;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #666;
+            }
+        """)
 
 class MarkPopup(QWidget):
     """
@@ -70,6 +90,31 @@ class MarkPopup(QWidget):
             self.color_layout.addWidget(btn)
             
         self.color_wrapper_layout.addWidget(self.color_container)
+        
+        # 3. Logical Marks Container (Right - alternative to color)
+        self.logical_marks_container = QFrame()
+        self.logical_marks_container.setStyleSheet("""
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 6px;
+        """)
+        self.logical_layout = QGridLayout(self.logical_marks_container)
+        self.logical_layout.setContentsMargins(8, 8, 8, 8)
+        self.logical_layout.setSpacing(5)
+        self.logical_marks_container.hide()
+        
+        row, col = 0, 0
+        for key, symbol in LOGICAL_MARKS.items():
+            l_btn = LogicalMarkButton(key, symbol)
+            l_btn.clicked.connect(lambda checked=False, k=key: self._on_select("logical_mark", k))
+            l_btn.setToolTip(key.replace("_", " ").title())
+            self.logical_layout.addWidget(l_btn, row, col)
+            col += 1
+            if col > 3: # 4 columns
+                col = 0
+                row += 1
+        
+        self.color_wrapper_layout.addWidget(self.logical_marks_container)
         self.color_wrapper_layout.addStretch()
 
         # Create Buttons
@@ -77,12 +122,14 @@ class MarkPopup(QWidget):
         self.btn_ul = self._create_btn("Underline", "underline")
         self.btn_box = self._create_btn("Box", "box")
         self.btn_cir = self._create_btn("Circle", "circle")
+        self.btn_logical = self._create_btn("Logical Marks", "logical_mark")
         
         self.mark_buttons = {
             self.btn_hl: "highlight",
             self.btn_ul: "underline",
             self.btn_box: "box",
-            self.btn_cir: "circle"
+            self.btn_cir: "circle",
+            self.btn_logical: "logical_mark"
         }
         
         self.btn_bookmark = self._create_action_btn("Add Bookmark")
@@ -107,6 +154,7 @@ class MarkPopup(QWidget):
         self.selection_layout.addWidget(self.btn_ul)
         self.selection_layout.addWidget(self.btn_box)
         self.selection_layout.addWidget(self.btn_cir)
+        self.selection_layout.addWidget(self.btn_logical)
         self.selection_layout.addWidget(self._create_sep())
         self.selection_layout.addWidget(self.btn_bookmark)
         self.selection_layout.addWidget(self.btn_note)
@@ -172,6 +220,7 @@ class MarkPopup(QWidget):
                 self._show_color_panel(obj)
             else:
                 self.color_container.hide()
+                self.logical_marks_container.hide()
                 self.adjustSize()
         return super().eventFilter(obj, event)
 
@@ -179,11 +228,17 @@ class MarkPopup(QWidget):
         # Calculate vertical offset to center color panel with button
         # y() is relative to selection_container
         y_center_btn = target_btn.y() + (target_btn.height() // 2)
+        
+        # Decide which panel to show
+        panel_to_show = self.logical_marks_container if self.active_mark_type == "logical_mark" else self.color_container
+        self.logical_marks_container.hide()
+        self.color_container.hide()
+        
         # Margin of selection_container
-        y_offset = y_center_btn - (self.color_container.sizeHint().height() // 2) + 5
+        y_offset = y_center_btn - (panel_to_show.sizeHint().height() // 2) + 5
         
         self.top_spacer.setFixedHeight(max(0, y_offset))
-        self.color_container.show()
+        panel_to_show.show()
         self.adjustSize()
 
     def _on_color_clicked(self, hex_code):
@@ -201,6 +256,7 @@ class MarkPopup(QWidget):
 
     def show_at(self, pos):
         self.color_container.hide()
+        self.logical_marks_container.hide()
         self.move(pos)
         self.show()
         self.adjustSize()

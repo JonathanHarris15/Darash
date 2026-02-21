@@ -112,6 +112,13 @@ class AppearancePanel(QDialog):
         self.arrow_opacity_spin.setValue(self.scene.arrow_opacity)
         self.arrow_opacity_spin.valueChanged.connect(self._on_arrow_opacity_changed)
         layout_layout.addRow("Arrow Opacity:", self.arrow_opacity_spin)
+
+        self.logical_opacity_spin = QDoubleSpinBox()
+        self.logical_opacity_spin.setRange(0.0, 1.0)
+        self.logical_opacity_spin.setSingleStep(0.1)
+        self.logical_opacity_spin.setValue(getattr(self.scene, 'logical_mark_opacity', 0.5))
+        self.logical_opacity_spin.valueChanged.connect(self._on_logical_opacity_changed)
+        layout_layout.addRow("Logical Mark Opacity:", self.logical_opacity_spin)
         
         self.form.addRow(layout_group)
         
@@ -173,6 +180,9 @@ class AppearancePanel(QDialog):
 
     def _on_arrow_opacity_changed(self, val):
         self.scene.target_arrow_opacity = val
+
+    def _on_logical_opacity_changed(self, val):
+        self.scene.target_logical_mark_opacity = val
 
     def apply_changes(self):
         self.scene.apply_layout_changes()

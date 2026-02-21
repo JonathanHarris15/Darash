@@ -9,6 +9,8 @@ HUD_BACKGROUND_COLOR = "rgba(30, 30, 30, 200)"
 OVERLAY_BACKGROUND_COLOR = "#1e1e1e"
 SEARCH_HIGHLIGHT_COLOR = QColor(255, 255, 0, 100)  # Translucent yellow
 SELECTION_COLOR = QColor(0, 120, 215, 150)        # Translucent blue
+LOGICAL_MARK_COLOR = QColor("white")
+LOGICAL_MARK_OPACITY_DEFAULT = 0.5
 
 HIGHLIGHT_COLORS = {
     "yellow": "#FFFF00",
@@ -16,6 +18,20 @@ HIGHLIGHT_COLORS = {
     "blue": "#00FFFF",
     "pink": "#FF00FF",
     "orange": "#FFA500"
+}
+
+LOGICAL_MARKS = {
+    "arrow_right": "→",
+    "arrow_left": "←",
+    "arrow_parallel_right": "⇒",
+    "arrow_parallel_left": "⇐",
+    "arrow_diverge": "↔", # Using this as approximation or we can draw custom
+    "arrow_converge": "→←", 
+    "equals": "=",
+    "plus": "+",
+    "question": "?",
+    "therefore": "∴",
+    "because": "∵"
 }
 
 # Study Paths
