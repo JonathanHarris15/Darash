@@ -17,6 +17,8 @@ class StudyManager:
             "note_folders": [], # List of folder paths
             "bookmarks": [], # List of {ref, color, book, chapter, verse}
             "arrows": {},    # start_key: [{"end_dx": float, "end_dy": float, "color": str}]
+            "verse_indent": {}, # ref: indent_level
+            "verse_marks": {},  # ref: mark_type
             "settings": {}   # Persistent appearance settings
         }
         self.undo_stack = [] # Stack of (symbols_dict, marks_list, arrows_dict) snapshots
@@ -63,6 +65,10 @@ class StudyManager:
                     self.data["arrows"] = {}
                 if "note_folders" not in self.data:
                     self.data["note_folders"] = []
+                if "verse_indent" not in self.data:
+                    self.data["verse_indent"] = {}
+                if "verse_marks" not in self.data:
+                    self.data["verse_marks"] = {}
                 if "settings" not in self.data:
                     self.data["settings"] = {}
                 print(f"Loaded study: {name}")
@@ -191,6 +197,17 @@ class StudyManager:
     def add_mark(self, mark_data: Dict[str, Any]):
         self.save_state()
         self.data["marks"].append(mark_data)
+        self.save_study()
+
+    def set_verse_indent(self, ref: str, indent_level: int):
+        self.data["verse_indent"][ref] = indent_level
+        self.save_study()
+
+    def set_verse_mark(self, ref: str, mark_type: str):
+        if mark_type:
+            self.data["verse_marks"][ref] = mark_type
+        elif ref in self.data["verse_marks"]:
+            del self.data["verse_marks"][ref]
         self.save_study()
 
     def add_bookmark(self, book: str, chap: str, verse: str, color: str = "#0078D7"):

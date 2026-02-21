@@ -1,18 +1,18 @@
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsPixmapItem, QGraphicsRectItem, QDialog, 
-    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem
+    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QMenu
 )
 from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QPointF
 from PySide6.QtGui import (
     QColor, QFont, QPixmap, QBrush, QPen, QTextCursor, QCursor,
-    QTextBlockFormat, QTextCharFormat
+    QTextBlockFormat, QTextCharFormat, QAction
 )
 from src.verse_loader import VerseLoader
 from src.study_manager import StudyManager
 from src.mark_popup import MarkPopup
 from src.note_editor import NoteEditor
 from src.symbol_manager import SymbolManager
-from src.reader_items import NoFocusTextItem, NoteIcon, ArrowItem
+from src.reader_items import NoFocusTextItem, NoteIcon, ArrowItem, VerseNumberItem
 from src.reader_utils import (
     get_ref_from_pos, get_word_idx_from_pos, get_text_rects, 
     get_word_offset_in_verse
@@ -24,6 +24,7 @@ from src.constants import (
     DEFAULT_FONT_FAMILY, VERSE_FONT_FAMILY, DEFAULT_FONT_SIZE, 
     HEADER_FONT_SIZE, CHAPTER_FONT_SIZE,
     LINE_SPACING_DEFAULT, SCROLL_SENSITIVITY, SIDE_MARGIN, TOP_MARGIN,
+    TAB_SIZE_DEFAULT, ARROW_OPACITY_DEFAULT, VERSE_MARK_SIZE_DEFAULT,
     LAYOUT_DEBOUNCE_INTERVAL, SEARCH_HIGHLIGHT_COLOR, SELECTION_COLOR,
     BIBLE_SECTIONS
 )
@@ -58,6 +59,9 @@ class ReaderScene(QGraphicsScene):
         self.font_family = VERSE_FONT_FAMILY
         self.verse_num_font_size = DEFAULT_FONT_SIZE - 4
         self.side_margin = SIDE_MARGIN
+        self.tab_size = TAB_SIZE_DEFAULT
+        self.arrow_opacity = ARROW_OPACITY_DEFAULT
+        self.verse_mark_size = VERSE_MARK_SIZE_DEFAULT
         
         self.scroll_sens = SCROLL_SENSITIVITY
         self.last_emitted_ref = ""
@@ -68,6 +72,10 @@ class ReaderScene(QGraphicsScene):
         self.strongs_manager = StrongsManager()
         self.strongs_manager.index_usages(self.loader)
         self.pixmap_cache = {} # Cache for symbol pixmaps
+        self.verse_number_items = {} # ref: VerseNumberItem
+        self.selected_verse_items = []
+        self.selected_refs = set()
+        self.last_clicked_verse_idx = -1
         
         # Unified Text Item
         self.main_text_item = NoFocusTextItem()
@@ -134,6 +142,9 @@ class ReaderScene(QGraphicsScene):
         self.font_family = settings.get("font_family", VERSE_FONT_FAMILY)
         self.verse_num_font_size = settings.get("verse_num_size", self.font_size - 4)
         self.side_margin = settings.get("side_margin", SIDE_MARGIN)
+        self.tab_size = settings.get("tab_size", TAB_SIZE_DEFAULT)
+        self.arrow_opacity = settings.get("arrow_opacity", ARROW_OPACITY_DEFAULT)
+        self.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
         
         # Targets for smooth transitions/delayed apply
         self.target_font_size = self.font_size
@@ -141,6 +152,9 @@ class ReaderScene(QGraphicsScene):
         self.target_font_family = self.font_family
         self.target_verse_num_size = self.verse_num_font_size
         self.target_side_margin = self.side_margin
+        self.target_tab_size = self.tab_size
+        self.target_arrow_opacity = self.arrow_opacity
+        self.target_verse_mark_size = self.verse_mark_size
 
     def save_settings(self):
         """Saves current appearance settings to study manager."""
@@ -150,6 +164,9 @@ class ReaderScene(QGraphicsScene):
         settings["font_family"] = self.font_family
         settings["verse_num_size"] = self.verse_num_font_size
         settings["side_margin"] = self.side_margin
+        settings["tab_size"] = self.tab_size
+        settings["arrow_opacity"] = self.arrow_opacity
+        settings["verse_mark_size"] = self.verse_mark_size
         settings["text_color"] = self.text_color.name()
         settings["ref_color"] = self.ref_color.name()
         settings["bg_color"] = self.backgroundBrush().color().name()
@@ -181,6 +198,7 @@ class ReaderScene(QGraphicsScene):
         self.header_font = QFont(DEFAULT_FONT_FAMILY, HEADER_FONT_SIZE, QFont.Bold)
         self.chapter_font = QFont(DEFAULT_FONT_FAMILY, CHAPTER_FONT_SIZE, QFont.Bold)
         self.verse_num_font = QFont(self.font_family, self.verse_num_font_size)
+        self.verse_mark_font = QFont(self.font_family, self.verse_mark_size)
 
     def _is_rect_visible(self, r):
         # Slightly larger buffer to prevent flickering
@@ -261,6 +279,13 @@ class ReaderScene(QGraphicsScene):
         self.verse_pos_map.clear()
         self.pos_verse_map.clear()
         
+        # Clear old verse number items
+        for it in self.verse_number_items.values():
+            self.removeItem(it)
+        self.verse_number_items.clear()
+        self.selected_verse_items.clear()
+        self.last_clicked_verse_idx = -1
+        
         doc = self.main_text_item.document()
         doc.clear()
         doc.setDocumentMargin(self.side_margin)
@@ -269,6 +294,8 @@ class ReaderScene(QGraphicsScene):
         self.main_text_item.setTextWidth(width)
 
         cursor = QTextCursor(doc)
+        cursor.beginEditBlock() # Optimization
+        
         last_book, last_chap = None, None
         
         header_fmt = QTextBlockFormat()
@@ -279,10 +306,6 @@ class ReaderScene(QGraphicsScene):
         chap_fmt.setAlignment(Qt.AlignCenter)
         chap_fmt.setTopMargin(20); chap_fmt.setBottomMargin(20)
         
-        verse_fmt = QTextBlockFormat()
-        verse_fmt.setLineHeight(float(self.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
-        verse_fmt.setBottomMargin(self.font_size * 0.5)
-
         header_char_fmt = QTextCharFormat()
         header_char_fmt.setFont(self.header_font); header_char_fmt.setForeground(self.text_color)
         
@@ -292,9 +315,8 @@ class ReaderScene(QGraphicsScene):
         verse_char_fmt = QTextCharFormat()
         verse_char_fmt.setFont(self.font); verse_char_fmt.setForeground(self.text_color)
         
-        verse_num_char_fmt = QTextCharFormat()
-        verse_num_char_fmt.setFont(self.verse_num_font); verse_num_char_fmt.setForeground(self.ref_color)
-        
+        verse_indents = self.study_manager.data.get("verse_indent", {})
+
         for verse in self.loader.flat_verses:
             if verse['book'] != last_book:
                 cursor.insertBlock(header_fmt)
@@ -308,40 +330,114 @@ class ReaderScene(QGraphicsScene):
                 cursor.insertText(f"{verse['book']} {verse['chapter']}")
                 last_chap = verse['chapter']
                 
+            indent_level = verse_indents.get(verse['ref'], 0)
+            
+            verse_fmt = QTextBlockFormat()
+            verse_fmt.setLineHeight(float(self.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
+            verse_fmt.setBottomMargin(self.font_size * 0.5)
+            verse_fmt.setLeftMargin(indent_level * self.tab_size)
+            verse_fmt.setTextIndent(30) # Space for the verse number
+            
             cursor.insertBlock(verse_fmt)
             cursor.setCharFormat(verse_char_fmt)
             self.verse_pos_map[verse['ref']] = cursor.position()
             self.pos_verse_map.append((cursor.position(), verse['ref']))
             
-            # Separately format verse number
-            cursor.setCharFormat(verse_num_char_fmt)
-            cursor.insertText(f"{verse['verse_num']}  ")
-            # Then main text
-            cursor.setCharFormat(verse_char_fmt)
             cursor.insertText(verse['text'])
 
+        cursor.endEditBlock()
+
         layout = doc.documentLayout()
-        doc_height = layout.documentSize().height()
-        
-        self.total_height = doc_height + 200
+        self.total_height = layout.documentSize().height() + 200
         self.layoutChanged.emit(int(self.total_height))
         self.layoutFinished.emit()
         self.calculate_section_positions()
+        self.render_verses()
 
     def render_verses(self) -> None:
-        """Updates transient UI elements (like HUD) that depend on scroll position."""
+        """Updates transient UI elements (like HUD) and lazy-renders verse numbers."""
         doc = self.main_text_item.document()
         layout = doc.documentLayout()
         
-        pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y + 100), Qt.FuzzyHit)
+        pos = layout.hitTest(QPointF(self.side_margin + 10, self.scroll_y + 100), Qt.FuzzyHit)
         if pos != -1:
             ref = self._get_ref_from_pos(pos)
             if ref and ref != self.last_emitted_ref:
                 self.last_emitted_ref = ref
                 self.currentReferenceChanged.emit(ref)
         
+        self._render_visible_verse_numbers()
+        
         if self.strongs_enabled:
             self._render_strongs_overlays()
+
+    def _render_visible_verse_numbers(self):
+        """Creates or updates VerseNumberItems only for visible verses."""
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        
+        buffer = 200
+        start_pos = layout.hitTest(QPointF(self.side_margin + 10, max(0, self.scroll_y - buffer)), Qt.FuzzyHit)
+        end_pos = layout.hitTest(QPointF(self.side_margin + 10, self.scroll_y + self.view_height + buffer), Qt.FuzzyHit)
+        
+        if start_pos == -1: start_pos = 0
+        if end_pos == -1: end_pos = doc.characterCount()
+        
+        visible_refs = set()
+        start_idx = bisect.bisect_left(self.pos_verse_map, (start_pos, ""))
+        end_idx = bisect.bisect_right(self.pos_verse_map, (end_pos, "zzzzzz"))
+        
+        start_idx = max(0, start_idx - 1)
+        end_idx = min(len(self.pos_verse_map), end_idx + 1)
+        
+        verse_indents = self.study_manager.data.get("verse_indent", {})
+        verse_marks = self.study_manager.data.get("verse_marks", {})
+        
+        for i in range(start_idx, end_idx):
+            char_pos, ref = self.pos_verse_map[i]
+            visible_refs.add(ref)
+            
+            mark_type = verse_marks.get(ref)
+            is_selected = hasattr(self, "selected_refs") and ref in self.selected_refs
+
+            if ref not in self.verse_number_items:
+                verse_data = next((v for v in self.loader.flat_verses if v['ref'] == ref), None)
+                if not verse_data: continue
+                
+                block = doc.findBlock(char_pos)
+                rect = layout.blockBoundingRect(block)
+                indent_level = verse_indents.get(ref, 0)
+                
+                v_item = VerseNumberItem(verse_data['verse_num'], ref, self.verse_num_font, self.ref_color, mark_font=self.verse_mark_font)
+                v_item.setPos(self.side_margin + (indent_level * self.tab_size), rect.top())
+                v_item.setZValue(10)
+                v_item.mark_type = mark_type
+                v_item.is_selected = is_selected
+                
+                v_item.clicked.connect(lambda shift, v=v_item: self._on_verse_num_clicked(v, shift))
+                v_item.doubleClicked.connect(self._clear_verse_selection)
+                v_item.contextMenuRequested.connect(lambda pos, v=v_item: self._on_verse_num_context_menu(v, pos))
+                v_item.dragged.connect(lambda dx, v=v_item: self._on_verse_num_dragged(v, dx))
+                v_item.released.connect(self._on_verse_num_released)
+                
+                self.addItem(v_item)
+                self.verse_number_items[ref] = v_item
+            else:
+                # Update existing item state
+                it = self.verse_number_items[ref]
+                if it.mark_type != mark_type or it.is_selected != is_selected:
+                    it.mark_type = mark_type
+                    it.is_selected = is_selected
+                    it.update()
+
+        to_remove = []
+        for ref, it in self.verse_number_items.items():
+            if ref not in visible_refs and not it.is_selected:
+                to_remove.append(ref)
+        
+        for ref in to_remove:
+            it = self.verse_number_items.pop(ref)
+            self.removeItem(it)
 
     def set_strongs_enabled(self, enabled: bool):
         self.strongs_enabled = enabled
@@ -367,62 +463,39 @@ class ReaderScene(QGraphicsScene):
         
         # Hit test with a buffer to ensure we catch verses slightly off screen
         buffer = 100
-        start_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, max(0, self.scroll_y - buffer)), Qt.FuzzyHit)
-        end_pos = layout.hitTest(QPointF(SIDE_MARGIN + 10, self.scroll_y + self.view_height + buffer), Qt.FuzzyHit)
+        start_pos = layout.hitTest(QPointF(self.side_margin + 10, max(0, self.scroll_y - buffer)), Qt.FuzzyHit)
+        end_pos = layout.hitTest(QPointF(self.side_margin + 10, self.scroll_y + self.view_height + buffer), Qt.FuzzyHit)
         
         if start_pos == -1: start_pos = 0
         if end_pos == -1: end_pos = doc.characterCount()
         
-        # Get refs for this range
-        start_ref = self._get_ref_from_pos(start_pos)
-        end_ref = self._get_ref_from_pos(end_pos)
-        
-        if not start_ref:
-            # Fallback to very first verse if we're at the top
-            if self.loader.flat_verses:
-                start_ref = self.loader.flat_verses[0]['ref']
-            else:
-                return
-                
-        if not end_ref:
-            # Fallback to very last verse if we're at the bottom
-            if self.loader.flat_verses:
-                end_ref = self.loader.flat_verses[-1]['ref']
-            else:
-                return
-        
-        # Find indices in flat_verses
         # Using binary search for efficiency on the large list
-        import bisect
+        start_idx = bisect.bisect_left(self.pos_verse_map, (start_pos, ""))
+        end_idx = bisect.bisect_right(self.pos_verse_map, (end_pos, "zzzzzz"))
         
-        # Create a temporary list of references for binary searching
-        ref_list = [v['ref'] for v in self.loader.flat_verses]
-        
-        # Since references aren't strictly alphabetical (Gen 1 comes before Gen 10), 
-        # but flat_verses IS sequential, we can just find them by index.
-        start_idx = -1
-        end_idx = -1
-        
-        # Quick linear scan for indices (usually small search space once in chapter)
-        # But we need them for the full bible. 
-        # Actually, let's just find them once.
-        for i, v in enumerate(self.loader.flat_verses):
-            if v['ref'] == start_ref: start_idx = i
-            if v['ref'] == end_ref: end_idx = i
-            if start_idx != -1 and end_idx != -1: break
-            
-        if start_idx == -1: start_idx = 0
-        if end_idx == -1: end_idx = len(self.loader.flat_verses) - 1
-        
-        # Ensure correct order
-        if start_idx > end_idx: start_idx, end_idx = end_idx, start_idx
+        # Adjust indices to be safe
+        start_idx = max(0, start_idx - 1)
+        end_idx = min(len(self.pos_verse_map), end_idx + 1)
         
         # Slightly more noticeable underline: Gray with 120 opacity and 1.5 width
         pen = QPen(QColor(120, 120, 120, 120), 1.5) 
         
-        for i in range(start_idx, end_idx + 1):
-            verse = self.loader.flat_verses[i]
-            v_start = self.verse_pos_map[verse['ref']]
+        # Map refs to verse data for faster lookup
+        flat_refs = [v['ref'] for v in self.loader.flat_verses]
+        
+        for i in range(start_idx, end_idx):
+            char_pos, ref = self.pos_verse_map[i]
+            
+            # Find verse data
+            v_idx = bisect.bisect_left(flat_refs, ref)
+            # Since flat_refs isn't strictly alphabetical, bisect might not work if 
+            # the loader hasn't sorted them. But flat_verses IS sequential.
+            # Actually, the pos_verse_map is also sequential.
+            # Let's just find the verse data once.
+            verse = next((v for v in self.loader.flat_verses if v['ref'] == ref), None)
+            if not verse: continue
+            
+            v_start = self.verse_pos_map[ref]
             
             for word_idx, token in enumerate(verse['tokens']):
                 if len(token) > 1: # Has Strongs
@@ -553,6 +626,7 @@ class ReaderScene(QGraphicsScene):
                 end_center = self._get_word_center(end_key)
                 if end_center:
                     item = ArrowItem(start_center, end_center, arrow_data['color'])
+                    item.setOpacity(self.arrow_opacity)
                     item.setVisible(self._is_rect_visible(QRectF(start_center, end_center).normalized()))
                     self.addItem(item)
                     self.study_overlay_items.append(item)
@@ -690,6 +764,13 @@ class ReaderScene(QGraphicsScene):
         self._render_search_overlays()
 
     def contextMenuEvent(self, event):
+        # 1. Prioritize VerseNumberItem
+        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        if isinstance(item, VerseNumberItem):
+            super().contextMenuEvent(event)
+            return
+
+        # 2. Fallback to text selection/marking logic
         cursor = self.main_text_item.textCursor()
         if not cursor.hasSelection():
             pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit)
@@ -711,6 +792,61 @@ class ReaderScene(QGraphicsScene):
             self.mark_popup.show_at(screen_pos)
         else: self.current_selection = None
         self.render_verses()
+
+    def _clear_verse_selection(self):
+        """Clears the selection of verse numbers."""
+        for it in self.verse_number_items.values():
+            it.is_selected = False
+            it.update()
+        self.selected_verse_items = []
+        if hasattr(self, "selected_refs"): self.selected_refs.clear()
+        self.last_clicked_verse_idx = -1
+
+    def _on_verse_num_context_menu(self, item, screen_pos):
+        # If item is not in selection, select it first
+        if item.ref not in self.selected_refs:
+            self._on_verse_num_clicked(item, False)
+            
+        menu = QMenu()
+        menu.setStyleSheet("QMenu { background-color: #333; color: white; } QMenu::item:selected { background-color: #555; }")
+        
+        heart_act = QAction("❤ Heart", menu)
+        heart_act.triggered.connect(lambda: self._set_selected_verse_mark("heart"))
+        menu.addAction(heart_act)
+        
+        question_act = QAction("? Question Mark", menu)
+        question_act.triggered.connect(lambda: self._set_selected_verse_mark("question"))
+        menu.addAction(question_act)
+        
+        attention_act = QAction("!! Attention", menu)
+        attention_act.triggered.connect(lambda: self._set_selected_verse_mark("attention"))
+        menu.addAction(attention_act)
+        
+        star_act = QAction("★ Star", menu)
+        star_act.triggered.connect(lambda: self._set_selected_verse_mark("star"))
+        menu.addAction(star_act)
+        
+        menu.addSeparator()
+        
+        clear_act = QAction("Clear Mark", menu)
+        clear_act.triggered.connect(lambda: self._set_selected_verse_mark(None))
+        menu.addAction(clear_act)
+        
+        menu.exec(screen_pos.toPoint())
+
+    def _set_selected_verse_mark(self, mark_type):
+        for ref in self.selected_refs:
+            self.study_manager.set_verse_mark(ref, mark_type)
+            
+        self.render_verses()
+        self.studyDataChanged.emit()
+
+    def mousePressEvent(self, event):
+        # Check if we clicked on a verse number item
+        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        if not isinstance(item, VerseNumberItem):
+            self._clear_verse_selection()
+        super().mousePressEvent(event)
 
     def _clear_selection(self):
         """Clears the current text selection and resets state."""
@@ -1036,6 +1172,9 @@ class ReaderScene(QGraphicsScene):
         self.font_family = self.target_font_family
         self.verse_num_font_size = self.target_verse_num_size
         self.side_margin = self.target_side_margin
+        self.tab_size = self.target_tab_size
+        self.arrow_opacity = self.target_arrow_opacity
+        self.verse_mark_size = self.target_verse_mark_size
         
         self._update_fonts()
         self.save_settings()
@@ -1114,4 +1253,143 @@ class ReaderScene(QGraphicsScene):
             
         if not self.flash_items:
             self.flash_timer.stop()
+
+    def _on_verse_num_clicked(self, item, shift):
+        # We need a stable index for range selection. 
+        flat_refs = [v['ref'] for v in self.loader.flat_verses]
+        item_idx = flat_refs.index(item.ref)
+
+        if not shift:
+            # Single selection or Grab group
+            if not hasattr(self, "selected_refs"): self.selected_refs = set()
+            
+            if item.ref in self.selected_refs:
+                # Item is already selected, don't clear others so we can "grab the group"
+                return
+            
+            # Not in selection, clear and select single
+            self._clear_verse_selection()
+            self.selected_verse_items = [item]
+            item.is_selected = True
+            item.update()
+            self.last_clicked_verse_idx = item_idx
+            
+            if not hasattr(self, "selected_refs"): self.selected_refs = set()
+            self.selected_refs.add(item.ref)
+        else:
+            # Range selection
+            if self.last_clicked_verse_idx == -1:
+                self.last_clicked_verse_idx = item_idx
+                self.selected_verse_items = [item]
+                item.is_selected = True
+                item.update()
+                if not hasattr(self, "selected_refs"): self.selected_refs = set()
+                self.selected_refs.add(item.ref)
+            else:
+                start = min(self.last_clicked_verse_idx, item_idx)
+                end = max(self.last_clicked_verse_idx, item_idx)
+                
+                # Clear previous selection visual
+                for it in self.verse_number_items.values():
+                    it.is_selected = False
+                    it.update()
+                
+                if not hasattr(self, "selected_refs"): self.selected_refs = set()
+                self.selected_refs.clear()
+                self.selected_verse_items = []
+                
+                for i in range(start, end + 1):
+                    ref = flat_refs[i]
+                    self.selected_refs.add(ref)
+                    it = self.verse_number_items.get(ref)
+                    if it:
+                        it.is_selected = True
+                        it.update()
+                        self.selected_verse_items.append(it)
+
+    def _on_verse_num_dragged(self, item, dx):
+        # If the item being dragged is not in selection, select it
+        if item.ref not in self.selected_refs:
+            self._on_verse_num_clicked(item, False)
+            
+        self._was_dragged = True # Track that a drag occurred
+        
+        # Calculate snap displacement
+        tabs_diff = round(dx / self.tab_size)
+        
+        # Track if we actually changed the tab count to avoid redundant updates
+        if not hasattr(self, "_last_drag_tabs_diff") or self._last_drag_tabs_diff != tabs_diff:
+            self._last_drag_tabs_diff = tabs_diff
+            
+            doc = self.main_text_item.document()
+            layout = doc.documentLayout()
+            verse_indents = self.study_manager.data.get("verse_indent", {})
+            
+            # Update indentation for all selected verses
+            for ref in self.selected_refs:
+                # Find the starting indent for this drag
+                if not hasattr(self, "_drag_start_indents"):
+                    self._drag_start_indents = {}
+                
+                if ref not in self._drag_start_indents:
+                    self._drag_start_indents[ref] = verse_indents.get(ref, 0)
+                
+                start_indent = self._drag_start_indents[ref]
+                new_indent = max(0, start_indent + tabs_diff)
+                
+                # Apply to data (temporarily)
+                self.study_manager.data["verse_indent"][ref] = new_indent
+                
+                # Apply to document live
+                if ref in self.verse_pos_map:
+                    pos = self.verse_pos_map[ref]
+                    block = doc.findBlock(pos)
+                    fmt = block.blockFormat()
+                    fmt.setLeftMargin(new_indent * self.tab_size)
+                    
+                    cursor = QTextCursor(block)
+                    cursor.setBlockFormat(fmt)
+
+            # After updating text margins, block positions might have changed
+            # We need to refresh all visible verse numbers' positions
+            self._update_all_verse_number_positions()
+            
+            # Live update other overlays (marks, symbols, arrows)
+            self._render_study_overlays()
+            if self.strongs_enabled:
+                self._render_strongs_overlays()
+
+    def _update_all_verse_number_positions(self):
+        """Updates the Y (and X) positions of all currently rendered verse numbers."""
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        verse_indents = self.study_manager.data.get("verse_indent", {})
+        
+        for ref, it in self.verse_number_items.items():
+            if ref in self.verse_pos_map:
+                pos = self.verse_pos_map[ref]
+                block = doc.findBlock(pos)
+                rect = layout.blockBoundingRect(block)
+                
+                indent_level = verse_indents.get(ref, 0)
+                it.setPos(self.side_margin + (indent_level * self.tab_size), rect.top())
+
+    def _on_verse_num_released(self):
+        # Save the final state to disk
+        self.study_manager.save_study()
+        
+        # Cleanup drag tracking state
+        if hasattr(self, "_last_drag_tabs_diff"):
+            del self._last_drag_tabs_diff
+        if hasattr(self, "_drag_start_indents"):
+            del self._drag_start_indents
+            
+        # If we were dragging, de-select automatically after letting go
+        if hasattr(self, "_was_dragged") and self._was_dragged:
+            self._clear_verse_selection()
+            self._was_dragged = False
+            
+        # Optional: Final full layout to ensure everything is perfect
+        # But live updates should have already done the work.
+        self.studyDataChanged.emit()
 

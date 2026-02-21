@@ -11,12 +11,6 @@ def get_ref_from_pos(pos, pos_verse_map):
 def get_word_idx_from_pos(verse_data, pos):
     """Finds the word index within a verse for a given document position."""
     if verse_data is None: return -1
-    prefix = f"{verse_data['verse_num']}  "
-    rel_pos = pos - len(prefix)
-    
-    # Map verse number/prefix to the first word (index 0)
-    if 0 <= pos < len(prefix):
-        return 0
     
     if pos < 0: return -1
     
@@ -24,10 +18,11 @@ def get_word_idx_from_pos(verse_data, pos):
     search_pos = 0
     for i, token in enumerate(verse_data['tokens']):
         token_text = token[0]
+        # Use find with search_pos to handle multiple occurrences of the same word
         start = text.find(token_text, search_pos)
         if start != -1:
             end = start + len(token_text)
-            if start <= rel_pos <= end:
+            if start <= pos <= end:
                 return i
             search_pos = end
     return -1
@@ -62,7 +57,6 @@ def get_text_rects(text_item, start, length):
 
 def get_word_offset_in_verse(verse_data, word_idx):
     """Calculates the character offset of a word within a verse block."""
-    prefix = f"{verse_data['verse_num']}  "
     text = verse_data['text']
     pos = 0
     for i in range(word_idx):
@@ -73,5 +67,5 @@ def get_word_offset_in_verse(verse_data, word_idx):
     
     target_token = verse_data['tokens'][word_idx][0]
     actual_start = text.find(target_token, pos)
-    if actual_start == -1: return len(prefix) + pos
-    return len(prefix) + actual_start
+    if actual_start == -1: return pos
+    return actual_start

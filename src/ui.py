@@ -384,6 +384,7 @@ class MainWindow(QMainWindow):
         self.study_panel.jumpRequested.connect(self.reader_widget.scene.jump_to)
         self.study_panel.noteOpenRequested.connect(self.reader_widget.scene.open_note_by_key)
         self.study_panel.dataChanged.connect(self.reader_widget.scene._render_study_overlays)
+        self.study_panel.dataChanged.connect(self.reader_widget.scene.render_verses)
         self.study_panel.dataChanged.connect(self.bookmark_sidebar.refresh_bookmarks)
         self.reader_widget.scene.studyDataChanged.connect(self.study_panel.refresh)
         

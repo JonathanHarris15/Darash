@@ -174,44 +174,106 @@ class StudyPanel(QWidget):
     def refresh(self):
         self.tree.clear()
         
-        # 1. Marks
+        # 1. Marks (includes Highlights, Underlines, Boxes, Circles, and Arrows)
         marks_root = QTreeWidgetItem(self.tree, ["Marks"])
         marks_root.setExpanded(True)
         
-        # Group marks by group_id
-        grouped_marks = {} # {group_id: [indices]}
-        ungrouped_indices = []
+        # Sub-categories for marks
+        mark_categories = {
+            "highlight": QTreeWidgetItem(marks_root, ["Highlights"]),
+            "underline": QTreeWidgetItem(marks_root, ["Underlines"]),
+            "box": QTreeWidgetItem(marks_root, ["Boxes"]),
+            "circle": QTreeWidgetItem(marks_root, ["Circles"]),
+            "arrow": QTreeWidgetItem(marks_root, ["Arrows"]),
+            "verse_mark": QTreeWidgetItem(marks_root, ["Verse Marks"])
+        }
         
+        # Marks grouping logic
         all_marks = self.study_manager.data.get("marks", [])
+        # Group marks by type first, then by group_id
+        type_grouped_marks = {} # {type: {group_id: [indices], "ungrouped": [indices]}}
+        
         for i, m in enumerate(all_marks):
+            m_type = m.get("type", "highlight")
+            if m_type not in type_grouped_marks:
+                type_grouped_marks[m_type] = {"ungrouped": []}
+            
             gid = m.get("group_id")
             if gid:
-                if gid not in grouped_marks:
-                    grouped_marks[gid] = []
-                grouped_marks[gid].append(i)
+                if gid not in type_grouped_marks[m_type]:
+                    type_grouped_marks[m_type][gid] = []
+                type_grouped_marks[m_type][gid].append(i)
             else:
-                ungrouped_indices.append(i)
+                type_grouped_marks[m_type]["ungrouped"].append(i)
+
+        # Add marks to their respective categories
+        for m_type, groups in type_grouped_marks.items():
+            parent = mark_categories.get(m_type, marks_root)
+            
+            # Add grouped marks
+            for gid, indices in groups.items():
+                if gid == "ungrouped": continue
+                group_data = [all_marks[i] for i in indices]
+                range_str = self._get_range_string(group_data)
+                
+                item = QTreeWidgetItem(parent, [range_str])
+                item.setData(0, Qt.UserRole, "mark_group")
+                item.setData(0, Qt.UserRole + 1, indices)
+                item.setData(0, Qt.UserRole + 2, group_data[0])
+            
+            # Add ungrouped marks
+            for i in groups["ungrouped"]:
+                m = all_marks[i]
+                ref = f"{m['book']} {m['chapter']}:{m['verse_num']}"
+                item = QTreeWidgetItem(parent, [ref])
+                item.setData(0, Qt.UserRole, "mark")
+                item.setData(0, Qt.UserRole + 1, m)
+                item.setData(0, Qt.UserRole + 2, i)
+
+        # Add Arrows to the Arrow sub-category
+        arrow_parent = mark_categories["arrow"]
+        verse_arrow_counts = {}
+        sorted_keys = sorted(self.study_manager.data.get("arrows", {}).keys())
+        for key in sorted_keys:
+            arrow_list = self.study_manager.data["arrows"][key]
+            parts = key.split('|')
+            ref = f"{parts[0]} {parts[1]}:{parts[2]}"
+            if ref not in verse_arrow_counts: verse_arrow_counts[ref] = 0
+            for i, a in enumerate(arrow_list):
+                verse_arrow_counts[ref] += 1
+                item = QTreeWidgetItem(arrow_parent, [f"{ref} Arrow {verse_arrow_counts[ref]}"])
+                item.setData(0, Qt.UserRole, "arrow")
+                item.setData(0, Qt.UserRole + 1, key)
+                item.setData(0, Qt.UserRole + 2, i)
+
+        # Add Verse Marks
+        vm_parent = mark_categories["verse_mark"]
+        verse_marks_data = self.study_manager.data.get("verse_marks", {})
         
-        # Add grouped marks
-        for gid, indices in grouped_marks.items():
-            group_data = [all_marks[i] for i in indices]
-            range_str = self._get_range_string(group_data)
-            mark_type = group_data[0]['type'].title()
+        # Group by mark type for display
+        vm_types = {
+            "heart": "Hearts",
+            "question": "Questions",
+            "attention": "Attention (!!)",
+            "star": "Stars"
+        }
+        
+        vm_type_nodes = {}
+        for ref, m_type in sorted(verse_marks_data.items()):
+            if m_type not in vm_type_nodes:
+                type_label = vm_types.get(m_type, m_type.title())
+                vm_type_nodes[m_type] = QTreeWidgetItem(vm_parent, [type_label])
+                vm_type_nodes[m_type].setExpanded(True)
             
-            item = QTreeWidgetItem(marks_root, [f"{range_str} ({mark_type})"])
-            item.setData(0, Qt.UserRole, "mark_group")
-            item.setData(0, Qt.UserRole + 1, indices)
-            item.setData(0, Qt.UserRole + 2, group_data[0]) # Use first mark for jump reference
-            
-        # Add ungrouped marks
-        for i in ungrouped_indices:
-            m = all_marks[i]
-            ref = f"{m['book']} {m['chapter']}:{m['verse_num']}"
-            item = QTreeWidgetItem(marks_root, [f"{ref} ({m['type'].title()})"])
-            item.setData(0, Qt.UserRole, "mark")
-            item.setData(0, Qt.UserRole + 1, m)
-            item.setData(0, Qt.UserRole + 2, i) # index
-            
+            item = QTreeWidgetItem(vm_type_nodes[m_type], [ref])
+            item.setData(0, Qt.UserRole, "verse_mark")
+            item.setData(0, Qt.UserRole + 1, ref)
+
+        # Hide empty mark categories
+        for cat in mark_categories.values():
+            if cat.childCount() == 0:
+                marks_root.removeChild(cat)
+
         # 2. Symbols
         symbols_root = QTreeWidgetItem(self.tree, ["Symbols"])
         symbols_root.setExpanded(True)
@@ -243,7 +305,7 @@ class StudyPanel(QWidget):
                 item.setData(0, Qt.UserRole + 1, key)
                 item.setData(0, Qt.UserRole + 2, s_file)
             
-        # 3. Notes
+        # 3. Notes (Always visible)
         notes_root = QTreeWidgetItem(self.tree, ["Notes"])
         notes_root.setData(0, Qt.UserRole, "notes_header")
         notes_root.setExpanded(True)
@@ -288,8 +350,7 @@ class StudyPanel(QWidget):
                 ref = f"{parts[0]} {parts[1]}:{parts[2]}"
                 
                 if title:
-                    # Clean up redundant prefixes (common for Symbol List Notes)
-                    # If title already contains the reference, don't repeat it
+                    # Clean up redundant prefixes
                     if ref in title:
                         label = title
                     else:
@@ -300,30 +361,8 @@ class StudyPanel(QWidget):
             item = QTreeWidgetItem(parent_item, [label])
             item.setData(0, Qt.UserRole, "note")
             item.setData(0, Qt.UserRole + 1, key)
-            
-        # 4. Arrows
-        arrows_root = QTreeWidgetItem(self.tree, ["Arrows"])
-        arrows_root.setExpanded(True)
-        verse_arrow_counts = {} # {ref: count}
-        # Sort keys to ensure consistent numbering
-        sorted_keys = sorted(self.study_manager.data.get("arrows", {}).keys())
-        for key in sorted_keys:
-            arrow_list = self.study_manager.data["arrows"][key]
-            parts = key.split('|')
-            ref = f"{parts[0]} {parts[1]}:{parts[2]}"
-            
-            # Initialize or get count for this ref
-            if ref not in verse_arrow_counts:
-                verse_arrow_counts[ref] = 0
-                
-            for i, a in enumerate(arrow_list):
-                verse_arrow_counts[ref] += 1
-                item = QTreeWidgetItem(arrows_root, [f"{ref} Arrow {verse_arrow_counts[ref]}"])
-                item.setData(0, Qt.UserRole, "arrow")
-                item.setData(0, Qt.UserRole + 1, key)
-                item.setData(0, Qt.UserRole + 2, i)
 
-        # 5. Bookmarks
+        # 4. Bookmarks
         bookmarks_root = QTreeWidgetItem(self.tree, ["Bookmarks"])
         bookmarks_root.setExpanded(True)
         for b in self.study_manager.data.get("bookmarks", []):
@@ -356,6 +395,14 @@ class StudyPanel(QWidget):
             key = item.data(0, Qt.UserRole + 1)
             parts = key.split('|')
             self.jumpRequested.emit(parts[0], parts[1], parts[2])
+        elif itype == "verse_mark":
+            ref = item.data(0, Qt.UserRole + 1)
+            # Parse ref "Book Chap:Verse"
+            import re
+            match = re.match(r"(.*) (\d+):(\d+)", ref)
+            if match:
+                book, chap, verse = match.groups()
+                self.jumpRequested.emit(book, chap, verse)
 
     def _create_symbol_list_note(self, symbol_items):
         if not symbol_items: return
@@ -556,6 +603,12 @@ class StudyPanel(QWidget):
             del_act.triggered.connect(lambda: self._delete_arrow(key, idx))
             menu.addAction(del_act)
             
+        elif itype == "verse_mark":
+            ref = item.data(0, Qt.UserRole + 1)
+            del_act = QAction("Delete Verse Mark", self)
+            del_act.triggered.connect(lambda: self._delete_verse_mark(ref))
+            menu.addAction(del_act)
+            
         if menu.actions():
             menu.exec(self.tree.mapToGlobal(pos))
 
@@ -673,6 +726,11 @@ class StudyPanel(QWidget):
         self.dataChanged.emit()
         self.refresh()
 
+    def _delete_verse_mark(self, ref):
+        self.study_manager.set_verse_mark(ref, None)
+        self.dataChanged.emit()
+        self.refresh()
+
     def _open_note(self, key):
         if key.startswith("standalone_"):
             # Use empty ref or custom string for standalone notes
@@ -702,9 +760,10 @@ class StudyPanel(QWidget):
             "marks": [], # indices
             "symbols": [], # keys
             "notes": [], # keys
-            "folders": [], # paths
+            "note_folders": [], # paths
             "arrows": [], # (key, idx)
-            "bookmarks": [] # refs
+            "bookmarks": [], # refs
+            "verse_marks": [] # refs
         }
         
         # Expand any groups to their children
@@ -728,11 +787,13 @@ class StudyPanel(QWidget):
             elif itype == "note":
                 to_del["notes"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "note_folder":
-                to_del["folders"].append(item.data(0, Qt.UserRole + 1))
+                to_del["note_folders"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "arrow":
                 to_del["arrows"].append((item.data(0, Qt.UserRole + 1), item.data(0, Qt.UserRole + 2)))
             elif itype == "bookmark":
                 to_del["bookmarks"].append(item.data(0, Qt.UserRole + 1)['ref'])
+            elif itype == "verse_mark":
+                to_del["verse_marks"].append(item.data(0, Qt.UserRole + 1))
         
         # Execute Deletions
         # Marks (reverse sort indices to pop correctly)
@@ -750,7 +811,7 @@ class StudyPanel(QWidget):
             self.study_manager.delete_note(key)
         
         # Folders
-        for path in to_del["folders"]:
+        for path in to_del["note_folders"]:
             self.study_manager.delete_folder(path)
         
         # Arrows
@@ -768,6 +829,10 @@ class StudyPanel(QWidget):
         # Bookmarks
         for ref in to_del["bookmarks"]:
             self.study_manager.delete_bookmark(ref)
+            
+        # Verse Marks
+        for ref in to_del["verse_marks"]:
+            self.study_manager.set_verse_mark(ref, None)
             
         self.study_manager.save_study()
         self.dataChanged.emit()

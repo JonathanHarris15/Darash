@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QGraphicsTextItem, QGraphicsEllipseItem, QGraphicsLineItem,
     QStyle, QGraphicsItem, QGraphicsObject, QGraphicsPathItem
 )
-from PySide6.QtCore import Qt, QPointF, QLineF, Signal
+from PySide6.QtCore import Qt, QPointF, QLineF, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QPen, QPainterPath
 import math
 
@@ -79,3 +79,112 @@ class ArrowItem(QGraphicsPathItem):
         head_fill = QColor(self.color)
         head_fill.setAlpha(200)
         self.setBrush(QBrush(head_fill))
+
+class VerseNumberItem(QGraphicsObject):
+    """Clickable and draggable verse number item."""
+    dragged = Signal(float) # dx
+    clicked = Signal(bool) # shift pressed
+    doubleClicked = Signal()
+    contextMenuRequested = Signal(QPointF)
+    released = Signal()
+
+    def __init__(self, verse_num, ref, font, color, mark_font=None, parent=None):
+        super().__init__(parent)
+        self.verse_num = str(verse_num)
+        self.ref = ref
+        self.font = font
+        self.color = color
+        self.mark_font = mark_font if mark_font else font
+        self.mark_type = None # heart, question, attention, star
+        self.is_selected = False
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self._dragging = False
+        self._drag_start_x = 0
+        
+        # Calculate dynamic height based on font
+        from PySide6.QtGui import QFontMetrics
+        metrics = QFontMetrics(self.font)
+        self._height = metrics.height()
+        
+        # Also check mark font height for bounding rect
+        m_metrics = QFontMetrics(self.mark_font)
+        self._mark_height = m_metrics.height()
+        
+    def boundingRect(self):
+        h = max(self._height, self._mark_height)
+        # Left margin (-35) for icon+arrow, width (80) total, and height from font
+        return QRectF(-35, 0, 80, h + 5)
+
+    def paint(self, painter, option, widget=None):
+        if self.is_selected:
+            # Draw a small right-pointing arrow to indicate tabbing capability
+            painter.setBrush(QBrush(self.color))
+            painter.setPen(Qt.NoPen)
+            
+            # Position arrow closer to the number
+            arrow_path = QPainterPath()
+            arrow_path.moveTo(-8, 6)
+            arrow_path.lineTo(-2, 10)
+            arrow_path.lineTo(-8, 14)
+            arrow_path.closeSubpath()
+            painter.drawPath(arrow_path)
+            
+        painter.setFont(self.font)
+        painter.setPen(self.color)
+        painter.drawText(QRectF(0, 0, 30, self._height + 5), Qt.AlignLeft | Qt.AlignTop, self.verse_num)
+        
+        if self.mark_type:
+            # Draw mark icon/symbol to the LEFT of the number
+            mark_color = self.color
+            symbol = ""
+            if self.mark_type == "heart":
+                symbol = "❤"; mark_color = QColor("#ff4b4b")
+            elif self.mark_type == "question":
+                symbol = "?"; mark_color = QColor("#4b9fff")
+            elif self.mark_type == "attention":
+                symbol = "!!"; mark_color = QColor("#ffcc00")
+            elif self.mark_type == "star":
+                symbol = "★"; mark_color = QColor("#ffcc00")
+                
+            if symbol:
+                painter.setFont(self.mark_font)
+                painter.setPen(mark_color)
+                # Position mark further left of the verse number
+                painter.drawText(QRectF(-28, 0, 30, self._mark_height + 5), Qt.AlignLeft | Qt.AlignTop, symbol)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(bool(event.modifiers() & Qt.ShiftModifier))
+            self._dragging = True
+            self._drag_start_x = event.scenePos().x()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event):
+        self.contextMenuRequested.emit(event.screenPos())
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.doubleClicked.emit()
+            event.accept()
+        else:
+            super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._dragging:
+            dx = event.scenePos().x() - self._drag_start_x
+            self.dragged.emit(dx)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._dragging:
+            self._dragging = False
+            self.released.emit()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)

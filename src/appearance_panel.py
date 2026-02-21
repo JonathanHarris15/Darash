@@ -67,6 +67,12 @@ class AppearancePanel(QDialog):
         self.verse_num_size_spin.valueChanged.connect(self._on_verse_num_size_changed)
         typo_layout.addRow("Verse Num Size:", self.verse_num_size_spin)
         
+        self.verse_mark_size_spin = QSpinBox()
+        self.verse_mark_size_spin.setRange(6, 72)
+        self.verse_mark_size_spin.setValue(getattr(self.scene, 'verse_mark_size', 18))
+        self.verse_mark_size_spin.valueChanged.connect(self._on_verse_mark_size_changed)
+        typo_layout.addRow("Verse Mark Size:", self.verse_mark_size_spin)
+        
         self.form.addRow(typo_group)
         
         # --- Colors Group ---
@@ -90,9 +96,22 @@ class AppearancePanel(QDialog):
         
         self.side_margin_spin = QSpinBox()
         self.side_margin_spin.setRange(0, 500)
-        self.side_margin_spin.setValue(constants.SIDE_MARGIN)
+        self.side_margin_spin.setValue(self.scene.side_margin)
         self.side_margin_spin.valueChanged.connect(self._on_margin_changed)
         layout_layout.addRow("Side Margin:", self.side_margin_spin)
+        
+        self.tab_size_spin = QSpinBox()
+        self.tab_size_spin.setRange(10, 200)
+        self.tab_size_spin.setValue(self.scene.tab_size)
+        self.tab_size_spin.valueChanged.connect(self._on_tab_size_changed)
+        layout_layout.addRow("Tab Size (px):", self.tab_size_spin)
+        
+        self.arrow_opacity_spin = QDoubleSpinBox()
+        self.arrow_opacity_spin.setRange(0.0, 1.0)
+        self.arrow_opacity_spin.setSingleStep(0.1)
+        self.arrow_opacity_spin.setValue(self.scene.arrow_opacity)
+        self.arrow_opacity_spin.valueChanged.connect(self._on_arrow_opacity_changed)
+        layout_layout.addRow("Arrow Opacity:", self.arrow_opacity_spin)
         
         self.form.addRow(layout_group)
         
@@ -132,6 +151,9 @@ class AppearancePanel(QDialog):
     def _on_verse_num_size_changed(self, val):
         self.scene.target_verse_num_size = val
 
+    def _on_verse_mark_size_changed(self, val):
+        self.scene.target_verse_mark_size = val
+
     def _on_text_color_changed(self, color):
         self.scene.text_color = color
 
@@ -145,6 +167,12 @@ class AppearancePanel(QDialog):
 
     def _on_margin_changed(self, val):
         self.scene.target_side_margin = val
+
+    def _on_tab_size_changed(self, val):
+        self.scene.target_tab_size = val
+
+    def _on_arrow_opacity_changed(self, val):
+        self.scene.target_arrow_opacity = val
 
     def apply_changes(self):
         self.scene.apply_layout_changes()
