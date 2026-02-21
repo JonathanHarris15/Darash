@@ -1,7 +1,7 @@
 import re
 import os
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Tuple
 
 class StrongsManager:
     """
@@ -123,3 +123,35 @@ class StrongsManager:
 
     def get_usages(self, sn: str) -> List[Dict[str, str]]:
         return self.usages.get(sn, [])
+
+    def get_top_strongs_words(self, scope_type: str, scope_text: str, flat_verses: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
+        """
+        Counts Strong's-enabled word frequencies within a given scope (book or chapter).
+        Returns top 10 words (ESV, not Strong's num) and their counts.
+        """
+        word_counts = {}
+        
+        for verse in flat_verses:
+            if scope_type == "book":
+                if verse['book'] != scope_text:
+                    continue
+            elif scope_type == "chapter":
+                # scope_text is like "Genesis 1"
+                book, chapter = scope_text.split()
+                if verse['book'] != book or verse['chapter'] != chapter:
+                    continue
+            else: # Unknown scope type
+                continue
+            
+            for token in verse['tokens']:
+                if len(token) > 1: # Has Strong's number(s)
+                    word = token[0].lower() # Count ESV word
+                    # Basic cleanup for punctuation attached to word
+                    word = word.strip(".,;!?:") 
+                    if word:
+                        word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Sort by frequency and get top 10
+        top_words = sorted(word_counts.items(), key=lambda item: item[1], reverse=True)[:10]
+        
+        return top_words

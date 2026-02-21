@@ -242,12 +242,15 @@ class StudyManager:
                 break
         self.save_study()
 
-    def add_arrow(self, start_key: str, end_key: str, color: str = "#00FFFF"):
+    def add_arrow(self, start_key: str, end_key: str, color: str = "#00FFFF", arrow_type: str = "straight"):
+        if not start_key or start_key == "null":
+            return
         self.save_state()
         if start_key not in self.data["arrows"]:
             self.data["arrows"][start_key] = []
         self.data["arrows"][start_key].append({
             "end_key": end_key,
-            "color": color
+            "color": color,
+            "type": arrow_type
         })
         self.save_study()

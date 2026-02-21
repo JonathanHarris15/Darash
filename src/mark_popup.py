@@ -193,6 +193,12 @@ class MarkPopup(QWidget):
         self.markSelected.emit(mark_type, color)
         self.hide()
 
+    def keyPressEvent(self, event):
+        # Close popup on any key press (especially Esc or Ctrl+C)
+        # but don't accept the event so it can bubble up to the main window/scene
+        self.hide()
+        event.ignore()
+
     def show_at(self, pos):
         self.color_container.hide()
         self.move(pos)

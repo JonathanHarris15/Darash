@@ -12,10 +12,23 @@
             "title": ""
         }
     ],
-    "arrows": {},
+    "arrows": {
+        "null": [
+            {
+                "end_key": "Genesis|1|2|0",
+                "color": "#99ffffff",
+                "type": "snake"
+            },
+            {
+                "end_key": "Genesis|1|5|4",
+                "color": "#99ffffff",
+                "type": "snake"
+            }
+        ]
+    },
     "note_folders": [],
     "settings": {
-        "font_size": 14,
+        "font_size": 20,
         "line_spacing": 1.6,
         "font_family": "Times New Roman",
         "verse_num_size": 10,

@@ -35,7 +35,7 @@ class NoteIcon(QGraphicsEllipseItem):
             super().mousePressEvent(event)
 
 class ArrowItem(QGraphicsPathItem):
-    """A single graphics item that renders an arrow from start to end."""
+    """A graphics item that renders a straight arrow from start to end."""
     def __init__(self, start_pos, end_pos, color, parent=None):
         super().__init__(parent)
         self.start_pos = start_pos
@@ -49,21 +49,18 @@ class ArrowItem(QGraphicsPathItem):
         path = QPainterPath(self.start_pos)
         path.lineTo(self.end_pos)
         
-        # Arrow head
-        # Use atan2(y2-y1, x2-x1) for direct vector angle in scene coordinates
+        # Arrow head calculation
         angle = math.atan2(self.end_pos.y() - self.start_pos.y(), 
                            self.end_pos.x() - self.start_pos.x())
         
         head_len = 10
         head_angle = math.pi / 6 # 30 degrees
         
-        # Calculate offsets from the end point back towards the start
         p1 = self.end_pos - QPointF(head_len * math.cos(angle - head_angle),
                                    head_len * math.sin(angle - head_angle))
         p2 = self.end_pos - QPointF(head_len * math.cos(angle + head_angle),
                                    head_len * math.sin(angle + head_angle))
         
-        # Refined arrowhead logic (standard for expert vector drawing)
         arrow_head = QPainterPath(self.end_pos)
         arrow_head.lineTo(p1)
         arrow_head.lineTo(p2)
@@ -75,10 +72,83 @@ class ArrowItem(QGraphicsPathItem):
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
         self.setPen(pen)
-        # Fill the arrowhead
-        head_fill = QColor(self.color)
-        head_fill.setAlpha(200)
-        self.setBrush(QBrush(head_fill))
+        self.setBrush(Qt.NoBrush)
+
+class SnakeArrowItem(QGraphicsPathItem):
+    """
+    An arrow item that snakes through lines and gates.
+    """
+    def __init__(self, points, color, parent=None):
+        super().__init__(parent)
+        self.points = points # List of QPointF
+        self.color = QColor(color)
+        self.radius = 8.0 # Corner rounding radius
+        self.setZValue(20)
+        self.setAcceptedMouseButtons(Qt.NoButton)
+        self.update_path()
+
+    def update_path(self):
+        if not self.points or len(self.points) < 2:
+            return
+
+        path = QPainterPath()
+        start = self.points[0]
+        path.moveTo(start)
+
+        # Draw segments with rounded corners
+        for i in range(1, len(self.points) - 1):
+            p1 = self.points[i-1]
+            p2 = self.points[i]
+            p3 = self.points[i+1]
+
+            # Vector p2 -> p1 and p2 -> p3
+            v1 = p1 - p2
+            v3 = p3 - p2
+            
+            d1 = math.sqrt(v1.x()**2 + v1.y()**2)
+            d3 = math.sqrt(v3.x()**2 + v3.y()**2)
+            
+            curr_r = min(self.radius, d1 / 2, d3 / 2)
+            
+            if curr_r > 0.1:
+                # Points where the curve starts and ends
+                start_p = p2 + (v1 / d1) * curr_r
+                end_p = p2 + (v3 / d3) * curr_r
+                
+                path.lineTo(start_p)
+                path.quadTo(p2, end_p)
+            else:
+                path.lineTo(p2)
+
+        # Final segment
+        end = self.points[-1]
+        path.lineTo(end)
+
+        # Arrow head
+        if len(self.points) >= 2:
+            last_p = self.points[-2]
+            angle = math.atan2(end.y() - last_p.y(), end.x() - last_p.x())
+            
+            head_len = 10
+            head_angle = math.pi / 6 # 30 degrees
+            
+            p1 = end - QPointF(head_len * math.cos(angle - head_angle),
+                               head_len * math.sin(angle - head_angle))
+            p2 = end - QPointF(head_len * math.cos(angle + head_angle),
+                               head_len * math.sin(angle + head_angle))
+            
+            arrow_head = QPainterPath(end)
+            arrow_head.lineTo(p1)
+            arrow_head.lineTo(p2)
+            arrow_head.closeSubpath()
+            path.addPath(arrow_head)
+
+        self.setPath(path)
+        pen = QPen(self.color, 2)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        self.setPen(pen)
+        self.setBrush(Qt.NoBrush)
 
 class VerseNumberItem(QGraphicsObject):
     """Clickable and draggable verse number item."""
@@ -113,8 +183,8 @@ class VerseNumberItem(QGraphicsObject):
         
     def boundingRect(self):
         h = max(self._height, self._mark_height)
-        # Left margin (-35) for icon+arrow, width (80) total, and height from font
-        return QRectF(-35, 0, 80, h + 5)
+        # Left margin (-35) for icon+arrow, width (65) total, and height from font
+        return QRectF(-35, 0, 65, h + 5)
 
     def paint(self, painter, option, widget=None):
         if self.is_selected:

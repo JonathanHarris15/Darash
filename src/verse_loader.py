@@ -15,6 +15,7 @@ class VerseLoader:
         
         self.data: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.flat_verses: List[Dict[str, Any]] = []
+        self.ref_map: Dict[str, Dict[str, Any]] = {}
         self._load_data(json_path)
 
     def _load_data(self, path: str) -> None:
@@ -66,9 +67,13 @@ class VerseLoader:
                         
                         self.data[book_name][chap_num][v_num] = verse_entry
                         self.flat_verses.append(verse_entry)
+                        self.ref_map[verse_entry['ref']] = verse_entry
             print(f"Loaded {len(self.flat_verses)} verses in {time.time() - start_t:.2f}s")
         except Exception as e:
             print(f"Error loading Bible data: {e}")
+
+    def get_verse_by_ref(self, ref: str) -> Optional[Dict[str, Any]]:
+        return self.ref_map.get(ref)
 
     def get_verse(self, book: str, chapter: int, verse: int) -> Optional[Dict[str, Any]]:
         try:
