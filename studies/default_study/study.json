@@ -2,6 +2,7 @@
     "symbols": {},
     "marks": [],
     "notes": {},
+    "note_folders": [],
     "bookmarks": [
         {
             "ref": "Psalms 32:6",
@@ -9,6 +10,14 @@
             "chapter": "32",
             "verse": "6",
             "color": "#0078D7",
+            "title": ""
+        },
+        {
+            "ref": "Mark 6:17",
+            "book": "Mark",
+            "chapter": "6",
+            "verse": "17",
+            "color": "#ff5500",
             "title": ""
         }
     ],
@@ -25,22 +34,6 @@
                 "type": "snake"
             }
         ]
-    },
-    "note_folders": [],
-    "settings": {
-        "font_size": 20,
-        "line_spacing": 1.6,
-        "font_family": "Times New Roman",
-        "verse_num_size": 10,
-        "side_margin": 40,
-        "text_color": "#dcdcdc",
-        "ref_color": "#64c8ff",
-        "bg_color": "#1e1e1e",
-        "tab_size": 40,
-        "arrow_opacity": 0.6,
-        "verse_mark_size": 8,
-        "logical_mark_opacity": 0.7,
-        "logical_mark_color": "#ff87fd"
     },
     "verse_indent": {
         "Genesis 1:1": 0,
@@ -71,10 +64,25 @@
         "Genesis 1:19": 0,
         "Genesis 2:1": 0,
         "Psalms 35:4": 0,
-        "Psalms 35:8": 0
+        "Psalms 35:8": 0,
+        "Mark 5:10": 0
     },
     "verse_marks": {},
-    "logical_marks": {
-        "Psalms|32|6|2": "arrow_diverge"
-    }
+    "logical_marks": {},
+    "settings": {
+        "font_size": 14,
+        "line_spacing": 1.6,
+        "font_family": "Times New Roman",
+        "verse_num_size": 10,
+        "side_margin": 40,
+        "text_color": "#dcdcdc",
+        "ref_color": "#64c8ff",
+        "bg_color": "#1e1e1e",
+        "tab_size": 40,
+        "arrow_opacity": 0.6,
+        "verse_mark_size": 12,
+        "logical_mark_opacity": 0.7,
+        "logical_mark_color": "#ff87fd"
+    },
+    "outlines": []
 }

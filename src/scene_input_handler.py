@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QPointF, QObject, QTimer
 from PySide6.QtGui import QColor, QCursor, QTextCursor, QGuiApplication
 from PySide6.QtWidgets import QDialog
-from src.reader_items import ArrowItem
+from src.reader_items import ArrowItem, OutlineDividerItem
 
 class SceneInputHandler(QObject):
     """
@@ -14,6 +14,7 @@ class SceneInputHandler(QObject):
         self._was_dragged = False
         self._last_drag_tabs_diff = 0
         self._drag_start_indents = {}
+        self.d_key_pressed = False
         
         # Arrow State
         self.is_drawing_snake_arrow = False
@@ -57,6 +58,10 @@ class SceneInputHandler(QObject):
             self._handle_strongs_lookup()
             return True
 
+        if key == Qt.Key_D:
+            self.d_key_pressed = True
+            return False # Allow bubble for scrolling if not using wheel
+
         if Qt.Key_1 <= key <= Qt.Key_9:
             scene._apply_symbol_at_mouse(str(key - Qt.Key_0))
             return True
@@ -74,6 +79,9 @@ class SceneInputHandler(QObject):
         if event.key() == Qt.Key_S and self.is_drawing_snake_arrow and not event.isAutoRepeat():
             self._finish_arrow_drawing()
             return True
+        if event.key() == Qt.Key_D and not event.isAutoRepeat():
+            self.d_key_pressed = False
+            return False
         return False
 
     def _handle_copy(self):
@@ -118,6 +126,17 @@ class SceneInputHandler(QObject):
         if final_text:
             QGuiApplication.clipboard().setText(final_text)
 
+    def handle_wheel(self, event):
+        if self.d_key_pressed:
+            # Cycle division levels
+            scene_pos = event.scenePos()
+            # QGraphicsSceneWheelEvent uses delta()
+            delta = event.delta()
+            if self.scene.cycle_divider_at_pos(scene_pos, delta):
+                return True
+            return True # Still block scrolling even if no divider found
+        return False
+
     def handle_mouse_move(self, event):
         scene = self.scene
         if scene.is_drawing_arrow:
@@ -159,6 +178,18 @@ class SceneInputHandler(QObject):
         scene = self.scene
         view = scene.views()[0]
         mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        
+        # 1. Check for OutlineDividerItem (Division lines)
+        item = scene.itemAt(mouse_pos, view.transform())
+        if isinstance(item, OutlineDividerItem):
+            if item.parent_node and item.split_idx != -1:
+                # Use specialized deletion that handles merging sub-elements
+                if scene.study_manager.outline_manager.delete_divider_smart(item.parent_node["id"], item.split_idx):
+                    scene._render_outline_overlays()
+                    scene.studyDataChanged.emit()
+                return # Stop here even if delete was blocked (protected line)
+
+        # 2. Check for other items at pos
         key_str = scene._get_word_key_at_pos(mouse_pos)
         if not key_str: return
         

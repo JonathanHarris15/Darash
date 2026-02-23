@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QGraphicsView, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QWidget, QScrollBar, QStyle, QStyleOptionSlider, QLabel, QMenuBar, QMenu
+    QWidget, QScrollBar, QStyle, QStyleOptionSlider, QLabel, QMenuBar, QMenu,
+    QPushButton
 )
 from PySide6.QtGui import QPainter, QColor, QAction, QFont
 from PySide6.QtCore import Qt, QTimer, QRect, Signal, QPoint
@@ -330,7 +331,6 @@ class ReaderWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Jehu Reader")
         self.resize(1400, 900)
 
         # Main Widget
@@ -343,6 +343,9 @@ class MainWindow(QMainWindow):
         # 1. Reader components
         self.reader_widget = ReaderWidget()
         self.search_bar = SearchBar()
+
+        study_name = self.reader_widget.scene.study_manager.current_study_name
+        self.setWindowTitle(f"Jehu Reader - {study_name}")
 
         # 2. Navigation (Left, Fixed Width, Spans both rows)
         self.nav_dock = NavigationDock(self.reader_widget.scene.loader)
@@ -376,6 +379,7 @@ class MainWindow(QMainWindow):
         # Connections
         self.nav_dock.jumpRequested.connect(self.reader_widget.scene.jump_to)
         self.nav_dock.strongsToggled.connect(self.reader_widget.scene.set_strongs_enabled)
+        self.nav_dock.outlinesToggled.connect(self.reader_widget.scene.set_outlines_enabled)
         self.bookmark_sidebar.bookmarkJumpRequested.connect(self.reader_widget.scene.jump_to)
         self.bookmark_sidebar.bookmarksChanged.connect(self.study_panel.refresh)
         self.reader_widget.scene.bookmarksUpdated.connect(self.bookmark_sidebar.refresh_bookmarks)
@@ -383,10 +387,13 @@ class MainWindow(QMainWindow):
         
         self.study_panel.jumpRequested.connect(self.reader_widget.scene.jump_to)
         self.study_panel.noteOpenRequested.connect(self.reader_widget.scene.open_note_by_key)
+        self.study_panel.activeOutlineChanged.connect(self.reader_widget.scene.set_active_outline)
         self.study_panel.dataChanged.connect(self.reader_widget.scene._render_study_overlays)
+        self.study_panel.dataChanged.connect(self.reader_widget.scene._render_outline_overlays)
         self.study_panel.dataChanged.connect(self.reader_widget.scene.render_verses)
         self.study_panel.dataChanged.connect(self.bookmark_sidebar.refresh_bookmarks)
         self.reader_widget.scene.studyDataChanged.connect(self.study_panel.refresh)
+        self.reader_widget.scene.outlineCreated.connect(self.study_panel.set_active_outline)
         
         self.search_bar.jumpToRef.connect(self.reader_widget.scene.jump_to)
         self.search_bar.searchText.connect(self.reader_widget.scene.handle_search)

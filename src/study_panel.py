@@ -1,21 +1,27 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, 
     QLabel, QMenu, QColorDialog, QInputDialog, QMessageBox, QStyle,
-    QPushButton
+    QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 import os
+from src.outline_dialog import OutlineDialog
+from src.outline_editor import OutlineEditor
 
 class StudyPanel(QWidget):
     jumpRequested = Signal(str, str, str) # book, chap, verse
     noteOpenRequested = Signal(str, str) # note_key, ref
+    outlineOpenRequested = Signal() # Optional, can handle internally
+    activeOutlineChanged = Signal(str) # Signal when entering/exiting outline mode
     dataChanged = Signal() # Signal to refresh view after edits
 
     def __init__(self, study_manager, symbol_manager, parent=None):
         super().__init__(parent)
         self.study_manager = study_manager
         self.symbol_manager = symbol_manager
+        self.open_outline_editors = {} # node_id: OutlineEditor
+        self.active_outline_id = None
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -46,6 +52,43 @@ class StudyPanel(QWidget):
             }
         """)
         layout.addWidget(self.tree)
+
+        # --- Active Outline Status Bar ---
+        self.status_bar = QFrame()
+        self.status_bar.setStyleSheet("""
+            QFrame {
+                background-color: #005a9e;
+                border-radius: 4px;
+                margin-top: 5px;
+            }
+        """)
+        self.status_layout = QHBoxLayout(self.status_bar)
+        self.status_layout.setContentsMargins(8, 4, 8, 4)
+        
+        self.status_label = QLabel("Editing: Outline Name")
+        self.status_label.setStyleSheet("color: white; font-weight: bold; font-size: 12px;")
+        self.status_layout.addWidget(self.status_label)
+        
+        self.close_status_btn = QPushButton("✕")
+        self.close_status_btn.setFixedSize(20, 20)
+        self.close_status_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 40);
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 80);
+            }
+        """)
+        self.close_status_btn.clicked.connect(lambda: self.set_active_outline(None))
+        self.status_layout.addWidget(self.close_status_btn)
+        
+        self.status_bar.hide()
+        layout.addWidget(self.status_bar)
         
         # Enable Drag and Drop
         self.tree.setDragEnabled(True)
@@ -69,8 +112,8 @@ class StudyPanel(QWidget):
         
         self.add_outline_btn = QPushButton()
         self.add_outline_btn.setIcon(self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        self.add_outline_btn.setToolTip("New Outline (Coming Soon)")
-        self.add_outline_btn.clicked.connect(lambda: QMessageBox.information(self, "Coming Soon", "The Outline feature is currently under development."))
+        self.add_outline_btn.setToolTip("New Outline")
+        self.add_outline_btn.clicked.connect(self._add_outline)
         
         btn_style = """
             QPushButton {
@@ -94,7 +137,36 @@ class StudyPanel(QWidget):
         actions_layout.addWidget(self.add_outline_btn)
         layout.addLayout(actions_layout)
         
+        # Ensure we refresh when our own dataChanged signal is emitted
+        self.dataChanged.connect(self.refresh)
+        
         self.refresh()
+
+    def _add_outline(self):
+        dialog = OutlineDialog(self, title="Book Outline")
+        if dialog.exec():
+            data = dialog.get_data()
+            if data["title"]:
+                node = self.study_manager.outline_manager.create_outline(
+                    data["start_ref"], data["end_ref"], data["title"]
+                )
+                self.refresh()
+                self.dataChanged.emit()
+                self.set_active_outline(node["id"])
+                self._open_outline_editor(node["id"])
+
+    def _open_outline_editor(self, node_id):
+        if node_id in self.open_outline_editors:
+            self.open_outline_editors[node_id].raise_()
+            self.open_outline_editors[node_id].activateWindow()
+            return
+            
+        editor = OutlineEditor(self.study_manager.outline_manager, node_id, self)
+        editor.jumpRequested.connect(self.jumpRequested.emit)
+        editor.outlineChanged.connect(self.dataChanged.emit)
+        editor.finished.connect(lambda: self.open_outline_editors.pop(node_id, None))
+        self.open_outline_editors[node_id] = editor
+        editor.show()
 
     def _on_drop_event(self, event):
         source_item = self.tree.currentItem()
@@ -144,6 +216,11 @@ class StudyPanel(QWidget):
         return f"{start['book']} {start['chapter']}:{start['verse_num']} - {end['book']} {end['chapter']}:{end['verse_num']}"
 
     def refresh(self):
+        # Refresh open editors if any
+        for editor in self.open_outline_editors.values():
+            if hasattr(editor, 'panel'):
+                editor.panel.refresh()
+
         # 0. Capture expansion state
         expanded_paths = set()
         def save_state(item, path=""):
@@ -153,7 +230,15 @@ class StudyPanel(QWidget):
         for i in range(self.tree.topLevelItemCount()): save_state(self.tree.topLevelItem(i))
 
         self.tree.clear()
-        
+
+        # 1. Outlines
+        outlines_root = QTreeWidgetItem(self.tree, ["Outlines"])
+        outlines = self.study_manager.outline_manager.get_outlines()
+        for outline in outlines:
+            item = QTreeWidgetItem(outlines_root, [outline["title"]])
+            item.setData(0, Qt.UserRole, "outline")
+            item.setData(0, Qt.UserRole + 1, outline["id"])
+
         # 1. Marks
         marks_root = QTreeWidgetItem(self.tree, ["Marks"])
         mark_categories = {
@@ -322,9 +407,24 @@ class StudyPanel(QWidget):
                 for i in range(item.childCount()): restore_state(item.child(i), current_path)
             for i in range(self.tree.topLevelItemCount()): restore_state(self.tree.topLevelItem(i))
 
+    def set_active_outline(self, outline_id):
+        self.active_outline_id = outline_id
+        if outline_id:
+            node = self.study_manager.outline_manager.get_node(outline_id)
+            title = node["title"] if node else "Unknown"
+            self.status_label.setText(f"Editing: {title}")
+            self.status_bar.show()
+        else:
+            self.status_bar.hide()
+        self.activeOutlineChanged.emit(outline_id)
+
     def _on_item_clicked(self, item, col):
         itype = item.data(0, Qt.UserRole)
-        if itype == "mark":
+        if itype == "outline":
+            node_id = item.data(0, Qt.UserRole + 1)
+            self.set_active_outline(node_id)
+            self._open_outline_editor(node_id)
+        elif itype == "mark":
             m = item.data(0, Qt.UserRole + 1)
             self.jumpRequested.emit(m['book'], str(m['chapter']), str(m['verse_num']))
         elif itype == "mark_group":
@@ -436,6 +536,9 @@ class StudyPanel(QWidget):
             key = item.data(0, Qt.UserRole + 1); del_act = QAction("Delete Logical Mark", self); del_act.triggered.connect(lambda: self._delete_logical_mark(key)); menu.addAction(del_act)
         elif itype == "verse_mark":
             ref = item.data(0, Qt.UserRole + 1); del_act = QAction("Delete Verse Mark", self); del_act.triggered.connect(lambda: self._delete_verse_mark(ref)); menu.addAction(del_act)
+        elif itype == "outline":
+            node_id = item.data(0, Qt.UserRole + 1)
+            del_act = QAction("Delete Outline", self); del_act.triggered.connect(lambda: self._delete_outline(node_id)); menu.addAction(del_act)
         if menu.actions(): menu.exec(self.tree.mapToGlobal(pos))
 
     def keyPressEvent(self, event):
@@ -504,6 +607,19 @@ class StudyPanel(QWidget):
             self.dataChanged.emit()
             self.refresh()
 
+    def _delete_outline(self, node_id):
+        res = QMessageBox.question(self, "Delete Outline", "Are you sure you want to delete this outline?", QMessageBox.Yes | QMessageBox.No)
+        if res == QMessageBox.Yes:
+            if self.active_outline_id == node_id:
+                self.set_active_outline(None)
+            # Close the editor window if open
+            if node_id in self.open_outline_editors:
+                self.open_outline_editors[node_id].close()
+                self.open_outline_editors.pop(node_id, None)
+            self.study_manager.outline_manager.delete_node(node_id)
+            self.refresh()
+            self.dataChanged.emit()
+
     def _open_note(self, key):
         if key.startswith("standalone_"): self.noteOpenRequested.emit(key, "General Note")
         else:
@@ -518,7 +634,7 @@ class StudyPanel(QWidget):
             res = QMessageBox.question(self, "Confirm Bulk Deletion", f"Are you sure you want to delete {len(selected_items)} selected items?", QMessageBox.Yes | QMessageBox.No)
             if res != QMessageBox.Yes: return
         self.study_manager.save_state()
-        to_del = {"marks": [], "symbols": [], "notes": [], "note_folders": [], "arrows": [], "bookmarks": [], "verse_marks": [], "logical_marks": []}
+        to_del = {"marks": [], "symbols": [], "notes": [], "note_folders": [], "arrows": [], "bookmarks": [], "verse_marks": [], "logical_marks": [], "outlines": []}
         expanded_selected = []
         for item in selected_items:
             if item.data(0, Qt.UserRole) == "symbol_type_group":
@@ -535,6 +651,7 @@ class StudyPanel(QWidget):
             elif itype == "bookmark": to_del["bookmarks"].append(item.data(0, Qt.UserRole + 1)['ref'])
             elif itype == "verse_mark": to_del["verse_marks"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "logical_mark": to_del["logical_marks"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "outline": to_del["outlines"].append(item.data(0, Qt.UserRole + 1))
         if to_del["marks"]:
             for idx in sorted(list(set(to_del["marks"])), reverse=True): self.study_manager.data["marks"].pop(idx)
         for key in to_del["symbols"]:
@@ -542,6 +659,13 @@ class StudyPanel(QWidget):
         for key in to_del["logical_marks"]:
             if "logical_marks" in self.study_manager.data and key in self.study_manager.data["logical_marks"]:
                 del self.study_manager.data["logical_marks"][key]
+        for node_id in to_del["outlines"]:
+            if self.active_outline_id == node_id:
+                self.set_active_outline(None)
+            if node_id in self.open_outline_editors:
+                self.open_outline_editors[node_id].close()
+                self.open_outline_editors.pop(node_id, None)
+            self.study_manager.outline_manager.delete_node(node_id)
         for key in to_del["notes"]: self.study_manager.delete_note(key)
         for path in to_del["note_folders"]: self.study_manager.delete_folder(path)
         arrow_map = {}

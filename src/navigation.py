@@ -10,6 +10,7 @@ class NavigationDock(QWidget):
     """
     jumpRequested = Signal(str, str, str) # book, chapter, verse
     strongsToggled = Signal(bool)
+    outlinesToggled = Signal(bool)
 
     def __init__(self, loader, parent=None):
         """
@@ -56,6 +57,32 @@ class NavigationDock(QWidget):
         """)
         self.btn_strongs.toggled.connect(self.strongsToggled.emit)
         header_layout.addWidget(self.btn_strongs)
+
+        self.btn_outlines = QPushButton("☰")
+        self.btn_outlines.setCheckable(True)
+        self.btn_outlines.setToolTip("Toggle Outlines")
+        self.btn_outlines.setFixedSize(28, 28)
+        self.btn_outlines.setStyleSheet("""
+            QPushButton {
+                background-color: #333;
+                color: #888;
+                border: 1px solid #444;
+                border-radius: 4px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #444;
+                color: #bbb;
+            }
+            QPushButton:checked {
+                background-color: #2a2a25;
+                color: #00ff00;
+                border-color: #006600;
+            }
+        """)
+        self.btn_outlines.toggled.connect(self.outlinesToggled.emit)
+        header_layout.addWidget(self.btn_outlines)
         
         layout.addLayout(header_layout)
         

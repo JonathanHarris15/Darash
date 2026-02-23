@@ -16,6 +16,7 @@ class VerseLoader:
         self.data: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.flat_verses: List[Dict[str, Any]] = []
         self.ref_map: Dict[str, Dict[str, Any]] = {}
+        self.ref_to_idx: Dict[str, int] = {}
         self._load_data(json_path)
 
     def _load_data(self, path: str) -> None:
@@ -68,12 +69,28 @@ class VerseLoader:
                         self.data[book_name][chap_num][v_num] = verse_entry
                         self.flat_verses.append(verse_entry)
                         self.ref_map[verse_entry['ref']] = verse_entry
+                        self.ref_to_idx[verse_entry['ref']] = len(self.flat_verses) - 1
             print(f"Loaded {len(self.flat_verses)} verses in {time.time() - start_t:.2f}s")
         except Exception as e:
             print(f"Error loading Bible data: {e}")
 
     def get_verse_by_ref(self, ref: str) -> Optional[Dict[str, Any]]:
         return self.ref_map.get(ref)
+
+    def get_verse_index(self, ref: str) -> float:
+        if not ref: return -1.0
+        
+        # Support suffixes like 'a', 'b', 'c' for sub-verse splits
+        base_ref = ref
+        suffix_val = 0.0
+        if len(ref) > 1 and ref[-1].isalpha() and (ref[-2].isdigit() or ref[-2] == ':'):
+            base_ref = ref[:-1]
+            # Map a->0.1, b->0.2, etc.
+            suffix_val = (ord(ref[-1].lower()) - ord('a') + 1) * 0.1
+            
+        idx = self.ref_to_idx.get(base_ref, -1)
+        if idx == -1: return -1.0
+        return float(idx) + suffix_val
 
     def get_verse(self, book: str, chapter: int, verse: int) -> Optional[Dict[str, Any]]:
         try:

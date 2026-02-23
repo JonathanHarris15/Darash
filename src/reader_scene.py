@@ -12,9 +12,9 @@ from src.study_manager import StudyManager
 from src.mark_popup import MarkPopup
 from src.note_editor import NoteEditor
 from src.symbol_manager import SymbolManager
-from src.reader_items import NoFocusTextItem, NoteIcon, ArrowItem, VerseNumberItem
+from src.reader_items import NoFocusTextItem, NoteIcon, ArrowItem, VerseNumberItem, OutlineDividerItem
 from src.reader_utils import (
-    get_ref_from_pos, get_word_idx_from_pos, get_text_rects, 
+    get_word_idx_from_pos, get_text_rects, 
     get_word_offset_in_verse
 )
 from src.strongs_manager import StrongsManager
@@ -36,6 +36,8 @@ import os
 import math
 import time
 
+from src.outline_dialog import OutlineDialog
+
 class ReaderScene(QGraphicsScene):
     """
     The main rendering engine for the Bible reader.
@@ -52,6 +54,7 @@ class ReaderScene(QGraphicsScene):
     sectionsUpdated = Signal(list, int) # section_data, total_height
     bookmarksUpdated = Signal()
     studyDataChanged = Signal()
+    outlineCreated = Signal(str) # node_id
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -74,7 +77,7 @@ class ReaderScene(QGraphicsScene):
         self.last_emitted_ref = ""
         
         self.loader = VerseLoader()
-        self.study_manager = StudyManager()
+        self.study_manager = StudyManager(loader=self.loader)
         self.symbol_manager = SymbolManager()
         self.strongs_manager = StrongsManager()
         self.strongs_manager.index_usages(self.loader)
@@ -95,11 +98,24 @@ class ReaderScene(QGraphicsScene):
         self.strongs_tooltip = StrongsTooltip()
         self.strongs_overlay_items = []
         
+        # Outlines UI
+        self.outlines_enabled = False
+        self.active_outline_id = None
+        self.outline_overlay_items = []
+        self.ghost_line_item = None
+        
+        self.is_dragging_divider = False
+        self.drag_divider_item = None
+        self.drag_divider_ghost = None
+        self.drag_min_idx = float('-inf')
+        self.drag_max_idx = float('inf')
+        
         # Popups
         self.mark_popup = MarkPopup()
         self.mark_popup.markSelected.connect(self._on_mark_selected)
         self.mark_popup.addNoteRequested.connect(self._on_add_note_requested)
         self.mark_popup.addBookmarkRequested.connect(self._on_add_bookmark_requested)
+        self.mark_popup.createOutlineRequested.connect(self._create_outline_from_selection)
         self.current_selection = None
         
         # Layout & Search State
@@ -201,11 +217,6 @@ class ReaderScene(QGraphicsScene):
         self.scroll_timer = QTimer(self)
         self.scroll_timer.setInterval(16)
         self.scroll_timer.timeout.connect(self.update_scroll_step)
-        
-        self.visibility_timer = QTimer(self)
-        self.visibility_timer.setSingleShot(True)
-        self.visibility_timer.setInterval(100)
-        self.visibility_timer.timeout.connect(self._update_item_visibility)
 
     def _update_fonts(self):
         """Updates the internal font objects based on current size settings."""
@@ -216,18 +227,25 @@ class ReaderScene(QGraphicsScene):
         self.verse_mark_font = QFont(self.font_family, self.verse_mark_size)
 
     def _is_rect_visible(self, r):
-        # Slightly larger buffer to prevent flickering
-        buffer = 150
+        # Increased buffer to ensure items are visible before they enter the viewport
+        buffer = 800 
         return not (r.bottom() < self.scroll_y - buffer or r.top() > self.scroll_y + self.view_height + buffer)
 
     def _update_item_visibility(self):
         """Updates the visible state of all study and search items based on scroll."""
-        for item in self.study_overlay_items + self.search_overlay_items:
+        for item in self.study_overlay_items + self.search_overlay_items + self.outline_overlay_items:
             item.setVisible(self._is_rect_visible(item.sceneBoundingRect()))
 
     def _get_ref_from_pos(self, pos):
-        return get_ref_from_pos(pos, self.pos_verse_map)
-
+        def _get_ref_from_pos(self, pos):
+            """Finds the verse reference corresponding to a document position."""
+            import bisect
+            if not self.pos_verse_map: return None
+            # pos_verse_map is a list of (char_pos, ref). Find the index where char_pos > pos.
+            # Then the verse is at the previous index.
+            idx = bisect.bisect_right(self.pos_verse_map, (pos, "zzzzzz")) - 1
+            return self.pos_verse_map[idx][1] if idx >= 0 else None
+    
     def _get_text_rects(self, start, length):
         return get_text_rects(self.main_text_item, start, length)
 
@@ -236,6 +254,25 @@ class ReaderScene(QGraphicsScene):
 
     def _get_word_idx_from_pos(self, verse_data, pos):
         return get_word_idx_from_pos(verse_data, pos)
+
+    def _create_outline_from_selection(self):
+        if not self.current_selection: return
+        start, length = self.current_selection
+        
+        start_ref = self._get_ref_from_pos(start)
+        end_ref = self._get_ref_from_pos(start + length - 1)
+        
+        if not start_ref or not end_ref: return
+        
+        dialog = OutlineDialog(None, title="New Outline", start_ref=start_ref, end_ref=end_ref)
+        if dialog.exec():
+            data = dialog.get_data()
+            if data["title"]:
+                self.study_manager.outline_manager.create_outline(
+                    data["start_ref"], data["end_ref"], data["title"]
+                )
+                self.studyDataChanged.emit() # Refresh panel
+                self._render_outline_overlays() # Refresh view
 
     def _get_heading_at_pos(self, scene_pos):
         """Returns (type, text) of heading at scene_pos, or None."""
@@ -430,6 +467,9 @@ class ReaderScene(QGraphicsScene):
         
         if self.strongs_enabled:
             self._render_strongs_overlays()
+            
+        if self.outlines_enabled or self.active_outline_id:
+            self._render_outline_overlays()
 
     def _render_visible_verse_numbers(self):
         """Creates or updates VerseNumberItems only for visible verses."""
@@ -498,6 +538,257 @@ class ReaderScene(QGraphicsScene):
         for ref in to_remove:
             it = self.verse_number_items.pop(ref)
             self.removeItem(it)
+
+    def set_outlines_enabled(self, enabled: bool):
+        self.outlines_enabled = enabled
+        if not enabled:
+            self._clear_outline_overlays()
+        else:
+            self._render_outline_overlays()
+
+    def set_active_outline(self, outline_id: str):
+        """Enables editing mode for a specific outline."""
+        self.active_outline_id = outline_id
+        self._render_outline_overlays()
+
+    def _is_descendant_of(self, node, root_id):
+        """Returns True if node is the root_id or a child/descendant of it."""
+        if not node or not root_id: return False
+        if node.get("id") == root_id: return True
+        # Note: This is expensive if called frequently; we might prefer passing a flag down render_node
+        return False # Fallback for now, will improve via render_node flag
+
+    def _clear_outline_overlays(self):
+        for it in self.outline_overlay_items:
+            if it.scene() == self:
+                self.removeItem(it)
+        self.outline_overlay_items.clear()
+        if self.ghost_line_item:
+            if self.ghost_line_item.scene() == self:
+                self.removeItem(self.ghost_line_item)
+            self.ghost_line_item = None
+
+    def _start_divider_drag(self, pos):
+        item = self.sender()
+        if not isinstance(item, OutlineDividerItem): return
+        
+        self.is_dragging_divider = True
+        self.drag_divider_item = item
+        
+        # Calculate valid index range based on siblings
+        parent = item.parent_node
+        idx = item.split_idx
+        loader = self.loader
+        
+        if idx == -2: # TOP OUTER BOUNDARY
+            self.drag_bounds_min = 0.0 # Start of Bible
+            if parent.get("children"):
+                # Cannot move past the end of the first child (must have at least one verse)
+                self.drag_bounds_max = loader.get_verse_index(parent["children"][0]["range"]["end"]) - 1.0
+            else:
+                # Leaf node: cannot move past its own end (must have at least one verse)
+                self.drag_bounds_max = loader.get_verse_index(parent["range"]["end"]) - 1.0
+            
+            # Divider is BEFORE the start verse, so index is start - 1.0 (or -0.1)
+            start_idx = loader.get_verse_index(parent["range"]["start"])
+            orig_split_idx = (start_idx - 1.0) if int(start_idx) == start_idx else (start_idx - 0.1)
+            self.drag_divider_original_idx = orig_split_idx
+            
+            preceding, succeeding = self.study_manager.outline_manager.get_nearest_split_indices(orig_split_idx)
+            # The top boundary must stay ABOVE all other splits and within Bible start
+            self.drag_hard_min = preceding
+            self.drag_hard_max = succeeding
+            
+        elif idx == -3: # BOTTOM OUTER BOUNDARY
+            # Cannot move past start of the last child (must have at least one verse)
+            if parent.get("children"):
+                self.drag_bounds_min = loader.get_verse_index(parent["children"][-1]["range"]["start"])
+            else:
+                self.drag_bounds_min = loader.get_verse_index(parent["range"]["start"])
+                
+            self.drag_bounds_max = float(len(loader.flat_verses) - 1) # End of Bible
+            
+            # Divider is AFTER the end verse, so index is just the end index
+            orig_split_idx = loader.get_verse_index(parent["range"]["end"])
+            self.drag_divider_original_idx = orig_split_idx
+            
+            preceding, succeeding = self.study_manager.outline_manager.get_nearest_split_indices(orig_split_idx)
+            # The bottom boundary must stay BELOW all other splits and within Bible end
+            self.drag_hard_min = preceding
+            self.drag_hard_max = succeeding
+
+        elif idx >= 0: # INTERNAL SPLIT
+            children = parent.get("children", [])
+            if idx < len(children) - 1:
+                c1 = children[idx]
+                c2 = children[idx+1]
+                
+                # Sibling boundaries
+                sibling_min = self.loader.get_verse_index(c1["range"]["start"])
+                sibling_max = self.loader.get_verse_index(c2["range"]["end"]) - 1.0
+                
+                # Original position
+                current_split_idx_val = self.loader.get_verse_index(c1["range"]["end"])
+                self.drag_divider_original_idx = current_split_idx_val
+                
+                # Hard obstacles from OTHER splits
+                preceding, succeeding = self.study_manager.outline_manager.get_nearest_split_indices(current_split_idx_val)
+                
+                # Final constraints are the tightest of sibling bounds and nearest obstacles
+                self.drag_bounds_min = sibling_min
+                self.drag_bounds_max = sibling_max
+                self.drag_hard_min = preceding
+                self.drag_hard_max = succeeding
+        
+        # Create a ghost line to show potential new position
+        pen = QPen(QColor("#005a9e"))
+        pen.setWidth(2)
+        self.drag_divider_ghost = QGraphicsLineItem(self.side_margin, pos.y(), self.sceneRect().width() - 10, pos.y())
+        self.drag_divider_ghost.setPen(pen)
+        self.drag_divider_ghost.setZValue(100)
+        self.addItem(self.drag_divider_ghost)
+        
+        # Capture current mouse position
+        self.views()[0].setCursor(Qt.SizeVerCursor)
+
+    def _render_outline_overlays(self):
+        self._clear_outline_overlays()
+        # If neither is enabled/active, nothing to render
+        if not self.outlines_enabled and not self.active_outline_id: return
+        
+        outlines = self.study_manager.outline_manager.get_outlines()
+        
+        # If global toggle is off, only render the active one
+        if not self.outlines_enabled and self.active_outline_id:
+            outlines = [o for o in outlines if o["id"] == self.active_outline_id]
+            
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        
+        def get_verse_y_range(ref):
+            # Strip suffixes like 'a', 'b' for position lookup in the verse_pos_map
+            base_ref = ref
+            if len(ref) > 1 and ref[-1].isalpha() and (ref[-2].isdigit() or ref[-2] == ':'):
+                base_ref = ref[:-1]
+                
+            if base_ref in self.verse_pos_map:
+                pos = self.verse_pos_map[base_ref]
+                block = doc.findBlock(pos)
+                rect = layout.blockBoundingRect(block)
+                return rect.top(), rect.bottom()
+            return None, None
+
+        def get_line_style(level):
+            """Returns (QPen, is_double, text_level) for a given depth level."""
+            color = QColor("#AAAAAA")
+            if level == 0: # Outer Boundary
+                pen = QPen(color, 2)
+                return pen, True, None
+            elif level == 1: # Section
+                pen = QPen(color, 2, Qt.SolidLine)
+                return pen, False, None
+            elif level == 2: # Sub-Section
+                pen = QPen(color, 1.5, Qt.CustomDashLine)
+                pen.setDashPattern([4, 4]) # Dash, Gap (Closer than level 3)
+                return pen, False, None
+            elif level == 3: # Sub-Sub-Section
+                pen = QPen(color, 1.5, Qt.CustomDashLine)
+                pen.setDashPattern([4, 10, 1, 10]) # Dash, Gap, Dot, Gap
+                return pen, False, None
+            elif level == 4: # Sub-Sub-Sub-Section
+                pen = QPen(color, 1.5, Qt.CustomDashLine)
+                pen.setDashPattern([1, 14]) # Dot, Gap
+                return pen, False, None
+            else: # Lower: spaced numbers
+                pen = QPen(color, 1, Qt.SolidLine)
+                return pen, False, level
+
+        def render_node(node, level=0, is_active=False):
+            start_ref = node["range"]["start"]
+            end_ref = node["range"]["end"]
+            
+            # This node is active if its parent was, or if it is the active root itself
+            node_is_active = is_active or (self.active_outline_id and node.get("id") == self.active_outline_id)
+            
+            s_top, s_bottom = get_verse_y_range(start_ref)
+            e_top, e_bottom = get_verse_y_range(end_ref)
+            
+            if s_top is None or e_bottom is None: return
+
+            # Calculate mid-points for boundaries
+            y_start = s_top
+            y_end = e_bottom
+
+            # For centering boundaries in gaps
+            s_idx = self.loader.get_verse_index(start_ref)
+            if s_idx >= 1.0:
+                prev_ref = self.loader.flat_verses[int(s_idx) - 1]['ref']
+                _, prev_bottom = get_verse_y_range(prev_ref)
+                if prev_bottom is not None: y_start = (prev_bottom + s_top) / 2
+                else: y_start -= 5
+            else: y_start -= 5
+
+            e_idx = self.loader.get_verse_index(end_ref)
+            if e_idx < len(self.loader.flat_verses) - 1:
+                next_ref = self.loader.flat_verses[int(e_idx) + 1]['ref']
+                next_top, _ = get_verse_y_range(next_ref)
+                if next_top is not None: y_end = (e_bottom + next_top) / 2
+                else: y_end += 5
+            else: y_end += 5
+
+            base_x = self.sceneRect().width() - 10
+            x_pos = base_x - (level * 10)
+            
+            # (Vertical Bracket logic removed as requested)
+            
+            def draw_h_line(y, h_level, summary_node=None, split_parent=None, split_idx=-1):
+                pen, is_double, text_level = get_line_style(h_level)
+                # Extend line nearly to the margin
+                x_end = self.sceneRect().width() - 10
+                
+                # Use specialized draggable divider item for all levels
+                item = OutlineDividerItem(split_parent, split_idx, y, self.side_margin, x_end, pen, is_double, text_level=text_level)
+                item.setVisible(self._is_rect_visible(item.boundingRect()))
+                if summary_node:
+                    tip = f"[{summary_node['title']}]\n{summary_node.get('summary', '')}"
+                    item.setToolTip(tip)
+                
+                # Only enable dragging if we are in active editing mode for this specific outline
+                if node_is_active and split_idx != -1:
+                    item.dragStarted.connect(self._start_divider_drag)
+                else:
+                    item.setCursor(Qt.ArrowCursor) # Standard cursor if not draggable
+                
+                self.addItem(item)
+                self.outline_overlay_items.append(item)
+
+            # Draw outer boundaries for level 0
+            if level == 0:
+                draw_h_line(y_start, 0, node, split_parent=node, split_idx=-2) # Top Boundary
+                draw_h_line(y_end, 0, node, split_parent=node, split_idx=-3) # Bottom Boundary
+            
+            if "children" in node:
+                children = node["children"]
+                
+                # Visual style is strictly dependent on tree structure.
+                # If parent is level L, the divider between its children is level L+1.
+                child_divider_level = level + 1
+                
+                for i in range(len(children) - 1):
+                    _, child_bottom = get_verse_y_range(children[i]["range"]["end"])
+                    next_child_top, _ = get_verse_y_range(children[i+1]["range"]["start"])
+                    
+                    if child_bottom is not None and next_child_top is not None:
+                        mid_y = (child_bottom + next_child_top) / 2
+                        # Pass split information to enable dragging
+                        draw_h_line(mid_y, child_divider_level, node, split_parent=node, split_idx=i)
+            
+
+                for child in children:
+                    render_node(child, level + 1, node_is_active)
+                    
+        for outline in outlines:
+            render_node(outline)
 
     def set_strongs_enabled(self, enabled: bool):
         self.strongs_enabled = enabled
@@ -748,25 +1039,93 @@ class ReaderScene(QGraphicsScene):
         # 3. Fallback to text selection/marking logic
         cursor = self.main_text_item.textCursor()
         if not cursor.hasSelection():
+            # If no text is selected, try to select the word under the cursor
             pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit)
             if pos != -1:
                 cursor.setPosition(pos); cursor.select(QTextCursor.WordUnderCursor); self.main_text_item.setTextCursor(cursor)
+        
         if cursor.hasSelection():
             self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            view = self.views()[0]; screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
-            self.mark_popup.show_at(screen_pos); event.accept(); self.render_verses(); return
+            view = self.views()[0]
+            # Use mapToGlobal from the view's viewport, not the scene
+            screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
+            self.mark_popup.show_at(screen_pos)
+            self.render_verses() # Rerender to show selection if any
+            event.accept()
+            return
         super().contextMenuEvent(event)
 
     def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
-        if event.button() != Qt.LeftButton: return
+        if self.is_dragging_divider:
+            self.is_dragging_divider = False
+            if self.drag_divider_ghost: # Check if ghost exists before checking visibility
+                if not self.drag_divider_ghost.isVisible():
+                    self.removeItem(self.drag_divider_ghost)
+                    self.drag_divider_ghost = None
+                    self.drag_divider_item = None
+                    self.views()[0].setCursor(Qt.ArrowCursor)
+                    event.accept()
+                    return
+
+                new_y = self.drag_divider_ghost.line().y1()
+                
+                doc = self.main_text_item.document()
+                layout = doc.documentLayout()
+                
+                ref_before, ref_after = None, None
+                
+                for i in range(len(self.pos_verse_map) - 1):
+                    char_pos1, r1 = self.pos_verse_map[i]
+                    char_pos2, r2 = self.pos_verse_map[i+1]
+                    rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1))
+                    rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
+                    mid_y = (rect1.bottom() + rect2.top()) / 2
+                    if abs(new_y - mid_y) < 2: # Very small tolerance as it should be snapped
+                        ref_before, ref_after = r1, r2
+                        break
+                
+                if ref_before and ref_after:
+                    item = self.drag_divider_item
+                    if item.split_idx == -2: # Top boundary
+                        # Line is BEFORE ref_after, so ref_after is the new start
+                        if self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], True, ref_after, self.loader):
+                            self._render_outline_overlays()
+                            self.studyDataChanged.emit()
+                    elif item.split_idx == -3: # Bottom boundary
+                        # Line is AFTER ref_before, so ref_before is the new end
+                        if self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], False, ref_before, self.loader):
+                            self._render_outline_overlays()
+                            self.studyDataChanged.emit()
+                    elif item.split_idx >= 0:
+                        if self.study_manager.outline_manager.move_split_by_id(item.parent_node["id"], item.split_idx, ref_before, ref_after, self.loader):
+                            self._render_outline_overlays()
+                            self.studyDataChanged.emit()
+
+                self.removeItem(self.drag_divider_ghost)
+                self.drag_divider_ghost = None
+                self.drag_divider_item = None
+                self.views()[0].setCursor(Qt.ArrowCursor)
+                event.accept()
+                return
+
+        # If not dragging, handle text selection/marking
+        if event.button() != Qt.LeftButton: 
+            super().mouseReleaseEvent(event) # Pass to base if not left button
+            return
+
         cursor = self.main_text_item.textCursor()
         if cursor.hasSelection():
             self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            view = self.views()[0]; screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
+            view = self.views()[0]
+            screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
             self.mark_popup.show_at(screen_pos)
-        else: self.current_selection = None
-        self.render_verses()
+        else: 
+            self.current_selection = None
+        
+        self.render_verses() # Always re-render to update UI if selection changed
+        
+        super().mouseReleaseEvent(event) # Call base class for other handling
+
 
     def _clear_verse_selection(self):
         """Clears the selection of verse numbers."""
@@ -806,8 +1165,34 @@ class ReaderScene(QGraphicsScene):
         clear_act = QAction("Clear Mark", menu)
         clear_act.triggered.connect(lambda: self._set_selected_verse_mark(None))
         menu.addAction(clear_act)
+
+        menu.addSeparator()
+        
+        outline_act = QAction("Create Outline", menu)
+        outline_act.triggered.connect(self._create_outline_from_verse_selection)
+        menu.addAction(outline_act)
         
         menu.exec(screen_pos.toPoint())
+
+    def _create_outline_from_verse_selection(self):
+        if not self.selected_refs: return
+        
+        # Sort selected refs by flat index
+        sorted_refs = sorted(list(self.selected_refs), key=lambda r: self.loader.get_verse_index(r))
+        start_ref = sorted_refs[0]
+        end_ref = sorted_refs[-1]
+        
+        dialog = OutlineDialog(None, title="Book Outline", start_ref=start_ref, end_ref=end_ref)
+        if dialog.exec():
+            data = dialog.get_data()
+            if data["title"]:
+                node = self.study_manager.outline_manager.create_outline(
+                    data["start_ref"], data["end_ref"], data["title"]
+                )
+                self.studyDataChanged.emit()
+                self._render_outline_overlays()
+                self.outlineCreated.emit(node["id"])
+                self.set_active_outline(node["id"])
 
     def _set_selected_verse_mark(self, mark_type):
         for ref in self.selected_refs:
@@ -816,12 +1201,85 @@ class ReaderScene(QGraphicsScene):
         self.render_verses()
         self.studyDataChanged.emit()
 
+    def wheelEvent(self, event) -> None:
+        # 1. Delegate to input_handler first
+        if self.input_handler.handle_wheel(event):
+            event.accept()
+            return
+        
+        # 2. Check for zoom/spacing modifications (Control/Alt)
+        modifiers = event.modifiers(); delta = event.delta() # Reverted to event.delta() for QGraphicsSceneWheelEvent
+        if delta == 0: 
+            super().wheelEvent(event) # Pass to base if no delta
+            return
+        
+        if modifiers & (Qt.ControlModifier | Qt.AltModifier):
+            self._zoom_accumulator += delta
+            # Trigger zoom/spacing adjustment for every 120 units (one mouse click)
+            while abs(self._zoom_accumulator) >= 120:
+                step = 120 if self._zoom_accumulator > 0 else -120
+                if modifiers & Qt.ControlModifier: 
+                    self.target_font_size = max(8, min(72, self.target_font_size + (2 if step > 0 else -2)))
+                elif modifiers & Qt.AltModifier: 
+                    self.target_line_spacing = max(1.0, min(3.0, self.target_line_spacing + (0.1 if step > 0 else -0.1)))
+                self._zoom_accumulator -= step
+            
+            self.settingsPreview.emit(self.target_font_size, self.target_line_spacing); self.layout_timer.start(); event.accept(); return
+        
+        # 3. Normal scrolling
+        self._wheel_accumulator += delta
+        # Discretize scroll to prevent tiny deltas from overwhelming the smoothing logic
+        # 30 units (1/4 of a mouse click) is a good balance between responsiveness and discretization
+        while abs(self._wheel_accumulator) >= 30:
+            step = 30 if self._wheel_accumulator > 0 else -30
+            move = -(step / 120.0) * self.scroll_sens
+            self.target_scroll_y = max(0, min(self.total_height - self.view_height, self.target_scroll_y + move))
+            self._wheel_accumulator -= step
+            
+        if not self.scroll_timer.isActive(): self.scroll_timer.start()
+        event.accept()
+        
+        super().wheelEvent(event) # Call base class for any unhandled events
+
     def mousePressEvent(self, event):
-        # Check if we clicked on a verse number item
+        # 1. Check if we clicked on a verse number item
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
         if not isinstance(item, VerseNumberItem):
             self._clear_verse_selection()
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        # Check for outline splits if in editing mode
+        if self.active_outline_id and event.button() == Qt.LeftButton:
+            scene_pos = event.scenePos()
+            doc = self.main_text_item.document()
+            layout = doc.documentLayout()
+            tolerance = 10 
+            
+            for i in range(len(self.pos_verse_map) - 1):
+                char_pos1, ref1 = self.pos_verse_map[i]
+                char_pos2, ref2 = self.pos_verse_map[i+1]
+                
+                rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1))
+                rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
+                
+                bottom1 = rect1.bottom()
+                top2 = rect2.top()
+                
+                if bottom1 - tolerance <= scene_pos.y() <= top2 + tolerance:
+                    if self.study_manager.outline_manager.add_split(ref1, ref2, self.loader):
+                        self._render_outline_overlays()
+                        self.studyDataChanged.emit()
+                    
+                    # Even if add_split returns None (e.g. already a split point),
+                    # we found the intended gap, so stop searching to avoid 
+                    # accidental splits of adjacent verses due to tolerance.
+                    if self.ghost_line_item:
+                        self.removeItem(self.ghost_line_item)
+                        self.ghost_line_item = None
+                    event.accept()
+                    return
+        super().mouseDoubleClickEvent(event)
 
     def _clear_selection(self):
         """Clears the current text selection and resets state."""
@@ -988,8 +1446,106 @@ class ReaderScene(QGraphicsScene):
         super().keyPressEvent(event)
 
     def mouseMoveEvent(self, event):
+        # 1. Handle divider dragging
+        if self.is_dragging_divider:
+            scene_pos = event.scenePos()
+            # Snap to closest verse gap within allowed range
+            doc = self.main_text_item.document()
+            layout = doc.documentLayout()
+            
+            best_gap_y = -1
+            best_dist = 1000
+            
+            for i in range(len(self.pos_verse_map) - 1):
+                char_pos1, r1 = self.pos_verse_map[i]
+                char_pos2, r2 = self.pos_verse_map[i+1]
+                
+                idx_before = self.loader.get_verse_index(r1)
+                idx_after = self.loader.get_verse_index(r2)
+                
+                # 1. Must be within immediate sibling bounds
+                # If idx_before is X, Child 1 ends at X, Child 2 starts at X+1.
+                # To ensure Child 2 has at least one verse, Child 2's end (drag_bounds_max)
+                # must be >= Child 2's start (X+1). So X <= drag_bounds_max - 1.0.
+                # Since drag_bounds_max was already adjusted by -1.0 in _start_drag for internal splits,
+                # we just check idx_before <= drag_bounds_max.
+                if idx_before < self.drag_bounds_min or idx_before > self.drag_bounds_max:
+                    continue
+                    
+                # 2. Must not touch or pass other divisions (regardless of level)
+                if self.drag_hard_min is not None and idx_before <= self.drag_hard_min:
+                    continue
+                if self.drag_hard_max is not None and idx_before >= self.drag_hard_max:
+                    continue
+                
+                rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1))
+                rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
+                
+                mid_y = (rect1.bottom() + rect2.top()) / 2
+                dist = abs(scene_pos.y() - mid_y)
+                
+                # Use a generous but reasonable snapping distance
+                if dist < 50 and dist < best_dist:
+                    best_dist = dist
+                    best_gap_y = mid_y
+            
+            if best_gap_y != -1:
+                self.drag_divider_ghost.setLine(self.side_margin, best_gap_y, self.sceneRect().width() - 10, best_gap_y)
+                self.drag_divider_ghost.show()
+            else:
+                self.drag_divider_ghost.hide()
+            
+            super().mouseMoveEvent(event)
+            return
+
+        # 2. Handle ghost line for outline editing
+        if self.active_outline_id:
+            scene_pos = event.scenePos()
+            doc = self.main_text_item.document()
+            layout = doc.documentLayout()
+            tolerance = 10
+            found_gap = False
+            
+            for i in range(len(self.pos_verse_map) - 1):
+                char_pos1, _ = self.pos_verse_map[i]
+                char_pos2, _ = self.pos_verse_map[i+1]
+                
+                rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1))
+                rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
+                
+                bottom1 = rect1.bottom()
+                top2 = rect2.top()
+                
+                if bottom1 - tolerance <= scene_pos.y() <= top2 + tolerance:
+                    mid_y = (bottom1 + top2) / 2
+                    if not self.ghost_line_item:
+                        pen = QPen(QColor("#AAAAAA"))
+                        pen.setStyle(Qt.DotLine)
+                        pen.setWidthF(1.0)
+                        # Ensure color is faint
+                        color = QColor("#AAAAAA")
+                        color.setAlpha(80)
+                        pen.setColor(color)
+                        
+                        self.ghost_line_item = QGraphicsLineItem(self.side_margin, mid_y, self.sceneRect().width() - 10, mid_y)
+                        self.ghost_line_item.setPen(pen)
+                        self.addItem(self.ghost_line_item)
+                    else:
+                        self.ghost_line_item.setLine(self.side_margin, mid_y, self.sceneRect().width() - 10, mid_y)
+                    found_gap = True
+                    break
+            
+            if not found_gap and self.ghost_line_item:
+                self.removeItem(self.ghost_line_item)
+                self.ghost_line_item = None
+        elif self.ghost_line_item:
+            self.removeItem(self.ghost_line_item)
+            self.ghost_line_item = None
+
         self.input_handler.handle_mouse_move(event)
         super().mouseMoveEvent(event)
+
+
 
     def keyReleaseEvent(self, event):
         if self.input_handler.handle_key_release(event):
@@ -1045,7 +1601,7 @@ class ReaderScene(QGraphicsScene):
         self.target_scroll_y = float(value); self.scroll_y = self.target_scroll_y
         super().setSceneRect(QRectF(0, self.scroll_y, self.last_width, self.view_height))
         self.render_verses(); self.scrollChanged.emit(int(self.scroll_y))
-        self.visibility_timer.start()
+        self._update_item_visibility()
 
     def setSceneRect(self, *args) -> None:
         if len(args) == 1: rect = args[0]
@@ -1058,35 +1614,41 @@ class ReaderScene(QGraphicsScene):
         super().setSceneRect(QRectF(0, self.scroll_y, self.last_width, self.view_height))
         self.render_verses()
 
-    def wheelEvent(self, event) -> None:
-        modifiers = event.modifiers(); delta = event.delta()
-        if delta == 0: return
+    def cycle_divider_at_pos(self, scene_pos, delta):
+        """Finds the divider near scene_pos and cycles its level based on wheel delta."""
+        # 1. First, check if there's an actual divider item at this position
+        view = self.views()[0]
+        item = self.itemAt(scene_pos, view.transform())
         
-        if modifiers & (Qt.ControlModifier | Qt.AltModifier):
-            self._zoom_accumulator += delta
-            # Trigger zoom/spacing adjustment for every 120 units (one mouse click)
-            while abs(self._zoom_accumulator) >= 120:
-                step = 120 if self._zoom_accumulator > 0 else -120
-                if modifiers & Qt.ControlModifier: 
-                    self.target_font_size = max(8, min(72, self.target_font_size + (2 if step > 0 else -2)))
-                elif modifiers & Qt.AltModifier: 
-                    self.target_line_spacing = max(1.0, min(3.0, self.target_line_spacing + (0.1 if step > 0 else -0.1)))
-                self._zoom_accumulator -= step
-            
-            self.settingsPreview.emit(self.target_font_size, self.target_line_spacing); self.layout_timer.start(); event.accept(); return
+        if isinstance(item, OutlineDividerItem):
+            # Internal splits have split_idx >= 0. Outer boundaries (-2, -3) are not cycled.
+            if item.split_idx >= 0:
+                if self.study_manager.outline_manager.cycle_level_by_id(item.parent_node["id"], item.split_idx, delta < 0):
+                    self._render_outline_overlays()
+                    self.studyDataChanged.emit()
+                    return True
         
-        # Normal scrolling
-        self._wheel_accumulator += delta
-        # Discretize scroll to prevent tiny deltas from overwhelming the smoothing logic
-        # 30 units (1/4 of a mouse click) is a good balance between responsiveness and discretization
-        while abs(self._wheel_accumulator) >= 30:
-            step = 30 if self._wheel_accumulator > 0 else -30
-            move = -(step / 120.0) * self.scroll_sens
-            self.target_scroll_y = max(0, min(self.total_height - self.view_height, self.target_scroll_y + move))
-            self._wheel_accumulator -= step
+        # 2. Fallback: Find which gap we are in (if item not directly hit)
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        tolerance = 20
+        
+        for i in range(len(self.pos_verse_map) - 1):
+            char_pos1, ref1 = self.pos_verse_map[i]
+            char_pos2, ref2 = self.pos_verse_map[i+1]
             
-        if not self.scroll_timer.isActive(): self.scroll_timer.start()
-        event.accept()
+            rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1))
+            rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
+            
+            if rect1.bottom() - tolerance <= scene_pos.y() <= rect2.top() + tolerance:
+                # Found the gap! Tell OutlineManager to cycle level
+                if self.study_manager.outline_manager.cycle_level(ref1, ref2, delta < 0, self.loader):
+                    self._render_outline_overlays()
+                    self.studyDataChanged.emit()
+                    return True
+        return False
+
+
 
     def apply_layout_changes(self) -> None:
         self.font_size = self.target_font_size
@@ -1115,7 +1677,7 @@ class ReaderScene(QGraphicsScene):
         else: self.scroll_y += diff * 0.15
         super().setSceneRect(QRectF(0, self.scroll_y, self.last_width, self.view_height))
         self.render_verses(); self.scrollChanged.emit(int(self.scroll_y))
-        self.visibility_timer.start()
+        self._update_item_visibility()
 
     def jump_to(self, book: str, chapter: str, verse: str = "1") -> None:
         if verse is None: verse = "1"

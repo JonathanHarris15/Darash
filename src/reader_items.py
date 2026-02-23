@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QStyle, QGraphicsItem, QGraphicsObject, QGraphicsPathItem
 )
 from PySide6.QtCore import Qt, QPointF, QLineF, Signal, QRectF
-from PySide6.QtGui import QBrush, QColor, QPen, QPainterPath
+from PySide6.QtGui import QBrush, QColor, QPen, QPainterPath, QPainter
 import math
 
 class NoFocusTextItem(QGraphicsTextItem):
@@ -303,7 +303,7 @@ class LogicalMarkItem(QGraphicsObject):
         painter.setPen(self.color)
         if not self.font:
             self.font = painter.font()
-            self.font.setPixelSize(int(self.target_rect.height() * 1.5)) # Larger size
+            self.font.setPixelSize(int(self.target_rect.height() * 2.0)) # Even larger size
             self.font.setBold(True)
             
         painter.setFont(self.font)
@@ -320,3 +320,71 @@ class LogicalMarkItem(QGraphicsObject):
 
     def boundingRect(self):
         return self.target_rect
+
+class OutlineDividerItem(QGraphicsObject):
+    """
+    A draggable horizontal line representing a split in the outline.
+    """
+    dragStarted = Signal(QPointF)
+    
+    def __init__(self, parent_node, split_idx, y, x_start, x_end, pen, is_double=False, text_level=None, parent=None):
+        super().__init__(parent)
+        self.parent_node = parent_node
+        self.split_idx = split_idx
+        self.y = y
+        self.x_start = x_start
+        self.x_end = x_end
+        self.pen = pen
+        self.is_double = is_double
+        self.text_level = text_level
+        
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.SizeVerCursor)
+        self.setZValue(15)
+
+    def boundingRect(self):
+        # Wider bounding rect for easier grabbing
+        return QRectF(self.x_start, self.y - 10, self.x_end - self.x_start, 20)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        if self.text_level is not None:
+            # Render spaced numbers for deep levels
+            from PySide6.QtGui import QFont
+            font = QFont("Consolas", 10)
+            painter.setFont(font)
+            painter.setPen(self.pen)
+            
+            # Subtle background to make numbers more readable
+            bg_rect = self.boundingRect()
+            bg_rect.setHeight(14)
+            bg_rect.moveCenter(QPointF(bg_rect.center().x(), self.y))
+            
+            painter.setBrush(QBrush(QColor(40, 40, 40, 150)))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(bg_rect, 2, 2)
+            
+            painter.setPen(self.pen)
+            
+            # Increase spacing as level goes deeper
+            # level 5 -> 4 spaces, level 6 -> 8 spaces, etc.
+            spacing = " " * (max(1, self.text_level - 4) * 4)
+            txt = f"{self.text_level}{spacing}" * 100
+            painter.drawText(self.boundingRect(), Qt.AlignLeft | Qt.AlignVCenter, txt)
+        elif self.is_double:
+            # Outer Boundary: Double line
+            painter.setPen(self.pen)
+            painter.drawLine(QPointF(self.x_start, self.y - 2), QPointF(self.x_end, self.y - 2))
+            painter.drawLine(QPointF(self.x_start, self.y + 2), QPointF(self.x_end, self.y + 2))
+        else:
+            # Standard line styles (Solid, Dash, etc. based on pen)
+            painter.setPen(self.pen)
+            painter.drawLine(QPointF(self.x_start, self.y), QPointF(self.x_end, self.y))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragStarted.emit(event.scenePos())
+            event.accept()
+        else:
+            super().mousePressEvent(event)

@@ -14,7 +14,7 @@ class LogicalMarkButton(QPushButton):
     def __init__(self, mark_key, symbol_text, parent=None):
         super().__init__(symbol_text, parent)
         self.mark_key = mark_key
-        self.setFixedSize(30, 30)
+        self.setFixedSize(36, 36)
         self.setCursor(Qt.PointingHandCursor)
         self.setStyleSheet("""
             QPushButton {
@@ -22,7 +22,7 @@ class LogicalMarkButton(QPushButton):
                 color: white; 
                 border-radius: 4px; 
                 border: 1px solid #666;
-                font-size: 14px;
+                font-size: 18px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -39,6 +39,7 @@ class MarkPopup(QWidget):
     markSelected = Signal(str, str) # type of mark, color (hex)
     addNoteRequested = Signal()
     addBookmarkRequested = Signal()
+    createOutlineRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
@@ -140,6 +141,10 @@ class MarkPopup(QWidget):
         self.btn_note.clicked.connect(self.addNoteRequested.emit)
         self.btn_note.clicked.connect(self.hide)
 
+        self.btn_outline = self._create_action_btn("Create Outline")
+        self.btn_outline.clicked.connect(self.createOutlineRequested.emit)
+        self.btn_outline.clicked.connect(self.hide)
+
         self.btn_clear = self._create_action_btn("Clear Marks")
         self.btn_clear.clicked.connect(lambda: self._on_select("clear", ""))
         
@@ -158,6 +163,7 @@ class MarkPopup(QWidget):
         self.selection_layout.addWidget(self._create_sep())
         self.selection_layout.addWidget(self.btn_bookmark)
         self.selection_layout.addWidget(self.btn_note)
+        self.selection_layout.addWidget(self.btn_outline)
         self.selection_layout.addWidget(self._create_sep())
         self.selection_layout.addWidget(self.btn_clear)
         self.selection_layout.addWidget(self.btn_clear_symbols)

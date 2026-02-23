@@ -2,12 +2,6 @@ import bisect
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QTextCursor
 
-def get_ref_from_pos(pos, pos_verse_map):
-    """Finds the verse reference corresponding to a document position."""
-    if not pos_verse_map: return None
-    idx = bisect.bisect_right(pos_verse_map, (pos, "zzzzzz")) - 1
-    return pos_verse_map[idx][1] if idx >= 0 else None
-
 def get_word_idx_from_pos(verse_data, pos):
     """Finds the word index within a verse for a given document position."""
     if verse_data is None: return -1

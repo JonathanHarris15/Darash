@@ -1,16 +1,16 @@
 import json
 import os
 from typing import Dict, List, Any, Optional
+# Delayed import to avoid circular dependency if OutlineManager imports StudyManager for typing
+# from src.outline_manager import OutlineManager
 
 class StudyManager:
     """
     Manages study files (symbols, marks, notes).
     Saves and loads data from JSON and manages associated symbol images.
     """
-    def __init__(self, base_dir: str = "studies"):
-        self.base_dir = base_dir
-        self.current_study_name = None
-        self.data = {
+    def _get_default_data(self):
+        return {
             "symbols": {}, # (book, chap, verse, word_idx): symbol_id
             "marks": [],   # List of mark dicts {type, range: (start_ref, end_ref), color}
             "notes": {},    # key: {"title": title, "text": markdown_text, "folder": "path"}
@@ -20,14 +20,45 @@ class StudyManager:
             "verse_indent": {}, # ref: indent_level
             "verse_marks": {},  # ref: mark_type
             "logical_marks": {}, # key (book|chap|verse|word_idx): mark_type (e.g. "arrow_right")
-            "settings": {}   # Persistent appearance settings
+            "settings": {},   # Persistent appearance settings
+            "outlines": []  # List of outline trees {id, title, range, children}
         }
+
+    def __init__(self, loader=None, base_dir: str = "studies"):
+        self.base_dir = base_dir
+        self.loader = loader
+        self.config_path = os.path.join(self.base_dir, "config.json")
+        self.current_study_name = None
+        self.data = self._get_default_data()
         self.undo_stack = [] # Stack of (symbols_dict, marks_list, arrows_dict) snapshots
         
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
             
-        self.load_study("default_study")
+        last_study = self._load_last_study_name()
+        self.load_study(last_study)
+        
+        # Initialize managers
+        from src.outline_manager import OutlineManager
+        self.outline_manager = OutlineManager(self)
+
+    def _load_last_study_name(self) -> str:
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get("last_study", "default_study")
+            except:
+                pass
+        return "default_study"
+
+    def _save_last_study_name(self, name: str):
+        config = {"last_study": name}
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            print(f"Error saving config: {e}")
 
     def save_state(self):
         """Saves current marks, symbols, and arrows to undo stack."""
@@ -54,32 +85,31 @@ class StudyManager:
 
     def load_study(self, name: str):
         self.current_study_name = name
+        self._save_last_study_name(name)
         study_path = os.path.join(self.base_dir, name, "study.json")
+        
+        default_data = self._get_default_data()
         
         if os.path.exists(study_path):
             try:
                 with open(study_path, 'r', encoding='utf-8') as f:
-                    self.data = json.load(f)
-                if "bookmarks" not in self.data:
-                    self.data["bookmarks"] = []
-                if "arrows" not in self.data:
-                    self.data["arrows"] = {}
-                if "note_folders" not in self.data:
-                    self.data["note_folders"] = []
-                if "verse_indent" not in self.data:
-                    self.data["verse_indent"] = {}
-                if "verse_marks" not in self.data:
-                    self.data["verse_marks"] = {}
-                if "logical_marks" not in self.data:
-                    self.data["logical_marks"] = {}
-                if "settings" not in self.data:
-                    self.data["settings"] = {}
+                    loaded_data = json.load(f)
+                
+                # Merge loaded data into default data to ensure all keys exist
+                self.data = default_data
+                self.data.update(loaded_data)
+                
+                # Ensure nested keys are also initialized if they were somehow missing
+                for key, default_val in default_data.items():
+                    if key not in self.data:
+                        self.data[key] = default_val
+                        
                 print(f"Loaded study: {name}")
             except Exception as e:
                 print(f"Error loading study {name}: {e}")
-                self.data = {"symbols": {}, "marks": [], "notes": {}, "note_folders": [], "bookmarks": [], "arrows": {}}
+                self.data = default_data
         else:
-            self.data = {"symbols": {}, "marks": [], "notes": {}, "note_folders": [], "bookmarks": [], "arrows": {}}
+            self.data = default_data
             self.save_study()
 
     def save_study(self):

@@ -1,0 +1,139 @@
+{
+    "symbols": {},
+    "marks": [
+        {
+            "type": "underline",
+            "book": "Romans",
+            "chapter": "3",
+            "verse_num": "10",
+            "start": 0,
+            "length": 50,
+            "color": "#00FF00",
+            "group_id": "1771766271.7201102"
+        },
+        {
+            "type": "underline",
+            "book": "Romans",
+            "chapter": "3",
+            "verse_num": "11",
+            "start": 0,
+            "length": 42,
+            "color": "#00FF00",
+            "group_id": "1771766271.7201102"
+        },
+        {
+            "type": "underline",
+            "book": "Romans",
+            "chapter": "3",
+            "verse_num": "12",
+            "start": 0,
+            "length": 91,
+            "color": "#00FF00",
+            "group_id": "1771766271.7201102"
+        },
+        {
+            "type": "underline",
+            "book": "Philippians",
+            "chapter": "3",
+            "verse_num": "8",
+            "start": 0,
+            "length": 211,
+            "color": "#00FF00",
+            "group_id": "1771766345.4943976"
+        },
+        {
+            "type": "underline",
+            "book": "Philippians",
+            "chapter": "3",
+            "verse_num": "9",
+            "start": 0,
+            "length": 180,
+            "color": "#00FF00",
+            "group_id": "1771766345.4943976"
+        },
+        {
+            "type": "underline",
+            "book": "Philippians",
+            "chapter": "3",
+            "verse_num": "10",
+            "start": 0,
+            "length": 117,
+            "color": "#00FF00",
+            "group_id": "1771766345.4943976"
+        },
+        {
+            "type": "underline",
+            "book": "Philippians",
+            "chapter": "3",
+            "verse_num": "11",
+            "start": 0,
+            "length": 71,
+            "color": "#00FF00",
+            "group_id": "1771766345.4943976"
+        },
+        {
+            "type": "underline",
+            "book": "I Peter",
+            "chapter": "2",
+            "verse_num": "21",
+            "start": 0,
+            "length": 135,
+            "color": "#00FF00",
+            "group_id": "1771766529.8494434"
+        },
+        {
+            "type": "underline",
+            "book": "I Peter",
+            "chapter": "2",
+            "verse_num": "22",
+            "start": 0,
+            "length": 60,
+            "color": "#00FF00",
+            "group_id": "1771766529.8494434"
+        },
+        {
+            "type": "underline",
+            "book": "I Peter",
+            "chapter": "2",
+            "verse_num": "23",
+            "start": 0,
+            "length": 148,
+            "color": "#00FF00",
+            "group_id": "1771766529.8494434"
+        },
+        {
+            "type": "underline",
+            "book": "I Peter",
+            "chapter": "2",
+            "verse_num": "24",
+            "start": 0,
+            "length": 138,
+            "color": "#00FF00",
+            "group_id": "1771766529.8494434"
+        },
+        {
+            "type": "underline",
+            "book": "I Peter",
+            "chapter": "2",
+            "verse_num": "25",
+            "start": 0,
+            "length": 99,
+            "color": "#00FF00",
+            "group_id": "1771766529.8494434"
+        }
+    ],
+    "notes": {
+        "standalone_1771767030996": {
+            "title": "Christ Our Righteousness - Feb 22 2026",
+            "text": "- Call to Worship [1 Peter 2:21-23](Bible:1Peter+2+21)\n- Call to Confession [Romans 3:10-12](Bible:Romans+3+10)\n- Assurance of Pardon [Philippians 3:8-11](Bible:Philippians+3+8)",
+            "folder": ""
+        }
+    },
+    "note_folders": [],
+    "bookmarks": [],
+    "arrows": {},
+    "verse_indent": {},
+    "verse_marks": {},
+    "logical_marks": {},
+    "settings": {}
+}

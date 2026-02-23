@@ -20,7 +20,20 @@
             "title": ""
         }
     ],
-    "arrows": {},
+    "arrows": {
+        "Jeremiah|9|11|10": [
+            {
+                "end_key": "Jeremiah|9|13|8",
+                "color": "#99ffffff",
+                "type": "straight"
+            }
+        ]
+    },
     "note_folders": [],
-    "settings": {}
+    "settings": {},
+    "verse_indent": {
+        "Jeremiah 9:22": 0
+    },
+    "verse_marks": {},
+    "logical_marks": {}
 }
