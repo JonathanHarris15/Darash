@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Dict, List, Optional, Tuple, Any
-from src.constants import OT_BOOKS, NT_BOOKS
+from src.core.constants import OT_BOOKS, NT_BOOKS
 
 class VerseLoader:
     """
@@ -10,7 +10,11 @@ class VerseLoader:
     """
     def __init__(self, json_path: Optional[str] = None):
         if json_path is None:
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # __file__ is src/core/verse_loader.py
+            # parent 1: src/core
+            # parent 2: src
+            # parent 3: project root
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             json_path = os.path.join(base_path, "mdbible-main", "mdbible-main", "json", "ESV.json")
         
         self.data: Dict[str, Dict[str, Dict[str, Any]]] = {}

@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 # Delayed import to avoid circular dependency if OutlineManager imports StudyManager for typing
-# from src.outline_manager import OutlineManager
+# from src.managers.outline_manager import OutlineManager
 
 class StudyManager:
     """
@@ -39,7 +39,7 @@ class StudyManager:
         self.load_study(last_study)
         
         # Initialize managers
-        from src.outline_manager import OutlineManager
+        from src.managers.outline_manager import OutlineManager
         self.outline_manager = OutlineManager(self)
 
     def _load_last_study_name(self) -> str:

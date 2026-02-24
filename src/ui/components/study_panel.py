@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 import os
-from src.outline_dialog import OutlineDialog
-from src.outline_editor import OutlineEditor
+from src.ui.components.outline_dialog import OutlineDialog
+from src.ui.components.outline_editor import OutlineEditor
 
 class StudyPanel(QWidget):
     jumpRequested = Signal(str, str, str) # book, chap, verse

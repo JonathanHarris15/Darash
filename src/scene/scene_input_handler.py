@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QPointF, QObject, QTimer
 from PySide6.QtGui import QColor, QCursor, QTextCursor, QGuiApplication
 from PySide6.QtWidgets import QDialog
-from src.reader_items import ArrowItem, OutlineDividerItem
+from src.scene.components.reader_items import ArrowItem, OutlineDividerItem
 
 class SceneInputHandler(QObject):
     """
@@ -160,7 +160,7 @@ class SceneInputHandler(QObject):
 
     def _handle_strongs_lookup(self):
         scene = self.scene
-        from src.strongs_ui import StrongsVerboseDialog
+        from src.ui.components.strongs_ui import StrongsVerboseDialog
         view = scene.views()[0]
         mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
         sn_str, _ = scene._get_strongs_at_pos(mouse_pos)

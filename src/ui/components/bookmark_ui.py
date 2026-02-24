@@ -200,7 +200,7 @@ class BookmarkSidebar(QScrollArea):
 
     def leaveEvent(self, event):
         # Don't shrink if a child bookmark has an active menu
-        from src.bookmark_ui import BookmarkWidget
+        from src.ui.components.bookmark_ui import BookmarkWidget
         for bw in self.findChildren(BookmarkWidget):
             if bw._menu_active:
                 super().leaveEvent(event)

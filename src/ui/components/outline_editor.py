@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QHBoxLayout
 from PySide6.QtCore import Qt
-from src.outline_panel import OutlinePanel
+from src.ui.components.outline_panel import OutlinePanel
 
 class OutlineEditor(QDialog):
     """

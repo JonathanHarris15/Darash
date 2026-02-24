@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QLabel, QPushButt
 from PySide6.QtCore import Signal, Qt
 import re
 import difflib
-from src.constants import OT_BOOKS, NT_BOOKS
+from src.core.constants import OT_BOOKS, NT_BOOKS
 
 ALL_BOOKS = OT_BOOKS + NT_BOOKS
 

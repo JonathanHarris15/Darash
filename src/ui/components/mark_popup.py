@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QFrame, QGridLayout, QLabel
 from PySide6.QtCore import Qt, Signal, QPoint, QEvent
-from src.constants import HIGHLIGHT_COLORS, LOGICAL_MARKS
+from src.core.constants import HIGHLIGHT_COLORS, LOGICAL_MARKS
 
 class ColorButton(QPushButton):
     def __init__(self, color_name, hex_code, parent=None):

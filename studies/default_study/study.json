@@ -3,24 +3,7 @@
     "marks": [],
     "notes": {},
     "note_folders": [],
-    "bookmarks": [
-        {
-            "ref": "Psalms 32:6",
-            "book": "Psalms",
-            "chapter": "32",
-            "verse": "6",
-            "color": "#0078D7",
-            "title": ""
-        },
-        {
-            "ref": "Mark 6:17",
-            "book": "Mark",
-            "chapter": "6",
-            "verse": "17",
-            "color": "#ff5500",
-            "title": ""
-        }
-    ],
+    "bookmarks": [],
     "arrows": {
         "null": [
             {
@@ -84,5 +67,43 @@
         "logical_mark_opacity": 0.7,
         "logical_mark_color": "#ff87fd"
     },
-    "outlines": []
+    "outlines": [
+        {
+            "id": "f21fcfd6-6907-44a2-af1f-142ca7807b99",
+            "title": "New Outline",
+            "summary": "",
+            "range": {
+                "start": "Genesis 1:1",
+                "end": "Genesis 1:12"
+            },
+            "children": [
+                {
+                    "id": "e6a10216-6174-48c6-890d-94dfe23f5e74",
+                    "title": "Group: Section 1 A & Section 1 B",
+                    "summary": "",
+                    "range": {
+                        "start": "Genesis 1:1",
+                        "end": "Genesis 1:7"
+                    },
+                    "children": [],
+                    "expanded": true,
+                    "split_levels": []
+                },
+                {
+                    "id": "b5abba8b-e5c4-4a91-b0f3-025fe58a6ac8",
+                    "title": "Section 2",
+                    "range": {
+                        "start": "Genesis 1:8",
+                        "end": "Genesis 1:12"
+                    },
+                    "children": [],
+                    "expanded": true
+                }
+            ],
+            "expanded": true,
+            "split_levels": [
+                1
+            ]
+        }
+    ]
 }

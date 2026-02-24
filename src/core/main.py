@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication
-from src.ui import MainWindow
+from src.ui.main_window import MainWindow
 
 def main():
     print("Starting Jehu Reader...")

@@ -2,9 +2,9 @@ import os
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsPixmapItem
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QBrush, QPen, QPixmap
-from src.reader_items import NoteIcon, ArrowItem, SnakeArrowItem, LogicalMarkItem
-from src.snake_path_finder import SnakePathFinder
-from src.constants import LOGICAL_MARKS, LOGICAL_MARK_COLOR
+from src.scene.components.reader_items import NoteIcon, ArrowItem, SnakeArrowItem, LogicalMarkItem
+from src.utils.snake_path_finder import SnakePathFinder
+from src.core.constants import LOGICAL_MARKS, LOGICAL_MARK_COLOR
 
 class SceneOverlayManager:
     """

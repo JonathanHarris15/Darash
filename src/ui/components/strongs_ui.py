@@ -8,7 +8,7 @@ from PySide6.QtGui import (
     QFont, QColor, QPalette, QTextDocument, QAbstractTextDocumentLayout,
     QPainter
 )
-from src.constants import APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR
+from src.core.constants import APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR
 
 class HTMLItemDelegate(QStyledItemDelegate):
     """Custom delegate to render HTML in QListWidget items with word wrap."""

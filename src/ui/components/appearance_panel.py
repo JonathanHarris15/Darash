@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFontDatabase
-import src.constants as constants
+import src.core.constants as constants
 
 class AppearancePanel(QDialog):
     """
