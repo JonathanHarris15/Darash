@@ -58,14 +58,14 @@
         "font_family": "Times New Roman",
         "verse_num_size": 10,
         "side_margin": 40,
-        "text_color": "#dcdcdc",
-        "ref_color": "#64c8ff",
+        "text_color": "#ffffff",
+        "ref_color": "#1d83c7",
         "bg_color": "#1e1e1e",
         "tab_size": 40,
         "arrow_opacity": 0.6,
-        "verse_mark_size": 12,
+        "verse_mark_size": 16,
         "logical_mark_opacity": 0.7,
-        "logical_mark_color": "#ff87fd"
+        "logical_mark_color": "#ee2fff"
     },
     "outlines": [
         {
@@ -102,6 +102,92 @@
             ],
             "expanded": true,
             "split_levels": [
+                1
+            ]
+        },
+        {
+            "id": "a76b1194-0269-481d-a2dd-94ba91d68abe",
+            "title": "Women Shut up",
+            "summary": "",
+            "range": {
+                "start": "II Timothy 2:2",
+                "end": "II Timothy 2:25"
+            },
+            "children": [
+                {
+                    "id": "665f44c6-5ce2-45e9-b78a-afb7b8f62e91",
+                    "title": "Group: Section 1 A A & Section 1 A B",
+                    "summary": "",
+                    "range": {
+                        "start": "II Timothy 2:2",
+                        "end": "II Timothy 2:5"
+                    },
+                    "children": [
+                        {
+                            "id": "0db6704c-854e-4614-8f9e-b852904b2d74",
+                            "title": "Section 1 A A",
+                            "range": {
+                                "start": "II Timothy 2:2",
+                                "end": "II Timothy 2:3"
+                            },
+                            "children": [],
+                            "expanded": true
+                        },
+                        {
+                            "id": "2b2a4c51-5e4d-47cd-ae96-ee840b7f5bff",
+                            "title": "Section 1 A B",
+                            "range": {
+                                "start": "II Timothy 2:4",
+                                "end": "II Timothy 2:5"
+                            },
+                            "children": [],
+                            "expanded": true
+                        }
+                    ],
+                    "expanded": true,
+                    "split_levels": [
+                        2
+                    ]
+                },
+                {
+                    "id": "14643d1d-4055-45a5-b0f0-f50447397cc0",
+                    "title": "Group: Section 1 B A & Section 1 B B",
+                    "summary": "",
+                    "range": {
+                        "start": "II Timothy 2:6",
+                        "end": "II Timothy 2:12"
+                    },
+                    "children": [],
+                    "expanded": true,
+                    "split_levels": []
+                },
+                {
+                    "id": "8a9e19d1-97f4-42cf-8e94-ef4af0a98639",
+                    "title": "Section 2 A",
+                    "range": {
+                        "start": "II Timothy 2:13",
+                        "end": "II Timothy 2:19"
+                    },
+                    "children": [],
+                    "expanded": true
+                },
+                {
+                    "id": "7c2afd0b-71ef-4f45-a464-d8c8321292b1",
+                    "title": "",
+                    "summary": "",
+                    "range": {
+                        "start": "II Timothy 2:20",
+                        "end": "II Timothy 2:25"
+                    },
+                    "children": [],
+                    "expanded": true,
+                    "split_levels": []
+                }
+            ],
+            "expanded": true,
+            "split_levels": [
+                1,
+                1,
                 1
             ]
         }
