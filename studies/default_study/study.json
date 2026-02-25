@@ -48,12 +48,13 @@
         "Genesis 2:1": 0,
         "Psalms 35:4": 0,
         "Psalms 35:8": 0,
-        "Mark 5:10": 0
+        "Mark 5:10": 0,
+        "Genesis 2:13": 0
     },
     "verse_marks": {},
     "logical_marks": {},
     "settings": {
-        "font_size": 14,
+        "font_size": 16,
         "line_spacing": 1.6,
         "font_family": "Times New Roman",
         "verse_num_size": 10,
@@ -73,7 +74,7 @@
             "title": "New Outline",
             "summary": "",
             "range": {
-                "start": "Genesis 1:1",
+                "start": "Genesis 1:2",
                 "end": "Genesis 1:12"
             },
             "children": [
@@ -82,7 +83,7 @@
                     "title": "Group: Section 1 A & Section 1 B",
                     "summary": "",
                     "range": {
-                        "start": "Genesis 1:1",
+                        "start": "Genesis 1:2",
                         "end": "Genesis 1:7"
                     },
                     "children": [],

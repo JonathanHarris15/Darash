@@ -6,12 +6,30 @@ class LayoutEngine:
     def __init__(self, scene):
         self.scene = scene
 
-    def recalculate_layout(self, width: float):
+    def recalculate_layout(self, width: float, center_verse_idx: int = None):
         scene = self.scene
         if width <= 0: return
         scene.layoutStarted.emit()
         
+        # Determine chunk range
+        if center_verse_idx is None:
+            center_verse_idx = int(scene.virtual_scroll_y)
+            
+        total_verses = len(scene.loader.flat_verses)
+        half_chunk = scene.CHUNK_SIZE // 2
+        
+        start_idx = max(0, center_verse_idx - half_chunk)
+        end_idx = min(total_verses, start_idx + scene.CHUNK_SIZE)
+        
+        # Adjust start if we hit the end
+        if end_idx == total_verses:
+            start_idx = max(0, end_idx - scene.CHUNK_SIZE)
+            
+        scene.chunk_start_idx = start_idx
+        scene.chunk_end_idx = end_idx
+        
         scene.verse_pos_map.clear()
+        scene.verse_y_map.clear()
         scene.pos_verse_map.clear()
         
         # Clear old verse number items
@@ -58,7 +76,9 @@ class LayoutEngine:
         scene.heading_rects = []
         scene._pending_headings = []
 
-        for verse in scene.loader.flat_verses:
+        chunk_verses = scene.loader.flat_verses[start_idx:end_idx]
+        
+        for i, verse in enumerate(chunk_verses):
             if verse['book'] != last_book:
                 cursor.insertBlock(header_fmt)
                 cursor.setCharFormat(header_char_fmt)
@@ -89,11 +109,35 @@ class LayoutEngine:
             cursor.insertText(verse['text'])
 
         cursor.endEditBlock()
+        
+        # Now that layout is fixed, calculate y-boundaries for each verse
+        for i, verse in enumerate(chunk_verses):
+            ref = verse['ref']
+            pos = scene.verse_pos_map[ref]
+            block = doc.findBlock(pos)
+            rect = layout.blockBoundingRect(block)
+            
+            # Simplified boundary logic: Each verse owns the space from the 
+            # bottom of the previous verse to its own bottom.
+            # This accounts for any headers inserted between them.
+            if i == 0:
+                y_top = 0.0
+            else:
+                prev_ref = chunk_verses[i-1]['ref']
+                y_top = layout.blockBoundingRect(doc.findBlock(scene.verse_pos_map[prev_ref])).bottom()
+
+            if i == len(chunk_verses) - 1:
+                y_bottom = layout.documentSize().height()
+            else:
+                y_bottom = rect.bottom()
+
+            scene.verse_y_map[ref] = (y_top, y_bottom)
 
         scene.total_height = layout.documentSize().height() + 200
         self._update_heading_rects()
         
-        scene.layoutChanged.emit(int(scene.total_height))
+        # Virtual total height is the total number of verses
+        scene.layoutChanged.emit(total_verses) 
         scene.layoutFinished.emit()
         self.calculate_section_positions()
         scene.render_verses()
@@ -119,44 +163,30 @@ class LayoutEngine:
 
     def calculate_section_positions(self):
         scene = self.scene
-        doc = scene.main_text_item.document()
-        layout = doc.documentLayout()
-        scene.total_height = layout.documentSize().height() + 200
-
-        if not scene.verse_pos_map:
-            return
-            
-        section_data = []
+        total_verses = len(scene.loader.flat_verses)
         
+        section_data = []
         for section in BIBLE_SECTIONS:
             first_book = section["books"][0]
             last_book = section["books"][-1]
             
-            y_start = 0
-            y_end = 0
-            
+            # Find index of first verse of first book
             ref_start = f"{first_book} 1:1"
-            if ref_start in scene.verse_pos_map:
-                pos = scene.verse_pos_map[ref_start]
-                y_start = layout.blockBoundingRect(doc.findBlock(pos)).top()
+            idx_start = scene.loader.get_verse_index(ref_start)
             
-            last_verse_ref = None
-            for ref in reversed(list(scene.verse_pos_map.keys())):
-                if ref.startswith(f"{last_book} "):
-                    last_verse_ref = ref
+            # Find index of last verse of last book
+            idx_end = idx_start
+            # Search backwards for the last verse of last_book
+            for i in range(len(scene.loader.flat_verses)-1, -1, -1):
+                if scene.loader.flat_verses[i]['book'] == last_book:
+                    idx_end = i
                     break
-            
-            if last_verse_ref:
-                pos = scene.verse_pos_map[last_verse_ref]
-                y_end = layout.blockBoundingRect(doc.findBlock(pos)).bottom()
-            else:
-                y_end = y_start + 100 
-                
+                    
             section_data.append({
                 "name": section["name"],
-                "y_start": y_start,
-                "y_end": y_end,
+                "y_start": idx_start, # Now represents virtual index
+                "y_end": idx_end,
                 "color": section["color"]
             })
             
-        scene.sectionsUpdated.emit(section_data, int(scene.total_height))
+        scene.sectionsUpdated.emit(section_data, total_verses)

@@ -27,21 +27,21 @@ class JumpScrollBar(QScrollBar):
         """)
         self.floating_label.hide()
 
-    def set_matches(self, y_positions, total_height):
-        if total_height > 0:
-            self.match_y_positions = [y / total_height for y in y_positions]
+    def set_matches(self, y_positions, total_count):
+        if total_count > 0:
+            self.match_y_positions = [y / total_count for y in y_positions]
         else:
             self.match_y_positions = []
         self.update()
 
-    def set_sections(self, section_data, total_height):
+    def set_sections(self, section_data, total_count):
         """Sets the normalized ranges for bible sections."""
         self.sections = []
-        if total_height > 0:
+        if total_count > 0:
             for s in section_data:
                 self.sections.append({
-                    "y_start": s["y_start"] / total_height,
-                    "y_end": s["y_end"] / total_height,
+                    "y_start": s["y_start"] / total_count,
+                    "y_end": s["y_end"] / total_count,
                     "color": s["color"],
                     "name": s["name"]
                 })

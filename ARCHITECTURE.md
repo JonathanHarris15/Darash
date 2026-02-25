@@ -14,10 +14,12 @@ The application is broken into specific domains:
 *   `src/core/`: Foundational logic, constants, and the entry point (`main.py`). Classes here do not depend on the UI.
 *   `src/managers/`: Data controllers (`StudyManager`, `OutlineManager`, `StrongsManager`, `SymbolManager`). They load, parse, and mutate state before interacting with the UI.
 *   `src/scene/`: The highly specialized graphics engine (`QGraphicsScene`).
-    *   **Rule:** `ReaderScene` is only a facade. Heavy lifting is delegated to distinct engines:
-        *   `layout_engine.py`: Responsible for calculating the `QTextDocument` block structures, pagination, and verse positions.
+    *   **Rule:** `ReaderScene` is only a facade. Heavy lifting is delegated to distinct engines and managers:
+        *   `layout_engine.py`: Responsible for virtual chunk-based layout, calculating `QTextDocument` block structures, and local verse boundaries.
         *   `scene_input_handler.py`: Solely handles mouse, keyboard, and wheel events.
-        *   `scene_overlay_manager.py`: Responsible for drawing dynamic graphical items (marks, symbols, outlines) on top of the text.
+        *   `scene_overlay_manager.py`: Responsible for drawing dynamic graphical items (marks, symbols, arrows) on top of the text.
+        *   `renderer.py`: Handles viewport-aware rendering of verse numbers, search highlights, and outlines.
+        *   **Specialized Managers**: `scene_search_manager.py`, `scene_interaction_manager.py`, `scene_indentation_manager.py`, `scene_outline_manager.py`, and `scene_settings_manager.py` handle specific stateful interactions to keep `ReaderScene` modular.
 *   `src/ui/`: The structural user interface (built around PySide6 standard widgets).
     *   `main_window.py`: The `QMainWindow` assembly point.
     *   `reader_widget.py`: The container holding the GraphicsView and overlay HUDs.
@@ -33,4 +35,7 @@ The application is broken into specific domains:
 
 ## State Management
 
-The primary source of truth for the active study is the `StudyManager`. UI components read from it and trigger its mutations. The `ReaderScene` listens to changes (via direct calls or signals) and schedules a re-render through its specific overlay/layout sub-managers.
+1.  **Active Study**: The primary source of truth for the active study is the `StudyManager`. UI components read from it and trigger its mutations. 
+2.  **Virtual Mapping**: The reading scene uses a **Virtual Coordinate System**. Instead of global pixels, the scroll progress is tracked by verse index. The `LayoutEngine` generates local geometry for a specific "chunk" of verses around the user's focus.
+3.  **Synchronization**: The `ReaderScene` listens to changes (via direct calls or signals) and schedules a re-render through its specialized engines and sub-managers.
+

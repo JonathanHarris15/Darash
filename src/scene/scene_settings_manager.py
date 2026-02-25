@@ -1,0 +1,87 @@
+from PySide6.QtGui import QFont, QColor
+from PySide6.QtCore import QRectF
+from src.core.constants import (
+    DEFAULT_FONT_FAMILY, VERSE_FONT_FAMILY, DEFAULT_FONT_SIZE, 
+    HEADER_FONT_SIZE, CHAPTER_FONT_SIZE, LINE_SPACING_DEFAULT, 
+    SIDE_MARGIN, TAB_SIZE_DEFAULT, ARROW_OPACITY_DEFAULT, 
+    VERSE_MARK_SIZE_DEFAULT, LOGICAL_MARK_OPACITY_DEFAULT,
+    TEXT_COLOR, REFERENCE_COLOR, LOGICAL_MARK_COLOR, APP_BACKGROUND_COLOR
+)
+
+class SceneSettingsManager:
+    """
+    Manages scene typography, margins, and persistent settings.
+    """
+    def __init__(self, scene):
+        self.scene = scene
+
+    def load_settings(self):
+        scene = self.scene
+        settings = scene.study_manager.data.get("settings", {})
+        scene.font_size = settings.get("font_size", DEFAULT_FONT_SIZE)
+        scene.line_spacing = settings.get("line_spacing", LINE_SPACING_DEFAULT)
+        scene.font_family = settings.get("font_family", VERSE_FONT_FAMILY)
+        scene.verse_num_font_size = settings.get("verse_num_size", scene.font_size - 4)
+        scene.side_margin = settings.get("side_margin", SIDE_MARGIN)
+        scene.tab_size = settings.get("tab_size", TAB_SIZE_DEFAULT)
+        scene.arrow_opacity = settings.get("arrow_opacity", ARROW_OPACITY_DEFAULT)
+        scene.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
+        scene.logical_mark_opacity = settings.get("logical_mark_opacity", LOGICAL_MARK_OPACITY_DEFAULT)
+        
+        scene.target_font_size = scene.font_size
+        scene.target_line_spacing = scene.line_spacing
+        scene.target_font_family = scene.font_family
+        scene.target_verse_num_size = scene.verse_num_font_size
+        scene.target_side_margin = scene.side_margin
+        scene.target_tab_size = scene.tab_size
+        scene.target_arrow_opacity = scene.arrow_opacity
+        scene.target_verse_mark_size = scene.verse_mark_size
+        scene.target_logical_mark_opacity = scene.logical_mark_opacity
+
+    def save_settings(self):
+        scene = self.scene
+        settings = scene.study_manager.data["settings"]
+        settings["font_size"] = scene.font_size
+        settings["line_spacing"] = scene.line_spacing
+        settings["font_family"] = scene.font_family
+        settings["verse_num_size"] = scene.verse_num_font_size
+        settings["side_margin"] = scene.side_margin
+        settings["tab_size"] = scene.tab_size
+        settings["arrow_opacity"] = scene.arrow_opacity
+        settings["verse_mark_size"] = scene.verse_mark_size
+        settings["logical_mark_opacity"] = scene.logical_mark_opacity
+        settings["text_color"] = scene.text_color.name()
+        settings["ref_color"] = scene.ref_color.name()
+        settings["logical_mark_color"] = scene.logical_mark_color.name()
+        settings["bg_color"] = scene.backgroundBrush().color().name()
+        scene.study_manager.save_study()
+
+    def update_fonts(self):
+        scene = self.scene
+        scene.font = QFont(scene.font_family, scene.font_size)
+        scene.header_font = QFont(DEFAULT_FONT_FAMILY, HEADER_FONT_SIZE, QFont.Bold)
+        scene.chapter_font = QFont(DEFAULT_FONT_FAMILY, CHAPTER_FONT_SIZE, QFont.Bold)
+        scene.verse_num_font = QFont(scene.font_family, scene.verse_num_font_size)
+        scene.verse_mark_font = QFont(scene.font_family, scene.verse_mark_size)
+
+    def apply_layout_changes(self):
+        scene = self.scene
+        scene.font_size = scene.target_font_size
+        scene.line_spacing = scene.target_line_spacing
+        scene.font_family = scene.target_font_family
+        scene.verse_num_font_size = scene.target_verse_num_size
+        scene.side_margin = scene.target_side_margin
+        scene.tab_size = scene.target_tab_size
+        scene.arrow_opacity = scene.target_arrow_opacity
+        scene.verse_mark_size = scene.target_verse_mark_size
+        scene.logical_mark_opacity = scene.target_logical_mark_opacity
+        
+        self.update_fonts()
+        self.save_settings()
+        scene.recalculate_layout(scene.last_width, center_verse_idx=int(scene.virtual_scroll_y))
+        scene.setSceneRect(QRectF(0, scene.scroll_y, scene.last_width, scene.view_height))
+        scene._render_study_overlays()
+        scene._render_search_overlays()
+        scene.render_verses()
+        scene.scrollChanged.emit(int(scene.virtual_scroll_y))
+        scene.layoutFinished.emit()

@@ -74,8 +74,8 @@ class OverlayRenderer:
                 v_item.clicked.connect(lambda shift, v=v_item: scene._on_verse_num_clicked(v, shift))
                 v_item.doubleClicked.connect(scene._clear_verse_selection)
                 v_item.contextMenuRequested.connect(lambda pos, v=v_item: scene._on_verse_num_context_menu(v, pos))
-                v_item.dragged.connect(lambda dx, v=v_item: scene._on_verse_num_dragged(v, dx))
-                v_item.released.connect(scene._on_verse_num_released)
+                v_item.dragged.connect(lambda dx, v=v_item: scene.indentation_manager.on_verse_num_dragged(v, dx))
+                v_item.released.connect(scene.indentation_manager.on_verse_num_released)
                 
                 scene.addItem(v_item)
                 scene.verse_number_items[ref] = v_item
@@ -108,14 +108,11 @@ class OverlayRenderer:
         layout = doc.documentLayout()
         
         def get_verse_y_range(ref):
-            base_ref = ref
-            if len(ref) > 1 and ref[-1].isalpha() and (ref[-2].isdigit() or ref[-2] == ':'):
-                base_ref = ref[:-1]
-                
-            if base_ref in scene.verse_pos_map:
-                pos = scene.verse_pos_map[base_ref]
+            if ref in scene.verse_pos_map:
+                pos = scene.verse_pos_map[ref]
                 block = doc.findBlock(pos)
                 rect = layout.blockBoundingRect(block)
+                # Use the actual text block boundaries
                 return rect.top(), rect.bottom()
             return None, None
 
@@ -138,7 +135,7 @@ class OverlayRenderer:
             elif level == 4:
                 pen = QPen(color, 1.5, Qt.CustomDashLine)
                 pen.setDashPattern([1, 14])
-                return pen, False, None
+                return pen, False, level
             else:
                 pen = QPen(color, 1, Qt.SolidLine)
                 return pen, False, level
@@ -154,24 +151,10 @@ class OverlayRenderer:
             
             if s_top is None or e_bottom is None: return
 
-            y_start = s_top
-            y_end = e_bottom
-
-            s_idx = scene.loader.get_verse_index(start_ref)
-            if s_idx >= 1.0:
-                prev_ref = scene.loader.flat_verses[int(s_idx) - 1]['ref']
-                _, prev_bottom = get_verse_y_range(prev_ref)
-                if prev_bottom is not None: y_start = (prev_bottom + s_top) / 2
-                else: y_start -= 5
-            else: y_start -= 5
-
-            e_idx = scene.loader.get_verse_index(end_ref)
-            if e_idx < len(scene.loader.flat_verses) - 1:
-                next_ref = scene.loader.flat_verses[int(e_idx) + 1]['ref']
-                next_top, _ = get_verse_y_range(next_ref)
-                if next_top is not None: y_end = (e_bottom + next_top) / 2
-                else: y_end += 5
-            else: y_end += 5
+            # Top boundary should be just above the verse text (below headers)
+            y_start = s_top - 2
+            # Bottom boundary should be just below the verse text (above next headers)
+            y_end = e_bottom + 2
 
             def draw_h_line(y, h_level, summary_node=None, split_parent=None, split_idx=-1):
                 pen, is_double, text_level = get_line_style(h_level)
@@ -200,10 +183,14 @@ class OverlayRenderer:
                 child_divider_level = level + 1
                 
                 for i in range(len(children) - 1):
+                    # Child dividers also go between verses
                     _, child_bottom = get_verse_y_range(children[i]["range"]["end"])
                     next_child_top, _ = get_verse_y_range(children[i+1]["range"]["start"])
                     
                     if child_bottom is not None and next_child_top is not None:
+                        # Center child dividers in the gap (usually includes headers)
+                        # Or should they also be below headers? Let's center for now 
+                        # as child splits usually don't happen across major book breaks.
                         mid_y = (child_bottom + next_child_top) / 2
                         draw_h_line(mid_y, child_divider_level, node, split_parent=node, split_idx=i)
             

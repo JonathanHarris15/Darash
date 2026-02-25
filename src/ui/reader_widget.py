@@ -94,8 +94,8 @@ class ReaderWidget(QWidget):
         self.scrollbar.valueChanged.connect(self.scene.set_scroll_y)
         self.ref_label.clicked.connect(self._on_ref_label_clicked)
         
-        self.total_height = self.scene.total_height
-        self.scrollbar.setMaximum(int(self.total_height))
+        self.total_count = len(self.scene.loader.flat_verses)
+        self.scrollbar.setMaximum(self.total_count)
 
     def _on_ref_label_clicked(self):
         ref = self.ref_label.text()
@@ -107,8 +107,8 @@ class ReaderWidget(QWidget):
                 self.scene.study_manager.add_bookmark(book, chap, verse)
                 self.scene.bookmarksUpdated.emit()
 
-    def update_scrollbar_range(self, total_height: int) -> None:
-        self.total_height = total_height
+    def update_scrollbar_range(self, total_count: int) -> None:
+        self.total_count = total_count
         self._recalc_scrollbar()
 
     def update_scrollbar_value(self, value: int) -> None:
@@ -145,9 +145,9 @@ class ReaderWidget(QWidget):
         self.overlay.hide()
 
     def _recalc_scrollbar(self) -> None:
-        view_height = self.view.viewport().height()
-        self.scrollbar.setMaximum(max(0, self.total_height - view_height))
-        self.scrollbar.setPageStep(view_height)
+        self.scrollbar.setMaximum(self.total_count)
+        self.scrollbar.setPageStep(10) # 10 verses per page step
+
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
