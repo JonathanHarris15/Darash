@@ -5,7 +5,7 @@
 - **Execution:** The agent MUST NOT attempt to start or run the project. Focus on code modification, analysis, and testing within the source structure.
 
 ## Architectural Mandates
-- **Single Source of Truth (Architecture):** ALWAYS refer to `ARCHITECTURE.md` before implementing features. It defines the domain boundaries (core, managers, scene, ui, utils) and ensures you are working in the correct location.
+- **Single Source of Truth (Architecture):** ALWAYS refer to `ARCHITECTURE.md` before implementing features. It defines the domain boundaries (core, managers, scene, ui, utils) and provides a **Project Map** of key file responsibilities.
 - **Clean Code & Granularity:** Files must be short and focused.
     - **Soft Limit:** 300 lines.
     - **Hard Limit:** 500 lines. If a file exceeds this, it MUST be split into sub-modules.

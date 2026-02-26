@@ -132,7 +132,7 @@ class SceneInputHandler(QObject):
             scene_pos = event.scenePos()
             # QGraphicsSceneWheelEvent uses delta()
             delta = event.delta()
-            if self.scene.cycle_divider_at_pos(scene_pos, delta):
+            if self.scene.outline_manager.cycle_divider_at_pos(scene_pos, delta):
                 return True
             return True # Still block scrolling even if no divider found
         return False

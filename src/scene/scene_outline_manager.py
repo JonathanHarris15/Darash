@@ -124,3 +124,18 @@ class SceneOutlineManager:
                     event.accept()
                     return True
         return False
+
+    def cycle_divider_at_pos(self, pos, delta):
+        from src.scene.components.reader_items import OutlineDividerItem
+        scene = self.scene
+        view = scene.views()[0]
+        item = scene.itemAt(pos, view.transform())
+        
+        if isinstance(item, OutlineDividerItem):
+            if item.parent_node and item.split_idx != -1:
+                forward = delta > 0
+                if scene.study_manager.outline_manager.cycle_level_by_id(item.parent_node["id"], item.split_idx, forward):
+                    scene._render_outline_overlays()
+                    scene.studyDataChanged.emit()
+                    return True
+        return False
