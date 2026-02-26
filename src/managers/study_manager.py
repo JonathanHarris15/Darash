@@ -20,7 +20,9 @@ class StudyManager:
             "verse_indent": {}, # ref: indent_level
             "verse_marks": {},  # ref: mark_type
             "logical_marks": {}, # key (book|chap|verse|word_idx): mark_type (e.g. "arrow_right")
-            "settings": {},   # Persistent appearance settings
+            "settings": {
+                "sentence_break_enabled": False
+            },   # Persistent appearance settings
             "outlines": []  # List of outline trees {id, title, range, children}
         }
 

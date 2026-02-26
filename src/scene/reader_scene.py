@@ -24,7 +24,7 @@ from src.ui.components.strongs_ui import StrongsTooltip
 from src.ui.components.suggested_symbols_dialog import SuggestedSymbolsDialog
 from src.ui.components.outline_dialog import OutlineDialog
 
-from src.scene.components.reader_items import NoFocusTextItem, VerseNumberItem
+from src.scene.components.reader_items import NoFocusTextItem, VerseNumberItem, SentenceHandleItem
 
 from src.utils.reader_utils import (
     get_word_idx_from_pos, get_text_rects, 
@@ -77,6 +77,8 @@ class ReaderScene(QGraphicsScene):
         self.logical_mark_opacity = LOGICAL_MARK_OPACITY_DEFAULT
         self.scroll_sens = SCROLL_SENSITIVITY
         self.last_emitted_ref = ""
+        self.sentence_break_enabled = False
+        self.target_sentence_break_enabled = False
         
         self.loader = VerseLoader()
         self.study_manager = StudyManager(loader=self.loader)
@@ -86,6 +88,7 @@ class ReaderScene(QGraphicsScene):
         
         self.pixmap_cache = {} 
         self.verse_number_items = {} 
+        self.sentence_handle_items = {}
         self.selected_verse_items = []
         self.selected_refs = set()
         self.last_clicked_verse_idx = -1
@@ -107,8 +110,10 @@ class ReaderScene(QGraphicsScene):
         self.is_dragging_divider = False
         self.drag_divider_item = None
         self.drag_divider_ghost = None
-        self.drag_min_idx = float('-inf')
-        self.drag_max_idx = float('inf')
+        self.drag_bounds_min = 0
+        self.drag_bounds_max = 0
+        self.drag_hard_min = None
+        self.drag_hard_max = None
         
         self.verse_pos_map = {}
         self.verse_y_map = {} # ref -> (y_top, y_bottom)
@@ -198,6 +203,57 @@ class ReaderScene(QGraphicsScene):
         idx = bisect.bisect_right(self.pos_verse_map, (pos, "zzzzzz")) - 1
         return self.pos_verse_map[idx][1] if idx >= 0 else None
     
+    def _get_sentence_ref_at_pos(self, scene_pos):
+        doc_pos = self.main_text_item.mapFromScene(scene_pos)
+        pos = self.main_text_item.document().documentLayout().hitTest(doc_pos, Qt.FuzzyHit)
+        if pos == -1: return None
+        
+        # This is a bit tricky: find the verse ref, then if sentences are enabled, 
+        # find the block number and find our sub-ref.
+        ref = self._get_ref_from_pos(pos)
+        if not ref: return None
+        if not self.sentence_break_enabled: return ref
+        
+        block = self.main_text_item.document().findBlock(pos)
+        block_pos = block.position()
+        
+        # Search verse_pos_map for a sub-ref that matches this position
+        for s_ref, s_pos in self.verse_pos_map.items():
+            if s_pos == block_pos and s_ref.startswith(ref + "|"):
+                return s_ref
+        
+        return ref + "|0" # Default to first sentence
+
+    def _get_verse_y_midpoint(self, ref_before, ref_after):
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        
+        # Bottom of verse_before (find last sentence if split)
+        pos1 = self.verse_pos_map[ref_before]
+        last_block1 = doc.findBlock(pos1)
+        if self.sentence_break_enabled:
+            s_idx = 1
+            while f"{ref_before}|{s_idx}" in self.verse_pos_map:
+                last_block1 = doc.findBlock(self.verse_pos_map[f"{ref_before}|{s_idx}"])
+                s_idx += 1
+        
+        y_bottom1 = layout.blockBoundingRect(last_block1).bottom()
+        
+        # Top of verse_after (always first sentence)
+        pos2 = self.verse_pos_map[ref_after]
+        block2 = doc.findBlock(pos2)
+        y_top2 = layout.blockBoundingRect(block2).top()
+        
+        return (y_bottom1 + y_top2) / 2
+
+    def _get_first_verse_y_top(self, ref):
+        doc = self.main_text_item.document()
+        layout = doc.documentLayout()
+        block = doc.findBlock(self.verse_pos_map[ref])
+        prev = block.previous()
+        rect = layout.blockBoundingRect(block)
+        return (layout.blockBoundingRect(prev).bottom() + rect.top()) / 2 if prev.isValid() else rect.top() - 5
+
     def _get_text_rects(self, start, length):
         return get_text_rects(self.main_text_item, start, length)
 
@@ -209,6 +265,9 @@ class ReaderScene(QGraphicsScene):
 
     def recalculate_layout(self, width: float, center_verse_idx: int = None) -> None:
         self.layout_engine.recalculate_layout(width, center_verse_idx=center_verse_idx)
+
+    def apply_layout_changes(self):
+        self.settings_manager.apply_layout_changes()
 
     def render_verses(self) -> None:
         self.renderer.render_verses()
@@ -352,20 +411,32 @@ class ReaderScene(QGraphicsScene):
                     self.views()[0].setCursor(Qt.ArrowCursor); event.accept(); return
                 new_y = self.drag_divider_ghost.line().y1(); doc = self.main_text_item.document(); layout = doc.documentLayout()
                 ref_before, ref_after = None, None
-                for i in range(len(self.pos_verse_map) - 1):
-                    char_pos1, r1 = self.pos_verse_map[i]; char_pos2, r2 = self.pos_verse_map[i+1]
-                    rect1 = layout.blockBoundingRect(doc.findBlock(char_pos1)); rect2 = layout.blockBoundingRect(doc.findBlock(char_pos2))
-                    if abs(new_y - (rect1.bottom() + rect2.top()) / 2) < 2: 
-                        ref_before, ref_after = r1, r2; break
-                if ref_before and ref_after:
+                
+                # Check first gap (before first verse)
+                if len(self.pos_verse_map) > 0:
+                    char_pos0, r0 = self.pos_verse_map[0]
+                    target_y = self._get_first_verse_y_top(r0)
+                    if abs(new_y - target_y) < 2:
+                        ref_before, ref_after = None, r0
+                
+                if not ref_after:
+                    for i in range(len(self.pos_verse_map) - 1):
+                        char_pos1, r1 = self.pos_verse_map[i]; char_pos2, r2 = self.pos_verse_map[i+1]
+                        
+                        target_y = self._get_verse_y_midpoint(r1, r2)
+                        
+                        if abs(new_y - target_y) < 2: 
+                            ref_before, ref_after = r1, r2; break
+                
+                if ref_after: # For boundaries, ref_before can be None
                     item = self.drag_divider_item
                     if item.split_idx == -2: 
                         if self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], True, ref_after, self.loader):
                             self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
                     elif item.split_idx == -3: 
-                        if self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], False, ref_before, self.loader):
+                        if ref_before and self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], False, ref_before, self.loader):
                             self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
-                    elif item.split_idx >= 0:
+                    elif item.split_idx >= 0 and ref_before:
                         if self.study_manager.outline_manager.move_split_by_id(item.parent_node["id"], item.split_idx, ref_before, ref_after, self.loader):
                             self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
                 self.removeItem(self.drag_divider_ghost); self.drag_divider_ghost = None; self.drag_divider_item = None
@@ -381,6 +452,7 @@ class ReaderScene(QGraphicsScene):
 
     def _clear_verse_selection(self):
         for it in self.verse_number_items.values(): it.is_selected = False; it.update()
+        for it in self.sentence_handle_items.values(): it.is_selected = False; it.update()
         self.selected_verse_items = []; self.selected_refs.clear(); self.last_clicked_verse_idx = -1
 
     def _on_verse_num_context_menu(self, item, screen_pos):
@@ -426,7 +498,8 @@ class ReaderScene(QGraphicsScene):
 
     def mousePressEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
-        if not isinstance(item, VerseNumberItem): self._clear_verse_selection()
+        if not isinstance(item, VerseNumberItem) and not isinstance(item, SentenceHandleItem): 
+            self._clear_verse_selection()
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
@@ -445,17 +518,27 @@ class ReaderScene(QGraphicsScene):
         if self.is_dragging_divider:
             scene_pos = event.scenePos(); doc = self.main_text_item.document(); layout = doc.documentLayout()
             best_gap_y, best_dist = -1, 1000
+            is_outer = self.drag_divider_item.split_idx < 0
+            
             if len(self.pos_verse_map) > 0:
                 char_pos0, r0 = self.pos_verse_map[0]; idx0 = self.loader.get_verse_index(r0)
                 if idx0 >= self.drag_bounds_min and idx0 <= self.drag_bounds_max:
-                    y_top0 = layout.blockBoundingRect(doc.findBlock(char_pos0)).top() - 2; dist0 = abs(scene_pos.y() - y_top0)
+                    y_top0 = self._get_first_verse_y_top(r0)
+                    dist0 = abs(scene_pos.y() - y_top0)
                     if dist0 < 50 and dist0 < best_dist: best_dist, best_gap_y = dist0, y_top0
             for i in range(len(self.pos_verse_map) - 1):
                 char_pos1, r1 = self.pos_verse_map[i]; char_pos2, r2 = self.pos_verse_map[i+1]; idx_before = self.loader.get_verse_index(r1)
-                if idx_before < self.drag_bounds_min or idx_before > self.drag_bounds_max: continue
+                
+                # Check draggable bounds
+                # For internal splits, idx_before must be < drag_bounds_max
+                if idx_before < self.drag_bounds_min or (not is_outer and idx_before >= self.drag_bounds_max) or (is_outer and idx_before > self.drag_bounds_max):
+                    continue
+                    
                 if self.drag_hard_min is not None and idx_before <= self.drag_hard_min: continue
                 if self.drag_hard_max is not None and idx_before >= self.drag_hard_max: continue
-                mid_y = layout.blockBoundingRect(doc.findBlock(char_pos2)).top() - 2; dist = abs(scene_pos.y() - mid_y)
+                
+                mid_y = self._get_verse_y_midpoint(r1, r2)
+                dist = abs(scene_pos.y() - mid_y)
                 if dist < 50 and dist < best_dist: best_dist, best_gap_y = dist, mid_y
             if best_gap_y != -1: self.drag_divider_ghost.setLine(self.side_margin, best_gap_y, self.sceneRect().width() - 10, best_gap_y); self.drag_divider_ghost.show()
             else: self.drag_divider_ghost.hide()
@@ -553,10 +636,16 @@ class ReaderScene(QGraphicsScene):
             self._clear_verse_selection(); self.selected_verse_items = [item]; item.is_selected = True; item.update()
             self.last_clicked_verse_idx = item_idx; self.selected_refs.add(item.ref)
         else:
+            # Shift-select only works for full verse numbers
+            if not isinstance(item, VerseNumberItem) or isinstance(item, SentenceHandleItem):
+                self._clear_verse_selection(); self.selected_verse_items = [item]; item.is_selected = True; item.update()
+                self.selected_refs.add(item.ref); return
+                
             if self.last_clicked_verse_idx == -1: self._on_verse_num_clicked(item, False)
             else:
                 start, end = min(self.last_clicked_verse_idx, item_idx), max(self.last_clicked_verse_idx, item_idx)
                 for it in self.verse_number_items.values(): it.is_selected = False; it.update()
+                for it in self.sentence_handle_items.values(): it.is_selected = False; it.update()
                 self.selected_refs.clear(); self.selected_verse_items = []
                 for i in range(start, end + 1):
                     ref = flat_refs[i]; self.selected_refs.add(ref); it = self.verse_number_items.get(ref)

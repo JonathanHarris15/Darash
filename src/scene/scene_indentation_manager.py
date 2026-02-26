@@ -1,5 +1,6 @@
 from PySide6.QtGui import QTextCursor
 from src.core.verse_loader import VerseLoader
+from src.core.constants import VERSE_NUMBER_RESERVED_WIDTH
 
 class SceneIndentationManager:
     """
@@ -22,7 +23,22 @@ class SceneIndentationManager:
             doc = scene.main_text_item.document()
             verse_indents = scene.study_manager.data.get("verse_indent", {})
             
-            for ref in scene.selected_refs:
+            # Determine target_ref from item
+            if hasattr(item, "s_ref") and item.s_ref:
+                target_ref = item.s_ref
+            elif scene.sentence_break_enabled:
+                target_ref = f"{item.ref}|0"
+            else:
+                target_ref = item.ref
+                
+            # If multiple verses are selected and we're NOT in sentence-break mode, 
+            # we apply to all selected verses.
+            if not scene.sentence_break_enabled and len(scene.selected_refs) > 1:
+                target_refs = list(scene.selected_refs)
+            else:
+                target_refs = [target_ref]
+
+            for ref in target_refs:
                 if not hasattr(scene, "_drag_start_indents"):
                     scene._drag_start_indents = {}
                 
@@ -38,11 +54,13 @@ class SceneIndentationManager:
                     pos = scene.verse_pos_map[ref]
                     block = doc.findBlock(pos)
                     fmt = block.blockFormat()
-                    fmt.setLeftMargin(new_indent * scene.tab_size)
+                    fmt.setLeftMargin(new_indent * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
                     
                     cursor = QTextCursor(block)
                     cursor.setBlockFormat(fmt)
 
+            # Targeted update: only update positions of items actually moved
+            # Instead of updating EVERYTHING, we update the target items
             self.update_all_verse_number_positions()
             scene._render_study_overlays()
             if scene.strongs_enabled:
@@ -60,7 +78,10 @@ class SceneIndentationManager:
                 block = doc.findBlock(pos)
                 rect = layout.blockBoundingRect(block)
                 
-                indent_level = verse_indents.get(ref, 0)
+                # If sentences are enabled, the indent for the first sentence (|0) 
+                # defines the position of the verse number.
+                s_ref = f"{ref}|0" if scene.sentence_break_enabled else ref
+                indent_level = verse_indents.get(s_ref, verse_indents.get(ref, 0))
                 it.setPos(scene.side_margin + (indent_level * scene.tab_size), rect.top())
 
     def on_verse_num_released(self):

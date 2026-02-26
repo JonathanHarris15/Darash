@@ -2,7 +2,7 @@ import bisect
 from PySide6.QtGui import QPen, QColor, QBrush
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem
-from src.scene.components.reader_items import VerseNumberItem, OutlineDividerItem
+from src.scene.components.reader_items import VerseNumberItem, OutlineDividerItem, SentenceHandleItem
 
 class OverlayRenderer:
     def __init__(self, scene):
@@ -41,6 +41,7 @@ class OverlayRenderer:
         if end_pos == -1: end_pos = doc.characterCount()
         
         visible_refs = set()
+        visible_sentence_refs = set()
         start_idx = bisect.bisect_left(scene.pos_verse_map, (start_pos, ""))
         end_idx = bisect.bisect_right(scene.pos_verse_map, (end_pos, "zzzzzz"))
         
@@ -63,7 +64,10 @@ class OverlayRenderer:
                 
                 block = doc.findBlock(char_pos)
                 rect = layout.blockBoundingRect(block)
-                indent_level = verse_indents.get(ref, 0)
+                
+                # Use |0 suffix for indentation level if sentences are enabled
+                s_ref = f"{ref}|0" if scene.sentence_break_enabled else ref
+                indent_level = verse_indents.get(s_ref, verse_indents.get(ref, 0))
                 
                 v_item = VerseNumberItem(verse_data['verse_num'], ref, scene.verse_num_font, scene.ref_color, mark_font=scene.verse_mark_font)
                 v_item.setPos(scene.side_margin + (indent_level * scene.tab_size), rect.top())
@@ -85,6 +89,42 @@ class OverlayRenderer:
                     it.mark_type = mark_type
                     it.is_selected = is_selected
                     it.update()
+                
+            # Handle additional sentence handles for indentation
+            if scene.sentence_break_enabled:
+                s_idx = 1 # Start from index 1 as index 0 is covered by VerseNumberItem
+                while True:
+                    s_ref = f"{ref}|{s_idx}"
+                    if s_ref not in scene.verse_pos_map: break
+                    
+                    visible_sentence_refs.add(s_ref)
+                    if s_ref not in scene.sentence_handle_items:
+                        s_pos = scene.verse_pos_map[s_ref]
+                        s_block = doc.findBlock(s_pos)
+                        s_rect = layout.blockBoundingRect(s_block)
+                        s_indent = verse_indents.get(s_ref, 0)
+                        
+                        # Only show handles if they are on screen
+                        if s_rect.top() > scene.scroll_y + scene.view_height + 500 or s_rect.bottom() < scene.scroll_y - 500:
+                             s_idx += 1; continue
+                             
+                        s_item = SentenceHandleItem(ref, s_ref, scene.verse_num_font, scene.ref_color)
+                        s_item.setPos(scene.side_margin + (s_indent * scene.tab_size), s_rect.top())
+                        s_item.setZValue(9)
+                        s_item.clicked.connect(lambda shift, v=s_item: scene._on_verse_num_clicked(v, shift))
+                        s_item.dragged.connect(lambda dx, v=s_item: scene.indentation_manager.on_verse_num_dragged(v, dx))
+                        s_item.released.connect(scene.indentation_manager.on_verse_num_released)
+                        
+                        scene.addItem(s_item)
+                        scene.sentence_handle_items[s_ref] = s_item
+                    else:
+                        # Update position if layout changed
+                        s_pos = scene.verse_pos_map[s_ref]
+                        s_rect = layout.blockBoundingRect(doc.findBlock(s_pos))
+                        s_indent = verse_indents.get(s_ref, 0)
+                        scene.sentence_handle_items[s_ref].setPos(scene.side_margin + (s_indent * scene.tab_size), s_rect.top())
+                    
+                    s_idx += 1
 
         to_remove = []
         for ref, it in scene.verse_number_items.items():
@@ -93,6 +133,14 @@ class OverlayRenderer:
         
         for ref in to_remove:
             it = scene.verse_number_items.pop(ref)
+            scene.removeItem(it)
+
+        to_remove_s = []
+        for s_ref, it in scene.sentence_handle_items.items():
+            if s_ref not in visible_sentence_refs:
+                to_remove_s.append(s_ref)
+        for s_ref in to_remove_s:
+            it = scene.sentence_handle_items.pop(s_ref)
             scene.removeItem(it)
 
     def _render_outline_overlays(self):
@@ -110,10 +158,31 @@ class OverlayRenderer:
         def get_verse_y_range(ref):
             if ref in scene.verse_pos_map:
                 pos = scene.verse_pos_map[ref]
-                block = doc.findBlock(pos)
-                rect = layout.blockBoundingRect(block)
-                # Use the actual text block boundaries
-                return rect.top(), rect.bottom()
+                first_block = doc.findBlock(pos)
+                
+                # Find last sentence block of this verse if sentences are enabled
+                last_block = first_block
+                if scene.sentence_break_enabled:
+                    s_idx = 1
+                    while True:
+                        s_ref = f"{ref}|{s_idx}"
+                        if s_ref in scene.verse_pos_map:
+                            last_block = doc.findBlock(scene.verse_pos_map[s_ref])
+                            s_idx += 1
+                        else:
+                            break
+                
+                rect_first = layout.blockBoundingRect(first_block)
+                rect_last = layout.blockBoundingRect(last_block)
+                
+                # Center boundaries in the gaps (including headers)
+                prev_block = first_block.previous()
+                y_top = (layout.blockBoundingRect(prev_block).bottom() + rect_first.top()) / 2 if prev_block.isValid() else rect_first.top() - 5
+                
+                next_block = last_block.next()
+                y_bottom = (rect_last.bottom() + layout.blockBoundingRect(next_block).top()) / 2 if next_block.isValid() else rect_last.bottom() + 5
+                
+                return y_top, y_bottom
             return None, None
 
         def get_line_style(level):
@@ -151,10 +220,9 @@ class OverlayRenderer:
             
             if s_top is None or e_bottom is None: return
 
-            # Top boundary should be just above the verse text (below headers)
-            y_start = s_top - 2
-            # Bottom boundary should be just below the verse text (above next headers)
-            y_end = e_bottom + 2
+            # Boundaries are already centered by get_verse_y_range
+            y_start = s_top
+            y_end = e_bottom
 
             def draw_h_line(y, h_level, summary_node=None, split_parent=None, split_idx=-1):
                 pen, is_double, text_level = get_line_style(h_level)

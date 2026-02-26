@@ -27,6 +27,7 @@ class SceneSettingsManager:
         scene.arrow_opacity = settings.get("arrow_opacity", ARROW_OPACITY_DEFAULT)
         scene.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
         scene.logical_mark_opacity = settings.get("logical_mark_opacity", LOGICAL_MARK_OPACITY_DEFAULT)
+        scene.sentence_break_enabled = settings.get("sentence_break_enabled", False)
         
         scene.target_font_size = scene.font_size
         scene.target_line_spacing = scene.line_spacing
@@ -37,6 +38,7 @@ class SceneSettingsManager:
         scene.target_arrow_opacity = scene.arrow_opacity
         scene.target_verse_mark_size = scene.verse_mark_size
         scene.target_logical_mark_opacity = scene.logical_mark_opacity
+        scene.target_sentence_break_enabled = scene.sentence_break_enabled
 
     def save_settings(self):
         scene = self.scene
@@ -50,6 +52,7 @@ class SceneSettingsManager:
         settings["arrow_opacity"] = scene.arrow_opacity
         settings["verse_mark_size"] = scene.verse_mark_size
         settings["logical_mark_opacity"] = scene.logical_mark_opacity
+        settings["sentence_break_enabled"] = scene.sentence_break_enabled
         settings["text_color"] = scene.text_color.name()
         settings["ref_color"] = scene.ref_color.name()
         settings["logical_mark_color"] = scene.logical_mark_color.name()
@@ -75,6 +78,7 @@ class SceneSettingsManager:
         scene.arrow_opacity = scene.target_arrow_opacity
         scene.verse_mark_size = scene.target_verse_mark_size
         scene.logical_mark_opacity = scene.target_logical_mark_opacity
+        scene.sentence_break_enabled = scene.target_sentence_break_enabled
         
         self.update_fonts()
         self.save_settings()

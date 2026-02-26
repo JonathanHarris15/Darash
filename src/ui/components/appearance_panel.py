@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSlider, 
     QPushButton, QColorDialog, QScrollArea, QGroupBox, QFormLayout,
-    QFontComboBox, QDoubleSpinBox, QSpinBox
+    QFontComboBox, QDoubleSpinBox, QSpinBox, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFontDatabase
@@ -122,6 +122,11 @@ class AppearancePanel(QDialog):
         self.logical_opacity_spin.setValue(getattr(self.scene, 'logical_mark_opacity', 0.5))
         self.logical_opacity_spin.valueChanged.connect(self._on_logical_opacity_changed)
         layout_layout.addRow("Logical Mark Opacity:", self.logical_opacity_spin)
+
+        self.sentence_break_check = QCheckBox()
+        self.sentence_break_check.setChecked(getattr(self.scene, 'sentence_break_enabled', False))
+        self.sentence_break_check.toggled.connect(self._on_sentence_break_changed)
+        layout_layout.addRow("Break at Sentences:", self.sentence_break_check)
         
         self.form.addRow(layout_group)
         
@@ -189,6 +194,9 @@ class AppearancePanel(QDialog):
 
     def _on_logical_opacity_changed(self, val):
         self.scene.target_logical_mark_opacity = val
+
+    def _on_sentence_break_changed(self, checked):
+        self.scene.target_sentence_break_enabled = checked
 
     def apply_changes(self):
         self.scene.apply_layout_changes()

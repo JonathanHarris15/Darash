@@ -64,9 +64,28 @@ class SceneOutlineManager:
         idx = item.split_idx
         loader = scene.loader
         
-        # (Draggable boundary logic from ReaderScene goes here)
-        # This part requires access to many scene properties, so it needs careful mapping.
+        # Determine draggable bounds
+        scene.drag_bounds_min = 0
+        scene.drag_bounds_max = len(loader.flat_verses) - 1
+        scene.drag_hard_min = None
+        scene.drag_hard_max = None
         
+        if idx == -2: # Outer Start
+            scene.drag_bounds_max = loader.get_verse_index(parent["range"]["end"]) - 1
+        elif idx == -3: # Outer End
+            scene.drag_bounds_min = loader.get_verse_index(parent["range"]["start"]) + 1
+        elif idx >= 0: # Internal Split
+            c1 = parent["children"][idx]
+            c2 = parent["children"][idx+1]
+            scene.drag_bounds_min = loader.get_verse_index(c1["range"]["start"])
+            scene.drag_bounds_max = loader.get_verse_index(c2["range"]["end"])
+            
+            # Hard constraints to prevent sub-children from being orphaned
+            if "children" in c1 and c1["children"]:
+                scene.drag_hard_min = loader.get_verse_index(c1["children"][-1]["range"]["start"])
+            if "children" in c2 and c2["children"]:
+                scene.drag_hard_max = loader.get_verse_index(c2["children"][0]["range"]["end"])
+
         pen = QPen(QColor("#005a9e"))
         pen.setWidth(2)
         scene.drag_divider_ghost = QGraphicsLineItem(scene.side_margin, pos.y(), scene.sceneRect().width() - 10, pos.y())

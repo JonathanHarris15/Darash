@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QPointF, QLineF, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QPen, QPainterPath, QPainter
+from src.core.constants import VERSE_NUMBER_RESERVED_WIDTH
 import math
 
 class NoFocusTextItem(QGraphicsTextItem):
@@ -183,6 +184,7 @@ class VerseNumberItem(QGraphicsObject):
         super().__init__(parent)
         self.verse_num = str(verse_num)
         self.ref = ref
+        self.s_ref = None # Set by SentenceHandleItem
         self.font = font
         self.color = color
         self.mark_font = mark_font if mark_font else font
@@ -204,8 +206,8 @@ class VerseNumberItem(QGraphicsObject):
         
     def boundingRect(self):
         h = max(self._height, self._mark_height)
-        # Left margin (-35) for icon+arrow, width (65) total, and height from font
-        return QRectF(-35, 0, 65, h + 5)
+        # Left margin (-35) for icon+arrow, width (35 + reserved_width) total, and height from font
+        return QRectF(-35, 0, 35 + VERSE_NUMBER_RESERVED_WIDTH, h + 5)
 
     def paint(self, painter, option, widget=None):
         if self.is_selected:
@@ -223,7 +225,7 @@ class VerseNumberItem(QGraphicsObject):
             
         painter.setFont(self.font)
         painter.setPen(self.color)
-        painter.drawText(QRectF(0, 0, 30, self._height + 5), Qt.AlignLeft | Qt.AlignTop, self.verse_num)
+        painter.drawText(QRectF(0, 0, VERSE_NUMBER_RESERVED_WIDTH, self._height + 5), Qt.AlignLeft | Qt.AlignTop, self.verse_num)
         
         if self.mark_type:
             # Draw mark icon/symbol to the LEFT of the number
@@ -242,7 +244,7 @@ class VerseNumberItem(QGraphicsObject):
                 painter.setFont(self.mark_font)
                 painter.setPen(mark_color)
                 # Position mark further left of the verse number
-                painter.drawText(QRectF(-28, 0, 30, self._mark_height + 5), Qt.AlignLeft | Qt.AlignTop, symbol)
+                painter.drawText(QRectF(-28, 0, VERSE_NUMBER_RESERVED_WIDTH, self._mark_height + 5), Qt.AlignLeft | Qt.AlignTop, symbol)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -279,6 +281,32 @@ class VerseNumberItem(QGraphicsObject):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+
+class SentenceHandleItem(VerseNumberItem):
+    """Draggable handle for sub-sentences when sentence breaking is enabled."""
+    def __init__(self, ref, s_ref, font, color, parent=None):
+        super().__init__("", ref, font, color, parent=parent)
+        self.s_ref = s_ref # e.g. Book 1:1|2
+        
+    def paint(self, painter, option, widget=None):
+        if self.is_selected:
+            # Draw a small right-pointing arrow to indicate tabbing capability
+            painter.setBrush(QBrush(self.color))
+            painter.setPen(Qt.NoPen)
+            
+            # Position arrow same as VerseNumberItem
+            arrow_path = QPainterPath()
+            arrow_path.moveTo(-8, 6)
+            arrow_path.lineTo(-2, 10)
+            arrow_path.lineTo(-8, 14)
+            arrow_path.closeSubpath()
+            painter.drawPath(arrow_path)
+            
+        # Draw a subtle "tick" to show where the handle is
+        painter.setPen(QPen(self.color, 1))
+        painter.setOpacity(0.3)
+        painter.drawLine(0, 5, 5, 5) # Small horizontal tick
+        painter.setOpacity(1.0)
 
 class LogicalMarkItem(QGraphicsObject):
     """

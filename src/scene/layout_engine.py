@@ -1,6 +1,7 @@
 from PySide6.QtGui import QTextCursor, QTextBlockFormat, QTextCharFormat
 from PySide6.QtCore import Qt, QRectF
-from src.core.constants import BIBLE_SECTIONS
+import re
+from src.core.constants import BIBLE_SECTIONS, VERSE_NUMBER_RESERVED_WIDTH
 
 class LayoutEngine:
     def __init__(self, scene):
@@ -36,6 +37,11 @@ class LayoutEngine:
         for it in scene.verse_number_items.values():
             scene.removeItem(it)
         scene.verse_number_items.clear()
+        
+        for it in scene.sentence_handle_items.values():
+            scene.removeItem(it)
+        scene.sentence_handle_items.clear()
+        
         scene.selected_verse_items.clear()
         scene.last_clicked_verse_idx = -1
         
@@ -93,45 +99,103 @@ class LayoutEngine:
                 scene._pending_headings.append((cursor.block().blockNumber(), "chapter", f"{verse['book']} {verse['chapter']}"))
                 last_chap = verse['chapter']
                 
-            indent_level = verse_indents.get(verse['ref'], 0)
-            
-            verse_fmt = QTextBlockFormat()
-            verse_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
-            verse_fmt.setBottomMargin(scene.font_size * 0.5)
-            verse_fmt.setLeftMargin(indent_level * scene.tab_size)
-            verse_fmt.setTextIndent(30)
-            
-            cursor.insertBlock(verse_fmt)
-            cursor.setCharFormat(verse_char_fmt)
-            scene.verse_pos_map[verse['ref']] = cursor.position()
-            scene.pos_verse_map.append((cursor.position(), verse['ref']))
-            
-            cursor.insertText(verse['text'])
+            # Split text into sentences if enabled
+            if scene.sentence_break_enabled:
+                # Split by .!? followed by space or end of string
+                # Handles multiple spaces and non-breaking spaces
+                sentences = [s.strip() for s in re.split(r'(?<=[.!?])[\s\u00A0]+', verse['text']) if s.strip()]
+            else:
+                sentences = [verse['text']]
+                
+            for s_idx, s_text in enumerate(sentences):
+                # Use sub-reference for sentence-level indentation
+                s_ref = f"{verse['ref']}|{s_idx}" if scene.sentence_break_enabled else verse['ref']
+                indent_level = verse_indents.get(s_ref, verse_indents.get(verse['ref'], 0))
+                
+                verse_fmt = QTextBlockFormat()
+                verse_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
+                verse_fmt.setBottomMargin(scene.font_size * 0.5 if s_idx == len(sentences) - 1 else 2)
+                verse_fmt.setLeftMargin(indent_level * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
+                
+                cursor.insertBlock(verse_fmt)
+                cursor.setCharFormat(verse_char_fmt)
+                
+                # Only map the start of the verse for global navigation
+                if s_idx == 0:
+                    scene.verse_pos_map[verse['ref']] = cursor.position()
+                    scene.pos_verse_map.append((cursor.position(), verse['ref']))
+                
+                # Store position for each sentence if needed for indentation dragging
+                scene.verse_pos_map[s_ref] = cursor.position()
+                
+                cursor.insertText(s_text)
 
         cursor.endEditBlock()
         
-        # Now that layout is fixed, calculate y-boundaries for each verse
+        # Now that layout is fixed, calculate y-boundaries for each verse/sentence
         for i, verse in enumerate(chunk_verses):
             ref = verse['ref']
-            pos = scene.verse_pos_map[ref]
-            block = doc.findBlock(pos)
-            rect = layout.blockBoundingRect(block)
             
-            # Simplified boundary logic: Each verse owns the space from the 
-            # bottom of the previous verse to its own bottom.
-            # This accounts for any headers inserted between them.
-            if i == 0:
-                y_top = 0.0
-            else:
-                prev_ref = chunk_verses[i-1]['ref']
-                y_top = layout.blockBoundingRect(doc.findBlock(scene.verse_pos_map[prev_ref])).bottom()
+            if scene.sentence_break_enabled:
+                # Iterate through all sentences of this verse
+                s_idx = 0
+                while True:
+                    s_ref = f"{ref}|{s_idx}"
+                    if s_ref not in scene.verse_pos_map: break
+                    
+                    pos = scene.verse_pos_map[s_ref]
+                    block = doc.findBlock(pos)
+                    rect = layout.blockBoundingRect(block)
+                    
+                    # Calculate top bound: if first sentence of chunk, own from 0.0
+                    if s_idx == 0:
+                        if i == 0:
+                            y_top = 0.0
+                        else:
+                            prev_ref = chunk_verses[i-1]['ref']
+                            # Link to the bottom of the previous verse
+                            y_top = scene.verse_y_map[prev_ref][1]
+                    else:
+                        prev_s_ref = f"{ref}|{s_idx-1}"
+                        y_top = scene.verse_y_map[prev_s_ref][1]
 
-            if i == len(chunk_verses) - 1:
-                y_bottom = layout.documentSize().height()
-            else:
-                y_bottom = rect.bottom()
+                    # Calculate bottom bound: if last sentence of last verse in chunk, own to end
+                    # Use a small peek at the next block if it exists to find the visual gap
+                    next_block = block.next()
+                    if i == len(chunk_verses) - 1 and next_block.isValid() == False:
+                        y_bottom = layout.documentSize().height()
+                    else:
+                        # For internal sentences, we use the block's bottom
+                        # unless it's the last sentence of a verse, then we might want to include headers?
+                        # No, the NEXT verse's first sentence will own the headers above it via the 'y_top' logic.
+                        y_bottom = rect.bottom()
 
-            scene.verse_y_map[ref] = (y_top, y_bottom)
+                    scene.verse_y_map[s_ref] = (y_top, y_bottom)
+                    s_idx += 1
+                
+                # Main verse ref spans all its sentences
+                first_s = f"{ref}|0"
+                last_s = f"{ref}|{s_idx-1}"
+                scene.verse_y_map[ref] = (scene.verse_y_map[first_s][0], scene.verse_y_map[last_s][1])
+            else:
+                pos = scene.verse_pos_map[ref]
+                block = doc.findBlock(pos)
+                rect = layout.blockBoundingRect(block)
+                
+                # Simplified boundary logic: Each verse owns the space from the 
+                # bottom of the previous verse to its own bottom.
+                if i == 0:
+                    y_top = 0.0
+                else:
+                    prev_ref = chunk_verses[i-1]['ref']
+                    y_top = layout.blockBoundingRect(doc.findBlock(scene.verse_pos_map[prev_ref])).bottom()
+
+                if i == len(chunk_verses) - 1:
+                    y_bottom = layout.documentSize().height()
+                else:
+                    y_bottom = rect.bottom()
+
+                scene.verse_y_map[ref] = (y_top, y_bottom)
 
         scene.total_height = layout.documentSize().height() + 200
         self._update_heading_rects()
