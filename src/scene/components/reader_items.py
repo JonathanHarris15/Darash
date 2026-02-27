@@ -302,10 +302,11 @@ class SentenceHandleItem(VerseNumberItem):
             arrow_path.closeSubpath()
             painter.drawPath(arrow_path)
             
-        # Draw a subtle "tick" to show where the handle is
-        painter.setPen(QPen(self.color, 1))
-        painter.setOpacity(0.3)
-        painter.drawLine(0, 5, 5, 5) # Small horizontal tick
+        # Draw a subtle "dot" to show where the handle is
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(self.color))
+        painter.setOpacity(0.5)
+        painter.drawEllipse(1, 4, 4, 4) # Small dot
         painter.setOpacity(1.0)
 
 class LogicalMarkItem(QGraphicsObject):

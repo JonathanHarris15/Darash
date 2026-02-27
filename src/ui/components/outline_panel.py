@@ -8,6 +8,75 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QRect, QEvent, QTimer
 from PySide6.QtGui import QColor, QFont, QPalette
 
+class DraggableLabel(QLabel):
+    dragged = Signal(int)
+    jumpRequested = Signal()
+    
+    def __init__(self, text, is_start, parent=None):
+        super().__init__(text, parent)
+        self.is_start = is_start
+        self.setCursor(Qt.SizeVerCursor)
+        self.setStyleSheet("""
+            QLabel { color: #569cd6; font-weight: bold; font-family: 'Consolas'; font-size: 14px; padding: 2px; }
+            QLabel:hover { text-decoration: underline; background-color: rgba(255,255,255,0.1); border-radius: 2px;}
+        """)
+        self._drag_start_y = None
+        self._last_delta_verses = 0
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_y = event.globalPosition().y()
+            self._last_delta_verses = 0
+        super().mousePressEvent(event)
+        
+    def mouseMoveEvent(self, event):
+        if self._drag_start_y is not None:
+            dy = event.globalPosition().y() - self._drag_start_y
+            delta_verses = int(dy // 10) # 10 pixels per verse sensitivity
+            if delta_verses != self._last_delta_verses:
+                self.dragged.emit(delta_verses - self._last_delta_verses)
+                self._last_delta_verses = delta_verses
+                
+    def mouseReleaseEvent(self, event):
+        if self._drag_start_y is not None:
+            if self._last_delta_verses == 0:
+                self.jumpRequested.emit()
+            self._drag_start_y = None
+        super().mouseReleaseEvent(event)
+
+class DraggableRefWidget(QWidget):
+    jumpRequested = Signal()
+    boundaryDragged = Signal(bool, int)
+
+    def __init__(self, start_text, end_text, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        b1 = QLabel("[")
+        b1.setStyleSheet("color: #777; font-weight: bold; font-family: 'Consolas'; font-size: 14px;")
+        
+        self.start_lbl = DraggableLabel(start_text, True)
+        self.start_lbl.jumpRequested.connect(self.jumpRequested)
+        self.start_lbl.dragged.connect(lambda d: self.boundaryDragged.emit(True, d))
+        
+        sep_lbl = QLabel("-")
+        sep_lbl.setStyleSheet("color: #777; font-weight: bold; font-family: 'Consolas'; font-size: 14px; margin: 0 2px;")
+        
+        self.end_lbl = DraggableLabel(end_text, False)
+        self.end_lbl.jumpRequested.connect(self.jumpRequested)
+        self.end_lbl.dragged.connect(lambda d: self.boundaryDragged.emit(False, d))
+        
+        b2 = QLabel("]")
+        b2.setStyleSheet("color: #777; font-weight: bold; font-family: 'Consolas'; font-size: 14px;")
+        
+        layout.addWidget(b1)
+        layout.addWidget(self.start_lbl)
+        layout.addWidget(sep_lbl)
+        layout.addWidget(self.end_lbl)
+        layout.addWidget(b2)
+
 class PrefixWidget(QLabel):
     """
     Focusable bullet label that handles outline manipulation keys.
@@ -127,20 +196,12 @@ class OutlineCell(QFrame):
         
         layout.addWidget(prefix_area, alignment=Qt.AlignTop)
         
-        # 3. Reference Link Button
-        ref_text = self.panel._format_ref(node["range"]["start"], node["range"]["end"])
-        self.ref_btn = QPushButton(f"[{ref_text}]")
-        self.ref_btn.setCursor(Qt.PointingHandCursor)
-        self.ref_btn.setFlat(True)
-        self.ref_btn.setStyleSheet("""
-            QPushButton {
-                color: #569cd6; font-weight: bold; font-family: 'Consolas'; font-size: 14px;
-                border: none; padding: 0px; text-align: left;
-            }
-            QPushButton:hover { text-decoration: underline; }
-        """)
-        self.ref_btn.clicked.connect(self._on_ref_clicked)
-        layout.addWidget(self.ref_btn, alignment=Qt.AlignTop)
+        # 3. Draggable Reference Link Widget
+        start_txt, end_txt = self.panel._format_ref_parts(node["range"]["start"], node["range"]["end"])
+        self.ref_widget = DraggableRefWidget(start_txt, end_txt)
+        self.ref_widget.jumpRequested.connect(self._on_ref_clicked)
+        self.ref_widget.boundaryDragged.connect(self._on_boundary_dragged)
+        layout.addWidget(self.ref_widget, alignment=Qt.AlignTop)
         
         # 4. Summary Edit (Multi-line)
         from PySide6.QtWidgets import QTextEdit
@@ -228,6 +289,12 @@ class OutlineCell(QFrame):
         start_ref = self.node["range"]["start"]
         m = re.match(r"(.*) (\d+):(\d+)", start_ref)
         if m: self.jumpRequested.emit(m.group(1), m.group(2), m.group(3))
+
+    def _on_boundary_dragged(self, is_start, delta):
+        loader = self.panel.outline_manager.study_manager.loader
+        if self.panel.outline_manager.adjust_node_boundary(self.panel.root_node_id, self.node["id"], is_start, delta, loader):
+            self.panel.refresh_labels()
+            self.contentChanged.emit()
 
     def _on_summary_changed(self):
         self.save_timer.start(1000) # Wait 1s after last character before emitting refresh
@@ -469,27 +536,51 @@ class OutlinePanel(QWidget):
                 self.outline_manager.study_manager.save_study()
                 self.outlineChanged.emit()
 
-    def _format_ref(self, start, end):
+    def _format_ref_parts(self, start, end):
         fmt = self.ref_format_combo.currentText()
         def parse(ref):
-            m = re.match(r"(.*) (\d+):(\d+)([a-z])?", ref)
+            if not ref: return None, None, None, None
+            m = re.match(r"(.*) (\d+):(\d+)([a-z])?", str(ref))
             if m: return m.groups()
             return None, None, None, None
         s_book, s_chap, s_verse, s_part = parse(start)
         e_book, e_chap, e_verse, e_part = parse(end)
-        if not s_book: return f"{start}"
+        if not s_book: return f"{start}", f"{end}"
         s_v = f"{s_verse}{s_part if s_part else ''}"
         e_v = f"{e_verse}{e_part if e_part else ''}"
         if fmt == "C:V":
-            if s_chap == e_chap: return f"{s_chap}:{s_v}-{e_v}" if s_v != e_v else f"{s_chap}:{s_v}"
-            return f"{s_chap}:{s_v}-{e_chap}:{e_v}"
+            if s_chap == e_chap: return f"{s_chap}:{s_v}", f"{e_v}"
+            return f"{s_chap}:{s_v}", f"{e_chap}:{e_v}"
         elif fmt == "v#":
-            return f"v{s_v}-{e_v}" if s_v != e_v else f"v{s_v}"
+            return f"v{s_v}", f"{e_v}"
         else: # Full
             if s_book == e_book:
-                if s_chap == e_chap: return f"{s_book} {s_chap}:{s_v}-{e_v}" if s_v != e_v else f"{s_book} {s_chap}:{s_v}"
-                return f"{s_book} {s_chap}:{s_v}-{e_chap}:{e_v}"
-            return f"{start}-{end}"
+                if s_chap == e_chap: return f"{s_book} {s_chap}:{s_v}", f"{e_v}"
+                return f"{s_book} {s_chap}:{s_v}", f"{e_chap}:{e_v}"
+            return f"{start}", f"{end}"
+
+    def refresh_labels(self):
+        if not self.root_node_id: return
+        root = self.outline_manager.get_node(self.root_node_id)
+        if not root: return
+        
+        def get_all_nodes(n):
+            res = [n]
+            for c in n.get('children', []): res.extend(get_all_nodes(c))
+            return res
+            
+        nodes_dict = {n['id']: n for n in get_all_nodes(root)}
+        
+        for i in range(self.container_layout.count()):
+            w = self.container_layout.itemAt(i).widget()
+            if isinstance(w, OutlineCell) and w.node["id"] in nodes_dict:
+                n = nodes_dict[w.node["id"]]
+                w.node = n
+                s_txt, e_txt = self._format_ref_parts(n["range"]["start"], n["range"]["end"])
+                w.ref_widget.start_lbl.setText(s_txt if s_txt else "")
+                w.ref_widget.end_lbl.setText(e_txt if e_txt else "")
+                
+        self._structure_hash = self._get_structure_hash(root) + "|" + self.ref_format_combo.currentText()
 
     def normalize_text(self):
         # No longer used in cell system, but kept for compatibility if called

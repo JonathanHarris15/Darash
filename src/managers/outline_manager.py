@@ -500,6 +500,107 @@ class OutlineManager:
                 return True
         return False
 
+    def adjust_node_boundary(self, root_id: str, node_id: str, is_start: bool, delta_verses: int, loader) -> bool:
+        """
+        Adjusts the start or end boundary of a node by delta_verses,
+        shifting adjacent node boundaries simultaneously. 
+        Expands the root outline if shifting its outer bounds.
+        """
+        if delta_verses == 0: return False
+        
+        root = self.get_node(root_id)
+        if not root: return False
+        
+        node = self._find_node_recursive([root], node_id)
+        if not node: return False
+        
+        # Determine the current adjacent verses
+        if is_start:
+            current_right_ref = node['range']['start']
+            current_right_idx = loader.get_verse_index(current_right_ref)
+            if current_right_idx == -1.0: return False
+            
+            # The left verse is the one immediately before our start
+            # Handled using fractional bounds (a/b parts) if needed, but for simplicity we rely on main verse indices.
+            current_left_idx = current_right_idx - 1.0 if int(current_right_idx) == current_right_idx else current_right_idx - 0.1
+            current_left_ref = loader.flat_verses[int(current_left_idx)]['ref'] if int(current_left_idx) >= 0 else None
+            # Handle suffix if it was fractional
+            if current_left_ref and current_left_idx != int(current_left_idx):
+                current_left_ref += chr(ord('a') + int(round((current_left_idx - int(current_left_idx))*10)) - 1)
+        else:
+            current_left_ref = node['range']['end']
+            current_left_idx = loader.get_verse_index(current_left_ref)
+            if current_left_idx == -1.0: return False
+            
+            current_right_idx = current_left_idx + 1.0 if int(current_left_idx) == current_left_idx else current_left_idx + 0.1
+            current_right_ref = loader.flat_verses[int(current_right_idx)]['ref'] if int(current_right_idx) < len(loader.flat_verses) else None
+            if current_right_ref and current_right_idx != int(current_right_idx):
+                current_right_ref += chr(ord('a') + int(round((current_right_idx - int(current_right_idx))*10)) - 1)
+
+        new_left_idx = current_left_idx + delta_verses
+        new_right_idx = current_right_idx + delta_verses
+
+        # 1-verse minimum constraints (bidirectional)
+        max_left_idx = float('-inf')
+        min_right_idx = float('inf')
+
+        def find_limits(n):
+            nonlocal max_left_idx, min_right_idx
+            if current_left_ref and n['range']['end'] == current_left_ref:
+                start_idx = loader.get_verse_index(n['range']['start'])
+                if start_idx > max_left_idx:
+                    max_left_idx = start_idx
+            if current_right_ref and n['range']['start'] == current_right_ref:
+                end_idx = loader.get_verse_index(n['range']['end'])
+                if end_idx < min_right_idx:
+                    min_right_idx = end_idx
+            for c in n.get('children', []):
+                find_limits(c)
+                
+        find_limits(root)
+
+        if current_left_ref and max_left_idx != float('-inf'):
+            if new_left_idx < max_left_idx:
+                new_left_idx = max_left_idx
+                new_right_idx = new_left_idx + 1.0 if int(new_left_idx) == new_left_idx else new_left_idx + 0.1
+                
+        if current_right_ref and min_right_idx != float('inf'):
+            if new_right_idx > min_right_idx:
+                new_right_idx = min_right_idx
+                new_left_idx = new_right_idx - 1.0 if int(new_right_idx) == new_right_idx else new_right_idx - 0.1
+                
+        # Resolve target references
+        new_left_ref = None
+        if new_left_idx >= 0:
+            new_left_ref = loader.flat_verses[int(new_left_idx)]['ref']
+            if new_left_idx != int(new_left_idx):
+                new_left_ref += chr(ord('a') + int(round((new_left_idx - int(new_left_idx))*10)) - 1)
+                
+        new_right_ref = None
+        if new_right_idx < len(loader.flat_verses):
+            new_right_ref = loader.flat_verses[int(new_right_idx)]['ref']
+            if new_right_idx != int(new_right_idx):
+                new_right_ref += chr(ord('a') + int(round((new_right_idx - int(new_right_idx))*10)) - 1)
+
+        # Apply shifts across the tree to any exact bounding match
+        changed = False
+        def apply_shift(n):
+            nonlocal changed
+            if current_left_ref and n['range']['end'] == current_left_ref:
+                n['range']['end'] = new_left_ref
+                changed = True
+            if current_right_ref and n['range']['start'] == current_right_ref:
+                n['range']['start'] = new_right_ref
+                changed = True
+            for c in n.get('children', []):
+                apply_shift(c)
+
+        apply_shift(root)
+        if changed:
+            self.study_manager.save_study()
+            return True
+        return False
+
     def update_outline_boundary(self, outline_id: str, is_top: bool, new_ref: str, loader):
         """Updates the outer start or end boundary of an outline and propagates to children."""
         node = self.get_node(outline_id)
