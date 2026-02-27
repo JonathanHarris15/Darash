@@ -1,0 +1,24 @@
+# Open Source Bible Translations & Morphological Parsing Resources
+
+## 1. General Bible Translations (English & Other Languages)
+If you need standard English translations (like KJV, ASV, WEB, etc.) or other languages in easy-to-parse formats for your project:
+*   **[scrollmapper/bible_databases](https://github.com/scrollmapper/bible_databases)**: A highly popular GitHub repo providing raw Bible data in JSON, XML, CSV, and SQL formats.
+*   **[thiagobodruk/bible](https://github.com/thiagobodruk/bible)**: Another excellent GitHub repository with Bible text in both JSON and XML formats across various languages.
+*   **APIs**: In case you prefer to pull text dynamically, platforms like the **Free Use Bible API** or **dailybible.ca** offer free JSON APIs with no authentication required for public domain texts.
+
+## 2. Greek New Testament & Parsing
+*   **UBS5 Copyright Constraint**: The UBS5 (United Bible Societies, 5th Edition) is a **copyrighted text** and is *not legally available* as an open-source data download for software integration. It is only available via commercial Bible software (like Logos or Accordance) or online reading.
+*   **The Open-Source Alternative (SBLGNT)**: Since UBS5 is closed, the industry standard for open-source scholarly Greek New Testaments is the **SBL Greek New Testament (SBLGNT)**, which is freely available and highly integrated with parsing data. 
+*   **Morphological Parsing Data**:
+    *   **[MorphGNT](https://github.com/morphgnt)**: This is the premier open-source project for Greek New Testament morphology. It provides complete lemma and morphological tagging datasets (primarily for the SBLGNT) in easy-to-parse text/TSV files.
+    *   **[Clear-Bible / macula-greek](https://github.com/Clear-Bible/macula-greek)**: This repository provides an extremely comprehensive dataset of syntax trees, morphology, and linguistic annotations for the Greek Bible in XML, JSON, and TSV formats.
+
+## 3. Hebrew Bible & Parsing
+*   **[Open Scriptures Hebrew Bible (OSHB)](https://github.com/openscriptures/morphhb)**: This is the definitive open-source data source for the Hebrew Old Testament. Based on the Westminster Leningrad Codex (WLC), it provides the text alongside lemma and full morphological parsing. They provide their data in OSIS XML format, and the community has built various JSON converters (scripts are available in their repo).
+*   **[Clear-Bible / macula-hebrew](https://github.com/Clear-Bible/macula-hebrew)**: Similar to their Greek offering, this GitHub repo provides the morphology data from OSHB alongside advanced syntax trees in extremely developer-friendly formats ("lowfat" XML, JSON nodes, and TSV).
+*   **ETCBC / Text-Fabric**: The Eep Talstra Centre for Bible and Computer provides a deeply annotated text of the Hebrew Bible with rich morphological features that can be programmed against using Python (`text-fabric`).
+
+## Summary & Recommendation for Your Project
+1. **General Translations**: Pull raw JSON files from `scrollmapper/bible_databases` into your project structure.
+2. **Greek**: You will need to pivot from UBS5 to the **SBLGNT**. Pull the morphological parse TSV/JSON data from **MorphGNT** or **macula-greek**.
+3. **Hebrew**: Utilize the **macula-hebrew** or **OSHB** datasets to get JSON/XML structured Hebrew text with comprehensive lemmas and grammatical parses.

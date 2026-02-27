@@ -366,19 +366,38 @@ class OutlineDividerItem(QGraphicsObject):
         self.pen = pen
         self.is_double = is_double
         self.text_level = text_level
+        self.is_inline = False
+        self.inline_x = 0
+        self.inline_y_top = 0
+        self.inline_y_bot = 0
         
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.SizeVerCursor)
         self.setZValue(15)
 
     def boundingRect(self):
-        # Wider bounding rect for easier grabbing
+        # Wider bounding rect for easier grabbing and fully containing the new inline stretch
+        if self.is_inline:
+            return QRectF(self.x_start, self.inline_y_top - 10, self.x_end - self.x_start, (self.inline_y_bot - self.inline_y_top) + 20)
         return QRectF(self.x_start, self.y - 10, self.x_end - self.x_start, 20)
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.Antialiasing)
         
-        if self.text_level is not None:
+        if self.is_inline:
+            painter.setPen(self.pen)
+            
+            top_y = self.inline_y_top
+            bot_y = self.inline_y_bot
+            
+            # Vertical step line
+            painter.drawLine(QPointF(self.inline_x, top_y), QPointF(self.inline_x, bot_y))
+            # Branch right to the end margin
+            painter.drawLine(QPointF(self.inline_x, top_y), QPointF(self.x_end, top_y))
+            # Branch left to the start margin
+            painter.drawLine(QPointF(self.x_start, bot_y), QPointF(self.inline_x, bot_y))
+            
+        elif self.text_level is not None:
             # Render spaced numbers for deep levels
             from PySide6.QtGui import QFont
             font = QFont("Consolas", 10)

@@ -4,6 +4,7 @@ venv/
 env/
 ENV/
 laptop-venv/
+BibleTranslations/
 
 # Python bytecode/cache
 __pycache__/

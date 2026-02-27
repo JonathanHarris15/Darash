@@ -21,11 +21,11 @@ HIGHLIGHT_COLORS = {
 }
 
 LOGICAL_MARKS = {
-    "arrow_right": "➔",
-    "arrow_left": "⬅",
+    "arrow_right": "→",
+    "arrow_left": "←",
     "arrow_parallel_right": "⇒",
     "arrow_parallel_left": "⇐",
-    "arrow_diverge": "↔", # Using this as approximation or we can draw custom
+    "arrow_diverge": "↔",
     "arrow_converge": "→←", 
     "equals": "=",
     "plus": "+",

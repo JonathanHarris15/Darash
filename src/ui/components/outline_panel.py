@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, QRect, QEvent, QTimer
 from PySide6.QtGui import QColor, QFont, QPalette
 
 class DraggableLabel(QLabel):
-    dragged = Signal(int)
+    dragged = Signal(int, bool)
     jumpRequested = Signal()
     
     def __init__(self, text, is_start, parent=None):
@@ -34,7 +34,8 @@ class DraggableLabel(QLabel):
             dy = event.globalPosition().y() - self._drag_start_y
             delta_verses = int(dy // 10) # 10 pixels per verse sensitivity
             if delta_verses != self._last_delta_verses:
-                self.dragged.emit(delta_verses - self._last_delta_verses)
+                is_word_drag = bool(event.modifiers() & Qt.ControlModifier)
+                self.dragged.emit(delta_verses - self._last_delta_verses, is_word_drag)
                 self._last_delta_verses = delta_verses
                 
     def mouseReleaseEvent(self, event):
@@ -46,7 +47,7 @@ class DraggableLabel(QLabel):
 
 class DraggableRefWidget(QWidget):
     jumpRequested = Signal()
-    boundaryDragged = Signal(bool, int)
+    boundaryDragged = Signal(bool, int, bool)
 
     def __init__(self, start_text, end_text, parent=None):
         super().__init__(parent)
@@ -59,14 +60,14 @@ class DraggableRefWidget(QWidget):
         
         self.start_lbl = DraggableLabel(start_text, True)
         self.start_lbl.jumpRequested.connect(self.jumpRequested)
-        self.start_lbl.dragged.connect(lambda d: self.boundaryDragged.emit(True, d))
+        self.start_lbl.dragged.connect(lambda d, w: self.boundaryDragged.emit(True, d, w))
         
         sep_lbl = QLabel("-")
         sep_lbl.setStyleSheet("color: #777; font-weight: bold; font-family: 'Consolas'; font-size: 14px; margin: 0 2px;")
         
         self.end_lbl = DraggableLabel(end_text, False)
         self.end_lbl.jumpRequested.connect(self.jumpRequested)
-        self.end_lbl.dragged.connect(lambda d: self.boundaryDragged.emit(False, d))
+        self.end_lbl.dragged.connect(lambda d, w: self.boundaryDragged.emit(False, d, w))
         
         b2 = QLabel("]")
         b2.setStyleSheet("color: #777; font-weight: bold; font-family: 'Consolas'; font-size: 14px;")
@@ -290,9 +291,9 @@ class OutlineCell(QFrame):
         m = re.match(r"(.*) (\d+):(\d+)", start_ref)
         if m: self.jumpRequested.emit(m.group(1), m.group(2), m.group(3))
 
-    def _on_boundary_dragged(self, is_start, delta):
+    def _on_boundary_dragged(self, is_start, delta, is_word_drag):
         loader = self.panel.outline_manager.study_manager.loader
-        if self.panel.outline_manager.adjust_node_boundary(self.panel.root_node_id, self.node["id"], is_start, delta, loader):
+        if self.panel.outline_manager.adjust_node_boundary(self.panel.root_node_id, self.node["id"], is_start, delta, loader, is_word_drag):
             self.panel.refresh_labels()
             self.contentChanged.emit()
 
@@ -540,7 +541,7 @@ class OutlinePanel(QWidget):
         fmt = self.ref_format_combo.currentText()
         def parse(ref):
             if not ref: return None, None, None, None
-            m = re.match(r"(.*) (\d+):(\d+)([a-z])?", str(ref))
+            m = re.match(r"(.*) (\d+):(\d+)([a-zA-Z]+)?", str(ref))
             if m: return m.groups()
             return None, None, None, None
         s_book, s_chap, s_verse, s_part = parse(start)

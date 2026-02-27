@@ -1,9 +1,60 @@
 {
-    "symbols": {},
-    "marks": [],
-    "notes": {},
+    "symbols": {
+        "Romans|1|1|5": "Christ-Symbol.png",
+        "Romans|1|3|2": "Christ-Symbol.png",
+        "Romans|1|4|6": "Christ-Symbol.png",
+        "Romans|1|4|14": "Ghost-Symbol.png",
+        "Romans|1|1|20": "Father-Symbol.png",
+        "Romans|1|2|1": "Father-Symbol.png",
+        "Romans|1|2|5": "Father-Symbol.png",
+        "Romans|1|3|1": "Father-Symbol.png",
+        "Romans|1|4|18": "Father-Symbol.png"
+    },
+    "marks": [
+        {
+            "type": "circle",
+            "book": "Romans",
+            "chapter": "1",
+            "verse_num": "1",
+            "start": 0,
+            "length": 4,
+            "color": "#FFFF00",
+            "group_id": "1772166915.8249698"
+        },
+        {
+            "type": "underline",
+            "book": "Romans",
+            "chapter": "1",
+            "verse_num": "1",
+            "start": 7,
+            "length": 24,
+            "color": "#FFFF00",
+            "group_id": "1772166923.0782242"
+        }
+    ],
+    "notes": {
+        "Romans|1|1|20": {
+            "title": "Father - Romans 1:1-4",
+            "text": "## Symbol List\n- Romans 1:1 - The gospel is Gods\n- Romans 1:2 - He promised the gospel before hand\n- Romans 1:2 - the prophets were his\n- Romans 1:3 - \n- Romans 1:4 - \n",
+            "folder": ""
+        },
+        "standalone_1772167633124": {
+            "title": "New Note 1",
+            "text": "",
+            "folder": ""
+        }
+    },
     "note_folders": [],
-    "bookmarks": [],
+    "bookmarks": [
+        {
+            "ref": "Genesis 1:4",
+            "book": "Genesis",
+            "chapter": "1",
+            "verse": "4",
+            "color": "#d363d7",
+            "title": ""
+        }
+    ],
     "arrows": {
         "null": [
             {
@@ -57,13 +108,18 @@
         "Genesis 1:7|1": 0,
         "Genesis 1:7|0": 0,
         "Genesis 1:4|1": 0,
-        "Genesis 1:5|1": 0
+        "Genesis 1:5|1": 0,
+        "Romans 1:2|0": 0,
+        "Romans 1:3|0": 0,
+        "Mark 6:11|0": 0,
+        "Ephesians 1:10|0": 0,
+        "Ephesians 1:4|1": 0
     },
     "verse_marks": {},
     "logical_marks": {},
     "settings": {
-        "font_size": 20,
-        "line_spacing": 2.0000000000000004,
+        "font_size": 18,
+        "line_spacing": 1.9999999999999991,
         "font_family": "Times New Roman",
         "verse_num_size": 10,
         "side_margin": 37,
@@ -77,5 +133,77 @@
         "logical_mark_color": "#ee2fff",
         "sentence_break_enabled": true
     },
-    "outlines": []
+    "outlines": [
+        {
+            "id": "9f0e5259-0130-4a96-9844-55acd78cc169",
+            "title": "New Outline",
+            "summary": "",
+            "range": {
+                "start": "Genesis 1:1",
+                "end": "Genesis 1:6"
+            },
+            "children": [
+                {
+                    "id": "0a1aa511-13bc-49ef-a428-f2496e8ab766",
+                    "title": "Section 1",
+                    "range": {
+                        "start": "Genesis 1:1",
+                        "end": "Genesis 1:3"
+                    },
+                    "children": [],
+                    "expanded": true
+                },
+                {
+                    "id": "bdf1fc21-0e23-4897-b013-0d50acfde945",
+                    "title": "Group: Section 2 A A A & Section 2 A A B",
+                    "summary": "",
+                    "range": {
+                        "start": "Genesis 1:4",
+                        "end": "Genesis 1:5"
+                    },
+                    "children": [
+                        {
+                            "id": "096e6cf9-9944-4338-980e-afac3f29ded1",
+                            "title": "Section 2 A A A",
+                            "range": {
+                                "start": "Genesis 1:4",
+                                "end": "Genesis 1:4n"
+                            },
+                            "children": [],
+                            "expanded": true
+                        },
+                        {
+                            "id": "67cce285-ca23-4a65-b40f-3f9101e66778",
+                            "title": "Section 2 A A B",
+                            "range": {
+                                "start": "Genesis 1:4o",
+                                "end": "Genesis 1:5"
+                            },
+                            "children": [],
+                            "expanded": true
+                        }
+                    ],
+                    "expanded": true,
+                    "split_levels": [
+                        2
+                    ]
+                },
+                {
+                    "id": "30583bcd-a10e-4761-bc0b-3c8d479a8618",
+                    "title": "Section 2 A B",
+                    "range": {
+                        "start": "Genesis 1:6",
+                        "end": "Genesis 1:6"
+                    },
+                    "children": [],
+                    "expanded": true
+                }
+            ],
+            "expanded": true,
+            "split_levels": [
+                1,
+                1
+            ]
+        }
+    ]
 }

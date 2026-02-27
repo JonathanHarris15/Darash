@@ -56,17 +56,17 @@ class OutlineManager:
         loader = self.study_manager.loader
         if not loader: return None, None
         
-        # Support optional 'a' or 'b' suffix
-        m_s = re.match(r"(.*) (\d+):(\d+)([a-z])?", start_ref)
-        m_e = re.match(r"(.*) (\d+):(\d+)([a-z])?", end_ref)
+        # Support optional 'a', 'b', 'aa' suffix etc.
+        m_s = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?", start_ref)
+        m_e = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?", end_ref)
         
         if not m_s or not m_e: return None, None
         
-        s_base = f"{m_s.group(1)} {m_s.group(2)}:{m_s.group(3)}"
-        e_base = f"{m_e.group(1)} {m_e.group(2)}:{m_e.group(3)}"
+        s_base = m_s.group(1)
+        e_base = m_e.group(1)
         
         # If already at part level granularity (a/b), don't split further
-        if m_s.group(4) or m_e.group(4): return None, None
+        if m_s.group(2) or m_e.group(2): return None, None
         
         idx_s = loader.get_verse_index(s_base)
         idx_e = loader.get_verse_index(e_base)
@@ -500,13 +500,71 @@ class OutlineManager:
                 return True
         return False
 
-    def adjust_node_boundary(self, root_id: str, node_id: str, is_start: bool, delta_verses: int, loader) -> bool:
+    def _shift_ref_by_verses(self, ref: str, delta: int, loader) -> str:
+        if delta == 0 or not ref: return ref
+        import re
+        m = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?$", ref)
+        if not m: return ref
+        base_ref = m.group(1)
+        
+        idx = loader.get_verse_index(base_ref)
+        if idx == -1.0: return ref
+        
+        new_idx = int(idx) + delta
+        new_idx = max(0, min(new_idx, len(loader.flat_verses) - 1))
+        
+        return loader.flat_verses[new_idx]['ref']
+
+    def _shift_ref_by_words(self, ref: str, delta: int, loader) -> str:
+        if delta == 0 or not ref: return ref
+        import re
+        m = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?$", ref)
+        if not m: return ref
+        base_ref = m.group(1)
+        letters = m.group(2)
+        
+        idx = loader.get_verse_index(base_ref)
+        if idx == -1.0: return ref
+        v_idx = int(idx)
+        
+        word_idx = loader.letters_to_word_idx(letters) if letters else 0
+        
+        while delta != 0:
+            v_data = loader.flat_verses[v_idx]
+            max_words = len(v_data['tokens'])
+            if delta > 0:
+                if word_idx + delta < max_words:
+                    word_idx += delta
+                    delta = 0
+                else:
+                    delta -= (max_words - word_idx)
+                    if v_idx < len(loader.flat_verses) - 1:
+                        v_idx += 1
+                        word_idx = 0
+                    else:
+                        word_idx = max_words - 1
+                        delta = 0
+            else:
+                if word_idx + delta >= 0:
+                    word_idx += delta
+                    delta = 0
+                else:
+                    delta += (word_idx + 1)
+                    if v_idx > 0:
+                        v_idx -= 1
+                        word_idx = len(loader.flat_verses[v_idx]['tokens']) - 1
+                    else:
+                        word_idx = 0
+                        delta = 0
+        return loader.flat_verses[v_idx]['ref'] + loader.word_idx_to_letters(word_idx)
+
+    def adjust_node_boundary(self, root_id: str, node_id: str, is_start: bool, delta: int, loader, is_word_drag: bool = False) -> bool:
         """
         Adjusts the start or end boundary of a node by delta_verses,
         shifting adjacent node boundaries simultaneously. 
         Expands the root outline if shifting its outer bounds.
         """
-        if delta_verses == 0: return False
+        if delta == 0: return False
         
         root = self.get_node(root_id)
         if not root: return False
@@ -514,75 +572,57 @@ class OutlineManager:
         node = self._find_node_recursive([root], node_id)
         if not node: return False
         
-        # Determine the current adjacent verses
         if is_start:
             current_right_ref = node['range']['start']
-            current_right_idx = loader.get_verse_index(current_right_ref)
-            if current_right_idx == -1.0: return False
-            
-            # The left verse is the one immediately before our start
-            # Handled using fractional bounds (a/b parts) if needed, but for simplicity we rely on main verse indices.
-            current_left_idx = current_right_idx - 1.0 if int(current_right_idx) == current_right_idx else current_right_idx - 0.1
-            current_left_ref = loader.flat_verses[int(current_left_idx)]['ref'] if int(current_left_idx) >= 0 else None
-            # Handle suffix if it was fractional
-            if current_left_ref and current_left_idx != int(current_left_idx):
-                current_left_ref += chr(ord('a') + int(round((current_left_idx - int(current_left_idx))*10)) - 1)
+            current_left_ref = self._shift_ref_by_words(current_right_ref, -1, loader) if is_word_drag else self._shift_ref_by_verses(current_right_ref, -1, loader)
         else:
             current_left_ref = node['range']['end']
-            current_left_idx = loader.get_verse_index(current_left_ref)
-            if current_left_idx == -1.0: return False
-            
-            current_right_idx = current_left_idx + 1.0 if int(current_left_idx) == current_left_idx else current_left_idx + 0.1
-            current_right_ref = loader.flat_verses[int(current_right_idx)]['ref'] if int(current_right_idx) < len(loader.flat_verses) else None
-            if current_right_ref and current_right_idx != int(current_right_idx):
-                current_right_ref += chr(ord('a') + int(round((current_right_idx - int(current_right_idx))*10)) - 1)
+            current_right_ref = self._shift_ref_by_words(current_left_ref, 1, loader) if is_word_drag else self._shift_ref_by_verses(current_left_ref, 1, loader)
 
-        new_left_idx = current_left_idx + delta_verses
-        new_right_idx = current_right_idx + delta_verses
-
-        # 1-verse minimum constraints (bidirectional)
         max_left_idx = float('-inf')
+        max_left_ref = None
         min_right_idx = float('inf')
+        min_right_ref = None
 
         def find_limits(n):
-            nonlocal max_left_idx, min_right_idx
+            nonlocal max_left_idx, min_right_idx, max_left_ref, min_right_ref
             if current_left_ref and n['range']['end'] == current_left_ref:
                 start_idx = loader.get_verse_index(n['range']['start'])
                 if start_idx > max_left_idx:
                     max_left_idx = start_idx
+                    max_left_ref = n['range']['start']
             if current_right_ref and n['range']['start'] == current_right_ref:
                 end_idx = loader.get_verse_index(n['range']['end'])
                 if end_idx < min_right_idx:
                     min_right_idx = end_idx
+                    min_right_ref = n['range']['end']
             for c in n.get('children', []):
                 find_limits(c)
                 
         find_limits(root)
 
-        if current_left_ref and max_left_idx != float('-inf'):
-            if new_left_idx < max_left_idx:
-                new_left_idx = max_left_idx
-                new_right_idx = new_left_idx + 1.0 if int(new_left_idx) == new_left_idx else new_left_idx + 0.1
-                
-        if current_right_ref and min_right_idx != float('inf'):
-            if new_right_idx > min_right_idx:
-                new_right_idx = min_right_idx
-                new_left_idx = new_right_idx - 1.0 if int(new_right_idx) == new_right_idx else new_right_idx - 0.1
-                
-        # Resolve target references
-        new_left_ref = None
-        if new_left_idx >= 0:
-            new_left_ref = loader.flat_verses[int(new_left_idx)]['ref']
-            if new_left_idx != int(new_left_idx):
-                new_left_ref += chr(ord('a') + int(round((new_left_idx - int(new_left_idx))*10)) - 1)
-                
-        new_right_ref = None
-        if new_right_idx < len(loader.flat_verses):
-            new_right_ref = loader.flat_verses[int(new_right_idx)]['ref']
-            if new_right_idx != int(new_right_idx):
-                new_right_ref += chr(ord('a') + int(round((new_right_idx - int(new_right_idx))*10)) - 1)
+        if is_word_drag:
+            new_left_ref = self._shift_ref_by_words(current_left_ref, delta, loader) if current_left_ref else None
+            new_right_ref = self._shift_ref_by_words(current_right_ref, delta, loader) if current_right_ref else None
+        else:
+            new_left_ref = self._shift_ref_by_verses(current_left_ref, delta, loader) if current_left_ref else None
+            new_right_ref = self._shift_ref_by_verses(current_right_ref, delta, loader) if current_right_ref else None
 
-        # Apply shifts across the tree to any exact bounding match
+        new_left_idx = loader.get_verse_index(new_left_ref) if new_left_ref else -1.0
+        new_right_idx = loader.get_verse_index(new_right_ref) if new_right_ref else float('inf')
+
+        clamped = False
+        if current_left_ref and max_left_idx != float('-inf'):
+            if new_left_idx <= max_left_idx:
+                new_left_ref = max_left_ref
+                new_right_ref = self._shift_ref_by_words(max_left_ref, 1, loader) if is_word_drag else self._shift_ref_by_verses(max_left_ref, 1, loader)
+                clamped = True
+                
+        if current_right_ref and min_right_idx != float('inf') and not clamped:
+            if new_right_idx >= min_right_idx:
+                new_right_ref = min_right_ref
+                new_left_ref = self._shift_ref_by_words(min_right_ref, -1, loader) if is_word_drag else self._shift_ref_by_verses(min_right_ref, -1, loader)
+
         changed = False
         def apply_shift(n):
             nonlocal changed

@@ -81,16 +81,40 @@ class VerseLoader:
     def get_verse_by_ref(self, ref: str) -> Optional[Dict[str, Any]]:
         return self.ref_map.get(ref)
 
+    @staticmethod
+    def word_idx_to_letters(idx: int) -> str:
+        """Converts a 0-based word index to a base-26 letter string (0->a, 25->z, 26->aa)."""
+        idx += 1
+        letters = ""
+        while idx > 0:
+            idx, rem = divmod(idx - 1, 26)
+            letters = chr(ord('a') + rem) + letters
+        return letters
+
+    @staticmethod
+    def letters_to_word_idx(letters: str) -> int:
+        """Converts a base-26 letter string to a 0-based word index ('a'->0, 'z'->25, 'aa'->26)."""
+        val = 0
+        for char in letters.lower():
+            val = val * 26 + (ord(char) - ord('a') + 1)
+        return val - 1
+
     def get_verse_index(self, ref: str) -> float:
         if not ref: return -1.0
         
-        # Support suffixes like 'a', 'b', 'c' for sub-verse splits
+        import re
         base_ref = ref
         suffix_val = 0.0
-        if len(ref) > 1 and ref[-1].isalpha() and (ref[-2].isdigit() or ref[-2] == ':'):
-            base_ref = ref[:-1]
-            # Map a->0.1, b->0.2, etc.
-            suffix_val = (ord(ref[-1].lower()) - ord('a') + 1) * 0.1
+        
+        # Support suffixes like 'a', 'b', 'c', 'aa', etc. (mid-verse word divisions)
+        m = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?$", ref)
+        if m:
+            base_ref = m.group(1)
+            if m.group(2):
+                word_idx = self.letters_to_word_idx(m.group(2))
+                # Add a fractional offset based on word index, ensuring it stays between 0.0 and 1.0.
+                # Max words in a verse is typically < 200, so dividing by 1000 provides stable ordering.
+                suffix_val = (word_idx + 1) / 1000.0
             
         idx = self.ref_to_idx.get(base_ref, -1)
         if idx == -1: return -1.0

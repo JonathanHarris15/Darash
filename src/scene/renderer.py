@@ -155,17 +155,22 @@ class OverlayRenderer:
         doc = scene.main_text_item.document()
         layout = doc.documentLayout()
         
-        def get_verse_y_range(ref):
-            if ref in scene.verse_pos_map:
-                pos = scene.verse_pos_map[ref]
+        def get_verse_y_range(ref, is_end=False):
+            import re
+            m = re.match(r"(.* \d+:\d+)([a-zA-Z]+)?$", ref)
+            if not m: return None, None, None, None
+            base_ref = m.group(1)
+            letters = m.group(2)
+
+            if base_ref in scene.verse_pos_map:
+                pos = scene.verse_pos_map[base_ref]
                 first_block = doc.findBlock(pos)
                 
-                # Find last sentence block of this verse if sentences are enabled
                 last_block = first_block
                 if scene.sentence_break_enabled:
                     s_idx = 1
                     while True:
-                        s_ref = f"{ref}|{s_idx}"
+                        s_ref = f"{base_ref}|{s_idx}"
                         if s_ref in scene.verse_pos_map:
                             last_block = doc.findBlock(scene.verse_pos_map[s_ref])
                             s_idx += 1
@@ -175,15 +180,58 @@ class OverlayRenderer:
                 rect_first = layout.blockBoundingRect(first_block)
                 rect_last = layout.blockBoundingRect(last_block)
                 
-                # Center boundaries in the gaps (including headers)
                 prev_block = first_block.previous()
                 y_top = (layout.blockBoundingRect(prev_block).bottom() + rect_first.top()) / 2 if prev_block.isValid() else rect_first.top() - 5
                 
                 next_block = last_block.next()
                 y_bottom = (rect_last.bottom() + layout.blockBoundingRect(next_block).top()) / 2 if next_block.isValid() else rect_last.bottom() + 5
                 
-                return y_top, y_bottom
-            return None, None
+                if not letters:
+                    return y_top, y_bottom, None, None
+                
+                word_idx = scene.loader.letters_to_word_idx(letters)
+                v_data = scene.loader.get_verse_by_ref(base_ref)
+                if not v_data or word_idx >= len(v_data['tokens']): return y_top, y_bottom, None, None
+                
+                def get_inline_metrics(v_data, w_index):
+                    w_offset = scene._get_word_offset_in_verse(v_data, w_index)
+                    rects = scene._get_text_rects(pos + w_offset, len(v_data['tokens'][w_index][0]))
+                    if not rects: return None
+                    
+                    rct = rects[-1]
+                    gap_x = rct.right()
+                    
+                    if w_index + 1 < len(v_data['tokens']):
+                        n_offset = scene._get_word_offset_in_verse(v_data, w_index + 1)
+                        if n_offset >= 0:
+                            n_rects = scene._get_text_rects(pos + n_offset, len(v_data['tokens'][w_index + 1][0]))
+                            if n_rects:
+                                n_rct = n_rects[0]
+                                if abs(n_rct.center().y() - rct.center().y()) < 5:
+                                    gap_x = (rct.right() + n_rct.left()) / 2
+                                else:
+                                    gap_x += 4
+                    else:
+                        gap_x += 4
+                    
+                    pitch = rct.height() * scene.line_spacing
+                    top_y = rct.center().y() - pitch / 2
+                    bot_y = rct.center().y() + pitch / 2
+                    
+                    return (gap_x, top_y, bot_y)
+
+                if not is_end:
+                    if word_idx > 0:
+                        metrics = get_inline_metrics(v_data, word_idx - 1)
+                        if metrics:
+                            return y_top, y_bottom, metrics, metrics
+                else:
+                    metrics = get_inline_metrics(v_data, word_idx)
+                    if metrics:
+                        return y_top, y_bottom, metrics, metrics
+                
+                return y_top, y_bottom, None, None
+            return None, None, None, None
 
         def get_line_style(level):
             color = QColor("#AAAAAA")
@@ -215,20 +263,22 @@ class OverlayRenderer:
             
             node_is_active = is_active or (scene.active_outline_id and node.get("id") == scene.active_outline_id)
             
-            s_top, s_bottom = get_verse_y_range(start_ref)
-            e_top, e_bottom = get_verse_y_range(end_ref)
+            s_top, s_bottom, s_inline_top, s_inline_bottom = get_verse_y_range(start_ref, is_end=False)
+            e_top, e_bottom, e_inline_top, e_inline_bottom = get_verse_y_range(end_ref, is_end=True)
             
             if s_top is None or e_bottom is None: return
 
-            # Boundaries are already centered by get_verse_y_range
-            y_start = s_top
-            y_end = e_bottom
-
-            def draw_h_line(y, h_level, summary_node=None, split_parent=None, split_idx=-1):
+            def draw_divider(y, h_level, summary_node=None, split_parent=None, split_idx=-1, inline_pos=None):
                 pen, is_double, text_level = get_line_style(h_level)
                 x_end = scene.sceneRect().width() - 10
                 
                 item = OutlineDividerItem(split_parent, split_idx, y, scene.side_margin, x_end, pen, is_double, text_level=text_level)
+                if inline_pos:
+                    item.is_inline = True
+                    item.inline_x = inline_pos[0]
+                    item.inline_y_top = inline_pos[1]
+                    item.inline_y_bot = inline_pos[2]
+                
                 item.setVisible(scene._is_rect_visible(item.boundingRect()))
                 if summary_node:
                     tip = f"[{summary_node['title']}]\\n{summary_node.get('summary', '')}"
@@ -243,24 +293,24 @@ class OverlayRenderer:
                 scene.outline_overlay_items.append(item)
 
             if level == 0:
-                draw_h_line(y_start, 0, node, split_parent=node, split_idx=-2)
-                draw_h_line(y_end, 0, node, split_parent=node, split_idx=-3)
+                draw_divider(s_top, 0, node, split_parent=node, split_idx=-2, inline_pos=s_inline_top)
+                draw_divider(e_bottom, 0, node, split_parent=node, split_idx=-3, inline_pos=e_inline_bottom)
             
             if "children" in node:
                 children = node["children"]
                 child_divider_level = level + 1
                 
                 for i in range(len(children) - 1):
-                    # Child dividers also go between verses
-                    _, child_bottom = get_verse_y_range(children[i]["range"]["end"])
-                    next_child_top, _ = get_verse_y_range(children[i+1]["range"]["start"])
+                    _, child_bottom, _, c_inline_bottom = get_verse_y_range(children[i]["range"]["end"], is_end=True)
+                    next_child_top, _, nc_inline_top, _ = get_verse_y_range(children[i+1]["range"]["start"], is_end=False)
                     
                     if child_bottom is not None and next_child_top is not None:
-                        # Center child dividers in the gap (usually includes headers)
-                        # Or should they also be below headers? Let's center for now 
-                        # as child splits usually don't happen across major book breaks.
-                        mid_y = (child_bottom + next_child_top) / 2
-                        draw_h_line(mid_y, child_divider_level, node, split_parent=node, split_idx=i)
+                        inline_pos = c_inline_bottom if c_inline_bottom else nc_inline_top
+                        if inline_pos:
+                            draw_divider(inline_pos[1], child_divider_level, node, split_parent=node, split_idx=i, inline_pos=inline_pos)
+                        else:
+                            mid_y = (child_bottom + next_child_top) / 2
+                            draw_divider(mid_y, child_divider_level, node, split_parent=node, split_idx=i)
             
                 for child in children:
                     render_node(child, level + 1, node_is_active)
