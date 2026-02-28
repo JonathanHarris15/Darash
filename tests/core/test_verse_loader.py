@@ -69,9 +69,9 @@ class TestVerseLoader(unittest.TestCase):
         self.assertEqual(loader.get_verse_index("Genesis 1:1"), 0.0)
         self.assertEqual(loader.get_verse_index("John 1:1"), 1.0)
         
-        # Test sub-verse indexing (e.g., 'a' -> 0.1)
-        self.assertAlmostEqual(loader.get_verse_index("Genesis 1:1a"), 0.1)
-        self.assertAlmostEqual(loader.get_verse_index("Genesis 1:1b"), 0.2)
+        # Test sub-verse indexing (e.g., 'a' -> 0.001)
+        self.assertAlmostEqual(loader.get_verse_index("Genesis 1:1a"), 0.001)
+        self.assertAlmostEqual(loader.get_verse_index("Genesis 1:1b"), 0.002)
         
         self.assertEqual(loader.get_verse_index("Invalid 1:1"), -1.0)
 

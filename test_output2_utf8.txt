@@ -1,0 +1,56 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.0.2, pluggy-1.6.0
+PySide6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.2
+rootdir: C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader
+plugins: qt-4.5.0
+collected 20 items
+
+tests\core\test_verse_loader.py ....                                     [ 20%]
+tests\managers\test_outline_manager_scrubbing.py FFFFF                   [ 45%]
+tests\managers\test_study_manager.py ......                              [ 75%]
+tests\ui\test_main_window_layout.py ...                                  [ 90%]
+tests\utils\test_reader_utils.py ..                                      [100%]
+
+================================== FAILURES ===================================
+__________________ test_drag_down_internal_end_expands_point __________________
+tests\managers\test_outline_manager_scrubbing.py:69: in test_drag_down_internal_end_expands_point
+    assert root["children"][0]["range"]["end"] == "v7"
+E   AssertionError: assert 'v5' == 'v7'
+E     
+E     - v7
+E     + v5
+__________________ test_drag_up_internal_start_expands_point __________________
+tests\managers\test_outline_manager_scrubbing.py:77: in test_drag_up_internal_start_expands_point
+    assert root["children"][1]["range"]["start"] == "v4"
+E   AssertionError: assert 'v6' == 'v4'
+E     
+E     - v4
+E     + v6
+_________________ test_drag_down_external_end_expands_outline _________________
+tests\managers\test_outline_manager_scrubbing.py:85: in test_drag_down_external_end_expands_outline
+    assert root["range"]["end"] == "v15"
+E   AssertionError: assert 'v10' == 'v15'
+E     
+E     - v15
+E     + v10
+__________________ test_constraint_prevents_collapsing_node ___________________
+tests\managers\test_outline_manager_scrubbing.py:92: in test_constraint_prevents_collapsing_node
+    assert root["children"][1]["range"]["start"] == "v10"
+E   AssertionError: assert 'v6' == 'v10'
+E     
+E     - v10
+E     + v6
+___________________ test_constraint_prevents_collapsing_end ___________________
+tests\managers\test_outline_manager_scrubbing.py:101: in test_constraint_prevents_collapsing_end
+    assert root["children"][0]["range"]["end"] == "v1"
+E   AssertionError: assert 'v5' == 'v1'
+E     
+E     - v1
+E     + v5
+=========================== short test summary info ===========================
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_down_internal_end_expands_point
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_up_internal_start_expands_point
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_down_external_end_expands_outline
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_node
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_end
+======================== 5 failed, 15 passed in 11.37s ========================

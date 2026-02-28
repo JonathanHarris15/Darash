@@ -1,0 +1,53 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.0.2, pluggy-1.6.0
+PySide6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.2
+rootdir: C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader
+plugins: qt-4.5.0
+collected 5 items
+
+tests\managers\test_outline_manager_scrubbing.py FFFFF                   [100%]
+
+================================== FAILURES ===================================
+__________________ test_drag_down_internal_end_expands_point __________________
+tests\managers\test_outline_manager_scrubbing.py:70: in test_drag_down_internal_end_expands_point
+    assert root["children"][0]["range"]["end"] == "v7"
+E   AssertionError: assert 'v1' == 'v7'
+E     
+E     - v7
+E     + v1
+__________________ test_drag_up_internal_start_expands_point __________________
+tests\managers\test_outline_manager_scrubbing.py:78: in test_drag_up_internal_start_expands_point
+    assert root["children"][1]["range"]["start"] == "v4"
+E   AssertionError: assert 'v10' == 'v4'
+E     
+E     - v4
+E     + v10
+_________________ test_drag_down_external_end_expands_outline _________________
+tests\managers\test_outline_manager_scrubbing.py:86: in test_drag_down_external_end_expands_outline
+    assert root["range"]["end"] == "v15"
+E   AssertionError: assert 'v1' == 'v15'
+E     
+E     - v15
+E     ?   -
+E     + v1
+__________________ test_constraint_prevents_collapsing_node ___________________
+tests\managers\test_outline_manager_scrubbing.py:95: in test_constraint_prevents_collapsing_node
+    assert root["children"][0]["range"]["end"] == "v9"
+E   AssertionError: assert 'v5' == 'v9'
+E     
+E     - v9
+E     + v5
+___________________ test_constraint_prevents_collapsing_end ___________________
+tests\managers\test_outline_manager_scrubbing.py:103: in test_constraint_prevents_collapsing_end
+    assert root["children"][1]["range"]["start"] == "v2"
+E   AssertionError: assert 'v6' == 'v2'
+E     
+E     - v2
+E     + v6
+=========================== short test summary info ===========================
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_down_internal_end_expands_point
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_up_internal_start_expands_point
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_drag_down_external_end_expands_outline
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_node
+FAILED tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_end
+============================== 5 failed in 0.05s ==============================

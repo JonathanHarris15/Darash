@@ -1,0 +1,71 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.0.2, pluggy-1.6.0
+PySide6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.2
+rootdir: C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader
+plugins: qt-4.5.0
+collected 20 items
+
+tests\core\test_verse_loader.py .F..                                     [ 20%]
+tests\managers\test_outline_manager_scrubbing.py EEEEE                   [ 45%]
+tests\managers\test_study_manager.py ......                              [ 75%]
+tests\ui\test_main_window_layout.py ...                                  [ 90%]
+tests\utils\test_reader_utils.py ..                                      [100%]
+
+=================================== ERRORS ====================================
+_________ ERROR at setup of test_drag_down_internal_end_expands_point _________
+file C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py, line 59
+  def test_drag_down_internal_end_expands_point(manager):
+E       fixture 'manager' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, monkeypatch, pytestconfig, qapp, qapp_args, qapp_cls, qtbot, qtlog, qtmodeltester, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py:59
+_________ ERROR at setup of test_drag_up_internal_start_expands_point _________
+file C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py, line 67
+  def test_drag_up_internal_start_expands_point(manager):
+E       fixture 'manager' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, monkeypatch, pytestconfig, qapp, qapp_args, qapp_cls, qtbot, qtlog, qtmodeltester, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py:67
+________ ERROR at setup of test_drag_down_external_end_expands_outline ________
+file C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py, line 75
+  def test_drag_down_external_end_expands_outline(manager):
+E       fixture 'manager' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, monkeypatch, pytestconfig, qapp, qapp_args, qapp_cls, qtbot, qtlog, qtmodeltester, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py:75
+_________ ERROR at setup of test_constraint_prevents_collapsing_node __________
+file C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py, line 83
+  def test_constraint_prevents_collapsing_node(manager):
+E       fixture 'manager' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, monkeypatch, pytestconfig, qapp, qapp_args, qapp_cls, qtbot, qtlog, qtmodeltester, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py:83
+__________ ERROR at setup of test_constraint_prevents_collapsing_end __________
+file C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py, line 91
+  def test_constraint_prevents_collapsing_end(manager):
+E       fixture 'manager' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, monkeypatch, pytestconfig, qapp, qapp_args, qapp_cls, qtbot, qtlog, qtmodeltester, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\managers\test_outline_manager_scrubbing.py:91
+================================== FAILURES ===================================
+____________________ TestVerseLoader.test_get_verse_index _____________________
+tests\core\test_verse_loader.py:73: in test_get_verse_index
+    self.assertAlmostEqual(loader.get_verse_index("Genesis 1:1a"), 0.1)
+E   AssertionError: 0.001 != 0.1 within 7 places (0.099 difference)
+---------------------------- Captured stdout call -----------------------------
+Loading Bible data from C:\Users\jono1\AppData\Local\Temp\tmp1xk3ddn2.json...
+Parsing JSON data...
+Loaded 2 verses in 0.00s
+=========================== short test summary info ===========================
+FAILED tests/core/test_verse_loader.py::TestVerseLoader::test_get_verse_index
+ERROR tests/managers/test_outline_manager_scrubbing.py::test_drag_down_internal_end_expands_point
+ERROR tests/managers/test_outline_manager_scrubbing.py::test_drag_up_internal_start_expands_point
+ERROR tests/managers/test_outline_manager_scrubbing.py::test_drag_down_external_end_expands_outline
+ERROR tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_node
+ERROR tests/managers/test_outline_manager_scrubbing.py::test_constraint_prevents_collapsing_end
+=================== 1 failed, 14 passed, 5 errors in 10.06s ===================

@@ -5,3 +5,5 @@ Transition and refactor the application to support a panel layout style. This is
 - Outline panel
 
 There should be another bar that is to the left bible directory that lets you open each of these panels. If nothing is open in the center and the button is pressed, it should open the panel to fill the center corresponding to the button pressed.
+
+I have not verbosely explained all of the features necessarry to implement this, but I have provided a solid foundation for you to build upon. I expect you to be able to infer the rest of the features necessarry to implement this, but if you are unsure about any of them, please ask me.

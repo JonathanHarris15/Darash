@@ -1,0 +1,22 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.0.2, pluggy-1.6.0
+PySide6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.2
+rootdir: C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader
+plugins: qt-4.5.0
+collected 0 items / 1 error
+
+=================================== ERRORS ====================================
+__________ ERROR collecting tests/ui/test_main_window_placeholder.py __________
+ImportError while importing test module 'C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader\tests\ui\test_main_window_placeholder.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\..\.pyenv\pyenv-win\versions\3.12.0\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\ui\test_main_window_placeholder.py:3: in <module>
+    from src.ui.main_window import MainWindow
+E   ModuleNotFoundError: No module named 'src'
+=========================== short test summary info ===========================
+ERROR tests/ui/test_main_window_placeholder.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+============================== 1 error in 0.08s ===============================
