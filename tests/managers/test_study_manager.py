@@ -78,5 +78,29 @@ class TestStudyManager(unittest.TestCase):
         self.assertEqual(note["text"], "Hello World")
         self.assertEqual(note["folder"], "")
 
+    def test_logical_mark(self):
+        # Adding a logical mark
+        self.manager.add_logical_mark("Genesis|1|1|0", "arrow_right")
+        self.assertIn("Genesis|1|1|0", self.manager.data["logical_marks"])
+        self.assertEqual(self.manager.data["logical_marks"]["Genesis|1|1|0"], "arrow_right")
+        
+        # Test simulated delete
+        del self.manager.data["logical_marks"]["Genesis|1|1|0"]
+        self.assertNotIn("Genesis|1|1|0", self.manager.data["logical_marks"])
+
+    def test_arrow(self):
+        # Adding an arrow
+        self.manager.add_arrow("Genesis|1|1|0", "Genesis|1|1|5", color="#FF0000", arrow_type="snake")
+        self.assertIn("Genesis|1|1|0", self.manager.data["arrows"])
+        arrows = self.manager.data["arrows"]["Genesis|1|1|0"]
+        self.assertEqual(len(arrows), 1)
+        self.assertEqual(arrows[0]["end_key"], "Genesis|1|1|5")
+        self.assertEqual(arrows[0]["color"], "#FF0000")
+        self.assertEqual(arrows[0]["type"], "snake")
+
+        # Simulated delete
+        del self.manager.data["arrows"]["Genesis|1|1|0"]
+        self.assertNotIn("Genesis|1|1|0", self.manager.data["arrows"])
+
 if __name__ == '__main__':
     unittest.main()

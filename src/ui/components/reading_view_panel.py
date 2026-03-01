@@ -16,10 +16,7 @@ class ReadingViewPanel(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
-        self.reader_widget = ReaderWidget()
-        # Ensure the reader widget uses the shared scene provided by the main window
-        self.reader_widget.scene = scene
-        self.reader_widget.view.setScene(scene)
+        self.reader_widget = ReaderWidget(scene=scene)
         
         self.search_bar = SearchBar()
         

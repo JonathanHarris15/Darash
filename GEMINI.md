@@ -1,7 +1,6 @@
 # Jehu-Reader Project Directions
 
 ## Environment & Execution
-- **Virtual Environment:** This project runs in a dedicated virtual environment located outside the project directory.
 - **Execution:** The agent MUST NOT attempt to start or run the project. Focus on code modification, analysis, and testing within the source structure.
 
 ## Architectural Mandates

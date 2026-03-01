@@ -26,6 +26,24 @@ class TestReaderUtils(unittest.TestCase):
         
         # "God" starts at index 17 ("In the beginning " is 17 chars)
         self.assertEqual(get_word_offset_in_verse(self.mock_verse_data, 3), 17)
+        
+        # Test bugfix: if "created" existed twice it shouldn't hit the first one.
+        # "created" starts at index 21 ("In the beginning God " is 21 chars)
+        self.assertEqual(get_word_offset_in_verse(self.mock_verse_data, 4), 21)
+        
+        # Edge Case: Add another "God" to the mock data to ensure it counts properly
+        mock_verse_data_dup = {
+            "text": "God made God",
+            "tokens": [
+                ["God", "0430"], 
+                ["made", "01254"],
+                ["God", "0430"]
+            ]
+        }
+        
+        self.assertEqual(get_word_offset_in_verse(mock_verse_data_dup, 0), 0)
+        self.assertEqual(get_word_offset_in_verse(mock_verse_data_dup, 1), 4)
+        self.assertEqual(get_word_offset_in_verse(mock_verse_data_dup, 2), 9)
 
     def test_get_word_idx_from_pos(self):
         # Pos 0-1 corresponds to "In"

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QCursor
 import os
 from src.ui.components.outline_dialog import OutlineDialog
 from src.ui.components.outline_editor import OutlineEditor

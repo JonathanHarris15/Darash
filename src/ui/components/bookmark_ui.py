@@ -111,7 +111,7 @@ class BookmarkWidget(QFrame):
         delete_act.triggered.connect(lambda: self.deleted.emit(self.ref))
         menu.addAction(delete_act)
         
-        menu.exec(pos)
+        menu.exec(self.mapToGlobal(pos))
         self._menu_active = False
         
         # Trigger leave logic if mouse is no longer over the widget

@@ -9,16 +9,27 @@ def get_word_idx_from_pos(verse_data, pos):
     if pos < 0: return -1
     
     text = verse_data['text']
-    search_pos = 0
+    current_char_offset = 0
+
     for i, token in enumerate(verse_data['tokens']):
         token_text = token[0]
-        # Use find with search_pos to handle multiple occurrences of the same word
-        start = text.find(token_text, search_pos)
-        if start != -1:
-            end = start + len(token_text)
-            if start <= pos <= end:
-                return i
-            search_pos = end
+        
+        # Advance current_char_offset to the precise start of this token in the full text string
+        start_idx = text.find(token_text, current_char_offset)
+        
+        # If the word isn't found, keep going from current position
+        if start_idx == -1:
+            start_idx = current_char_offset
+            
+        end_idx = start_idx + len(token_text)
+        
+        # Check if the document hit-test position falls cleanly within this token's bounds.
+        # We also want to include the whitespace/formatting preceding the token as belonging to it
+        if current_char_offset <= pos <= end_idx:
+            return i
+            
+        current_char_offset = end_idx
+        
     return -1
 
 def get_text_rects(text_item, start, length):
@@ -50,16 +61,23 @@ def get_text_rects(text_item, start, length):
     return rects
 
 def get_word_offset_in_verse(verse_data, word_idx):
-    """Calculates the character offset of a word within a verse block."""
+    """Calculates the exact character offset of a word within a verse block."""
     text = verse_data['text']
-    pos = 0
-    for i in range(word_idx):
-        token_text = verse_data['tokens'][i][0]
-        found_pos = text.find(token_text, pos)
-        if found_pos != -1:
-            pos = found_pos + len(token_text)
+    current_char_offset = 0
     
-    target_token = verse_data['tokens'][word_idx][0]
-    actual_start = text.find(target_token, pos)
-    if actual_start == -1: return pos
-    return actual_start
+    for i in range(min(word_idx + 1, len(verse_data['tokens']))):
+        token_text = verse_data['tokens'][i][0]
+        
+        # Advance current_char_offset to the precise start of this token
+        start_idx = text.find(token_text, current_char_offset)
+        
+        # If the word isn't found, keep going from current position
+        if start_idx == -1:
+            start_idx = current_char_offset
+            
+        if i == word_idx:
+            return start_idx
+            
+        current_char_offset = start_idx + len(token_text)
+        
+    return current_char_offset

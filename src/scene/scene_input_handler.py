@@ -162,7 +162,7 @@ class SceneInputHandler(QObject):
         scene = self.scene
         from src.ui.components.strongs_ui import StrongsVerboseDialog
         view = scene.views()[0]
-        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        mouse_pos = scene.last_mouse_scene_pos
         sn_str, _ = scene._get_strongs_at_pos(mouse_pos)
         if sn_str:
             scene.strongs_tooltip.hide()
@@ -177,7 +177,7 @@ class SceneInputHandler(QObject):
     def _handle_delete_key(self):
         scene = self.scene
         view = scene.views()[0]
-        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        mouse_pos = scene.last_mouse_scene_pos
         
         # 1. Check for OutlineDividerItem (Division lines)
         item = scene.itemAt(mouse_pos, view.transform())
@@ -212,8 +212,7 @@ class SceneInputHandler(QObject):
 
     def _start_arrow_drawing(self):
         scene = self.scene
-        view = scene.views()[0]
-        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        mouse_pos = scene.last_mouse_scene_pos
         key_at_pos = scene._get_word_key_at_pos(mouse_pos)
         if key_at_pos:
             scene.arrow_start_key = key_at_pos
@@ -224,8 +223,7 @@ class SceneInputHandler(QObject):
 
     def _finish_arrow_drawing(self):
         scene = self.scene
-        view = scene.views()[0]
-        mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos()))
+        mouse_pos = scene.last_mouse_scene_pos
         end_key = scene._get_word_key_at_pos(mouse_pos)
         
         if end_key and end_key != scene.arrow_start_key:

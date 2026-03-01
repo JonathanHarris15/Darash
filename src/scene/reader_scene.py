@@ -66,6 +66,7 @@ class ReaderScene(QGraphicsScene):
         
         self.scroll_y = 0.0
         self.target_scroll_y = 0.0
+        self.last_mouse_scene_pos = QPointF()
         self.font_size = DEFAULT_FONT_SIZE
         self.line_spacing = LINE_SPACING_DEFAULT
         self.font_family = VERSE_FONT_FAMILY
@@ -382,24 +383,31 @@ class ReaderScene(QGraphicsScene):
     def clear_search(self): self.search_manager.clear_search()
 
     def contextMenuEvent(self, event):
+        view = self.views()[0]
+        # event.screenPos() is the native OS screen position of the right-click
+        global_pos = event.screenPos()
+        
         heading_data = self._get_heading_at_pos(event.scenePos())
         if heading_data:
-            menu = QMenu(); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
+            menu = QMenu(view); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
             suggest_act = QAction("Get suggested symbols", menu)
             suggest_act.triggered.connect(lambda: self._show_suggested_symbols_dialog(heading_data))
-            menu.addAction(suggest_act); menu.exec(event.screenPos()); event.accept(); return
-        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+            menu.addAction(suggest_act); menu.exec(global_pos); event.accept(); return
+            
+        item = self.itemAt(event.scenePos(), view.transform())
         if isinstance(item, VerseNumberItem):
-            item.contextMenuRequested.emit(event.screenPos()); event.accept(); return
+            item.contextMenuRequested.emit(QPointF(global_pos)); event.accept(); return
+            
         cursor = self.main_text_item.textCursor()
         if not cursor.hasSelection():
             pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit)
             if pos != -1:
                 cursor.setPosition(pos); cursor.select(QTextCursor.WordUnderCursor); self.main_text_item.setTextCursor(cursor)
+                
         if cursor.hasSelection():
             self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            view = self.views()[0]; screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
-            self.mark_popup.show_at(screen_pos); self.render_verses(); event.accept(); return
+            self.mark_popup.show_at(global_pos); self.render_verses(); event.accept(); return
+            
         super().contextMenuEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -441,7 +449,8 @@ class ReaderScene(QGraphicsScene):
 
     def _on_verse_num_context_menu(self, item, screen_pos):
         if item.ref not in self.selected_refs: self._on_verse_num_clicked(item, False)
-        menu = QMenu(); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
+        view = self.views()[0]
+        menu = QMenu(view); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
         
         marks = [("❤ Heart", "heart"), ("? Question Mark", "question"), ("!! Attention", "attention"), ("★ Star", "star")]
         for label, m_type in marks:
@@ -453,7 +462,11 @@ class ReaderScene(QGraphicsScene):
         clear_act = QAction("Clear Mark", menu); clear_act.triggered.connect(lambda: self._set_selected_verse_mark(None)); menu.addAction(clear_act)
         menu.addSeparator()
         outline_act = QAction("Create Outline", menu); outline_act.triggered.connect(self.outline_manager.create_outline_from_verse_selection); menu.addAction(outline_act)
-        menu.exec(screen_pos.toPoint())
+        
+        if isinstance(screen_pos, QPointF):
+            menu.exec(screen_pos.toPoint())
+        else:
+            menu.exec(screen_pos)
 
     def _set_selected_verse_mark(self, mark_type):
         for ref in self.selected_refs: self.study_manager.set_verse_mark(ref, mark_type)
@@ -499,6 +512,7 @@ class ReaderScene(QGraphicsScene):
         if not self.input_handler.handle_key_press(event): super().keyPressEvent(event)
 
     def mouseMoveEvent(self, event):
+        self.last_mouse_scene_pos = event.scenePos()
         if self.is_dragging_divider:
             scene_pos = event.scenePos(); doc = self.main_text_item.document(); layout = doc.documentLayout()
             best_gap_y, best_dist = -1, 1000
@@ -634,7 +648,8 @@ class ReaderScene(QGraphicsScene):
         if not self.input_handler.handle_key_release(event): super().keyReleaseEvent(event)
 
     def _apply_symbol_at_mouse(self, number_key):
-        view = self.views()[0]; mouse_pos = view.mapToScene(view.mapFromGlobal(QCursor.pos())); key = self._get_word_key_at_pos(mouse_pos)
+        mouse_pos = self.last_mouse_scene_pos
+        key = self._get_word_key_at_pos(mouse_pos)
         if not key: return
         symbol_id = self.symbol_manager.get_binding(number_key)
         if symbol_id:

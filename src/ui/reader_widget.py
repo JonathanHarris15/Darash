@@ -15,9 +15,9 @@ class ReaderWidget(QWidget):
     The main container widget for the Bible reader.
     Integrates the GraphicsView, custom scrollbar, HUD, and loading overlay.
     """
-    def __init__(self, parent=None):
+    def __init__(self, scene=None, parent=None):
         super().__init__(parent)
-        self.scene = ReaderScene()
+        self.scene = scene if scene is not None else ReaderScene()
         
         self.view = QGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing)
