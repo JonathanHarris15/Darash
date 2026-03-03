@@ -15,7 +15,7 @@ class VerseLoader:
             # parent 2: src
             # parent 3: project root
             base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            json_path = os.path.join(base_path, "mdbible-main", "mdbible-main", "json", "ESV.json")
+            json_path = os.path.join(base_path, "data", "mdbible-main", "mdbible-main", "json", "ESV.json")
         
         self.data: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.flat_verses: List[Dict[str, Any]] = []

@@ -1,9 +1,0 @@
-﻿============================= test session starts =============================
-platform win32 -- Python 3.11.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Python311\python.exe
-cachedir: .pytest_cache
-PySide6 6.10.2 -- Qt runtime 6.10.2 -- Qt compiled 6.10.2
-rootdir: C:\Users\jono1\OneDrive\Documents\Personal Projects\Jehu-Reader
-plugins: anyio-4.9.0, qt-4.5.0, typeguard-3.0.2
-collecting ... collected 3 items
-
-tests/scene/test_scene_interactions.py::TestSceneInteractionArrows::test_arrow_drawing_coordinate_mapping 

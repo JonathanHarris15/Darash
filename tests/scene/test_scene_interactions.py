@@ -14,6 +14,7 @@ class TestSceneInteractionArrows(unittest.TestCase):
         self.mock_scene.is_drawing_arrow = False
         self.mock_scene.arrow_start_key = None
         self.mock_scene.arrow_start_center = None
+        self.mock_scene.last_mouse_scene_pos = QPointF(50, 50)
         self.mock_scene.views.return_value = [MagicMock()]
         
         # Give the first view a mocked mapping
@@ -26,6 +27,7 @@ class TestSceneInteractionArrows(unittest.TestCase):
         self.handler = SceneInputHandler(self.mock_scene)
         # Prevent Strongs timer from trying to start
         self.handler.strongs_hover_timer = MagicMock()
+        self.mock_scene.temp_arrow_item = None
 
     def test_start_arrow_drawing(self):
         # Simulate pressing 'A' to start drawing an arrow
