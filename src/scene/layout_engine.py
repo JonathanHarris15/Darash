@@ -205,6 +205,7 @@ class LayoutEngine:
         scene.layoutFinished.emit()
         self.calculate_section_positions()
         scene.render_verses()
+        scene._render_search_overlays()
         scene.layout_version += 1
 
     def _update_heading_rects(self):

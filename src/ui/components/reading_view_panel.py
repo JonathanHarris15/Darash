@@ -66,4 +66,4 @@ class ReadingViewPanel(QWidget):
 
     def _update_scrollbar_matches(self, current, total):
         scene = self.reader_widget.scene
-        self.reader_widget.scrollbar.set_matches(scene.search_marks_y, scene.total_height)
+        self.reader_widget.scrollbar.set_matches(scene.search_marks_y, len(scene.loader.flat_verses))

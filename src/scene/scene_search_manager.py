@@ -7,25 +7,36 @@ class SceneSearchManager(QObject):
     def __init__(self, scene):
         super().__init__(scene)
         self.scene = scene
+        self.search_engine = None
 
     def handle_search(self, text: str):
         scene = self.scene
+        if self.search_engine is None:
+            from src.core.search_engine import SearchEngine
+            self.search_engine = SearchEngine(scene.loader.flat_verses)
+
         scene.search_results.clear()
         scene.search_marks_y.clear()
+        if hasattr(scene, 'search_verse_refs'):
+            scene.search_verse_refs.clear()
+        if hasattr(scene, 'search_heading_matches'):
+            scene.search_heading_matches.clear()
         scene.current_search_idx = -1
         
         if not text:
             scene.searchStatusUpdated.emit(0, 0)
+            scene._render_search_overlays()
             scene.render_verses()
             return
             
-        doc = scene.main_text_item.document()
-        cursor = doc.find(text)
-        while not cursor.isNull():
-            start = cursor.selectionStart()
-            scene.search_results.append((start, cursor.selectionEnd() - start))
-            scene.search_marks_y.append(doc.documentLayout().blockBoundingRect(cursor.block()).top())
-            cursor = doc.find(text, cursor)
+        results = self.search_engine.search(text)
+        scene.search_results = results
+        
+        scene.search_verse_refs = {res.display_ref for res in results if res.scope == 'verse'}
+        scene.search_heading_matches = {(res.scope, res.display_ref) for res in results if res.scope in ('chapter', 'book')}
+        
+        # Calculate virtual scroll positions for the scrollbar marks
+        scene.search_marks_y = [scene.loader.get_verse_index(res.scroll_ref) for res in results]
             
         total = len(scene.search_results)
         if total > 0:
@@ -37,15 +48,11 @@ class SceneSearchManager(QObject):
 
     def scroll_to_current_match(self):
         scene = self.scene
-        if 0 <= scene.current_search_idx < len(scene.search_marks_y):
-            # In the virtual system, we should ideally find the verse index
-            # for this search result and scroll to it.
-            start_pos, _ = scene.search_results[scene.current_search_idx]
-            ref = scene._get_ref_from_pos(start_pos)
-            if ref:
-                idx = scene.loader.get_verse_index(ref)
-                if idx != -1:
-                    scene.set_scroll_y(idx)
+        if 0 <= scene.current_search_idx < len(scene.search_results):
+            result = scene.search_results[scene.current_search_idx]
+            idx = scene.loader.get_verse_index(result.scroll_ref)
+            if idx != -1:
+                scene.set_scroll_y(idx)
             
             scene.searchStatusUpdated.emit(scene.current_search_idx, len(scene.search_results))
 
@@ -65,6 +72,11 @@ class SceneSearchManager(QObject):
         scene = self.scene
         scene.search_results.clear()
         scene.search_marks_y.clear()
+        if hasattr(scene, 'search_verse_refs'):
+            scene.search_verse_refs.clear()
+        if hasattr(scene, 'search_heading_matches'):
+            scene.search_heading_matches.clear()
         scene.current_search_idx = -1
         scene.searchStatusUpdated.emit(-1, 0)
         scene._render_search_overlays()
+        scene.render_verses()

@@ -74,6 +74,7 @@ class OverlayRenderer:
                 v_item.setZValue(10)
                 v_item.mark_type = mark_type
                 v_item.is_selected = is_selected
+                v_item.is_search_result = ref in getattr(scene, 'search_verse_refs', set())
                 
                 v_item.clicked.connect(lambda shift, v=v_item: scene._on_verse_num_clicked(v, shift))
                 v_item.doubleClicked.connect(scene._clear_verse_selection)
@@ -85,9 +86,11 @@ class OverlayRenderer:
                 scene.verse_number_items[ref] = v_item
             else:
                 it = scene.verse_number_items[ref]
-                if it.mark_type != mark_type or it.is_selected != is_selected:
+                is_search = ref in getattr(scene, 'search_verse_refs', set())
+                if it.mark_type != mark_type or it.is_selected != is_selected or getattr(it, 'is_search_result', False) != is_search:
                     it.mark_type = mark_type
                     it.is_selected = is_selected
+                    it.is_search_result = is_search
                     it.update()
                 
             # Handle additional sentence handles for indentation
@@ -365,13 +368,19 @@ class OverlayRenderer:
         from src.core.constants import SEARCH_HIGHLIGHT_COLOR
         for it in scene.search_overlay_items: scene.removeItem(it)
         scene.search_overlay_items.clear()
-
-        for start, length in scene.search_results:
-            rects = scene._get_text_rects(start, length)
-            for r in rects:
-                hl = QGraphicsRectItem(r)
+        
+        # We only draw overlays for chapter and book headings here.
+        # Verse number highlights are handled intrinsically by VerseNumberItem in their own paint methods.
+        search_matches = getattr(scene, 'search_heading_matches', set())
+        if not search_matches: return
+        
+        for h_rect, h_type, h_text in scene.heading_rects:
+            if (h_type, h_text) in search_matches:
+                hl = QGraphicsRectItem(h_rect)
                 hl.setBrush(QBrush(SEARCH_HIGHLIGHT_COLOR))
-                hl.setPen(Qt.NoPen); hl.setZValue(-1)
+                hl.setPen(Qt.NoPen)
+                hl.setZValue(-1)
                 hl.setAcceptedMouseButtons(Qt.NoButton)
-                hl.setVisible(scene._is_rect_visible(r))
-                scene.addItem(hl); scene.search_overlay_items.append(hl)
+                hl.setVisible(scene._is_rect_visible(h_rect))
+                scene.addItem(hl)
+                scene.search_overlay_items.append(hl)

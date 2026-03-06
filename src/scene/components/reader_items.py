@@ -190,6 +190,7 @@ class VerseNumberItem(QGraphicsObject):
         self.mark_font = mark_font if mark_font else font
         self.mark_type = None # heart, question, attention, star
         self.is_selected = False
+        self.is_search_result = False
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.PointingHandCursor)
         self._dragging = False
@@ -210,6 +211,13 @@ class VerseNumberItem(QGraphicsObject):
         return QRectF(-35, 0, 35 + VERSE_NUMBER_RESERVED_WIDTH, h + 5)
 
     def paint(self, painter, option, widget=None):
+        if getattr(self, 'is_search_result', False):
+            from src.core.constants import SEARCH_HIGHLIGHT_COLOR
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(SEARCH_HIGHLIGHT_COLOR))
+            # Just behind the verse number
+            painter.drawRect(QRectF(-2, 2, VERSE_NUMBER_RESERVED_WIDTH + 4, self._height + 2))
+            
         if self.is_selected:
             # Draw a small right-pointing arrow to indicate tabbing capability
             painter.setBrush(QBrush(self.color))

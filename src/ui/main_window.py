@@ -209,8 +209,10 @@ class MainWindow(QMainWindow):
                         self.add_note_panel(state.get("note_key"), state.get("ref"), object_name=p_name)
                         restored_any = True
                     elif p_type == "Outline":
-                        self.add_outline_panel(state.get("outline_id"), object_name=p_name)
-                        restored_any = True
+                        outline_id = state.get("outline_id")
+                        if outline_id:
+                            self.add_outline_panel(outline_id, object_name=p_name, is_restoring=True)
+                            restored_any = True
             except Exception as e:
                 print("Failed to restore panels:", e)
 
@@ -381,13 +383,15 @@ class MainWindow(QMainWindow):
         self.activity_bar.openOutlinePanel.connect(lambda: self.add_outline_panel(None))
 
         # Panel Navigation & Synchronized State
-        self.nav_dock.jumpRequested.connect(self.main_scene.jump_to)
-        self.nav_dock.strongsToggled.connect(self.main_scene.set_strongs_enabled)
-        self.nav_dock.outlinesToggled.connect(self.main_scene.set_outlines_enabled)
+        self.nav_dock.jumpRequested.connect(self._broadcast_jump)
+        self.nav_dock.strongsToggled.connect(self._broadcast_strongs_enabled)
+        self.nav_dock.outlinesToggled.connect(self._broadcast_outlines_enabled)
         
-        self.study_panel.jumpRequested.connect(self.main_scene.jump_to)
+        self.study_panel.jumpRequested.connect(self._broadcast_jump)
         self.study_panel.noteOpenRequested.connect(self.add_note_panel)
-        self.study_panel.activeOutlineChanged.connect(self.main_scene.set_active_outline)
+        self.study_panel.outlineOpenRequested.connect(self.add_outline_panel)
+        self.study_panel.outlineDeleted.connect(self._close_outline_panel)
+        self.study_panel.activeOutlineChanged.connect(self._broadcast_active_outline)
         
         # Render updates
         self.study_panel.dataChanged.connect(self._render_all_study_data)
@@ -411,6 +415,67 @@ class MainWindow(QMainWindow):
                         scene._render_study_overlays()
                         scene._render_outline_overlays()
                         scene.render_verses()
+                elif isinstance(widget, OutlinePanel):
+                    widget.refresh()
+            except RuntimeError:
+                pass
+
+    def _broadcast_jump(self, book, chapter, verse):
+        jumped = False
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if p.isVisible() and isinstance(p.widget(), ReadingViewPanel):
+                    p.widget().reader_widget.scene.jump_to(book, chapter, verse)
+                    jumped = True
+                    break
+            except RuntimeError:
+                pass
+        if not jumped:
+            self.add_reading_view()
+            self._broadcast_jump(book, chapter, verse)
+
+    def _broadcast_active_outline(self, outline_id):
+        self.main_scene.set_active_outline(outline_id)
+        self.study_panel.set_active_outline(outline_id, emit_signal=False)
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if isinstance(p.widget(), ReadingViewPanel):
+                    p.widget().reader_widget.scene.set_active_outline(outline_id)
+                elif isinstance(p.widget(), OutlinePanel):
+                    is_active = (p.widget().root_node_id == outline_id)
+                    p.widget().update_active_state(is_active)
+            except RuntimeError:
+                pass
+
+    def _close_outline_panel(self, outline_id):
+        for p in list(self.center_panels): # Copy list since closing modifies it
+            try:
+                p.parent()
+                if isinstance(p.widget(), OutlinePanel):
+                    if p.widget().root_node_id == outline_id:
+                        p.close()
+            except RuntimeError:
+                pass
+
+    def _broadcast_strongs_enabled(self, enabled):
+        self.main_scene.set_strongs_enabled(enabled)
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if isinstance(p.widget(), ReadingViewPanel):
+                    p.widget().reader_widget.scene.set_strongs_enabled(enabled)
+            except RuntimeError:
+                pass
+
+    def _broadcast_outlines_enabled(self, enabled):
+        self.main_scene.set_outlines_enabled(enabled)
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if isinstance(p.widget(), ReadingViewPanel):
+                    p.widget().reader_widget.scene.set_outlines_enabled(enabled)
             except RuntimeError:
                 pass
 
@@ -546,9 +611,23 @@ class MainWindow(QMainWindow):
             'strongs_manager': self.main_scene.strongs_manager
         }
         scene = ReaderScene(self, shared_resources=shared)
+        scene.set_strongs_enabled(self.main_scene.strongs_enabled)
+        scene.set_outlines_enabled(self.main_scene.outlines_enabled)
+        scene.set_active_outline(self.main_scene.active_outline_id)
         
         panel = ReadingViewPanel(scene, self.main_scene.study_manager)
         dock = self._add_center_dock("Reading View", panel, object_name=object_name)
+        
+        # Make sure outline panels know if they are the active one for this new reading view
+        # (Though active_outline is broadcast, reading views share the main_scene's state)
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if isinstance(p.widget(), OutlinePanel):
+                    is_active = (p.widget().root_node_id == self.main_scene.active_outline_id)
+                    p.widget().update_active_state(is_active)
+            except RuntimeError:
+                pass
         
         # Connect the new scene to the global study panel
         # When a scene modifies data (adds a bookmark), it emits studyDataChanged.
@@ -575,7 +654,7 @@ class MainWindow(QMainWindow):
         
         dock = self._add_center_dock(f"Note - {ref}", editor, object_name=object_name)
         
-        editor.jumpRequested.connect(self.main_scene.jump_to)
+        editor.jumpRequested.connect(self._broadcast_jump)
         editor.finished.connect(lambda result: self._on_note_editor_finished(result, editor, note_key, dock))
 
     def _on_note_editor_finished(self, result, editor, note_key, dock):
@@ -600,8 +679,11 @@ class MainWindow(QMainWindow):
             
         dock.close()
 
-    def add_outline_panel(self, outline_id, object_name=None):
+    def add_outline_panel(self, outline_id, object_name=None, is_restoring=False):
         if not outline_id:
+            if is_restoring:
+                return
+            
             from src.ui.components.outline_dialog import OutlineDialog
             dialog = OutlineDialog(self, title="New Outline")
             if dialog.exec():
@@ -618,8 +700,9 @@ class MainWindow(QMainWindow):
                 return
 
         panel = OutlinePanel(self.main_scene.study_manager.outline_manager, outline_id)
-        panel.jumpRequested.connect(self.main_scene.jump_to)
+        panel.jumpRequested.connect(self._broadcast_jump)
         panel.outlineChanged.connect(self.main_scene.studyDataChanged.emit)
+        panel.editRequested.connect(self._broadcast_active_outline)
         
         title = "Outline Editor"
         if outline_id:
@@ -628,6 +711,9 @@ class MainWindow(QMainWindow):
                 title = f"Outline - {node.get('title', 'Unknown')}"
                 
         self._add_center_dock(title, panel, object_name=object_name)
+        
+        # Init button state
+        panel.update_active_state(outline_id == self.main_scene.active_outline_id)
 
     # --- Actions ---
     def _toggle_left_dock(self, checked):

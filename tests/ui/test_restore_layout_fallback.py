@@ -9,6 +9,8 @@ Ensures the app always opens with a Reading View panel when:
 """
 import json
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import pytest
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings

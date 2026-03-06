@@ -311,6 +311,7 @@ class OutlinePanel(QWidget):
     """
     jumpRequested = Signal(str, str, str)
     outlineChanged = Signal()
+    editRequested = Signal(str) # node_id
 
     def __init__(self, outline_manager, root_node_id=None, parent=None):
         super().__init__(parent)
@@ -323,8 +324,16 @@ class OutlinePanel(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(4)
         
-        # 1. Header with Formatting Options
+        # 1. Header with Formatting Options & Edit Toggle
         header_layout = QHBoxLayout()
+        
+        self.edit_btn = QPushButton("Edit Outline in Reader")
+        self.edit_btn.setCheckable(True)
+        self.edit_btn.setToolTip("Enable visual editing in the reading view")
+        self.edit_btn.setFixedHeight(24)
+        self.edit_btn.clicked.connect(self._on_edit_toggled)
+        header_layout.addWidget(self.edit_btn)
+        
         header_layout.addStretch()
         
         self.ref_format_combo = QComboBox()
@@ -369,7 +378,45 @@ class OutlinePanel(QWidget):
         self.title_save_timer.setSingleShot(True)
         self.title_save_timer.timeout.connect(self._save_title)
         
+        self.update_active_state(False)
         self.refresh()
+
+    def _on_edit_toggled(self, checked):
+        if checked:
+            self.editRequested.emit(self.root_node_id)
+        else:
+            self.editRequested.emit("") # Turn off
+
+    def update_active_state(self, is_active):
+        self.edit_btn.blockSignals(True)
+        self.edit_btn.setChecked(is_active)
+        self.edit_btn.blockSignals(False)
+        
+        if is_active:
+            self.edit_btn.setText("Currently Editing in Reader")
+            self.edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #005a9e;
+                    color: white;
+                    border: 1px solid #0078d4;
+                    border-radius: 4px;
+                    padding: 0px 8px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #0078d4; }
+            """)
+        else:
+            self.edit_btn.setText("Edit Outline in Reader")
+            self.edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #333;
+                    color: #ccc;
+                    border: 1px solid #555;
+                    border-radius: 4px;
+                    padding: 0px 8px;
+                }
+                QPushButton:hover { background-color: #444; color: white; border-color: #0078d4; }
+            """)
 
     def refresh(self):
         """Rebuilds the cell list from the tree data."""
