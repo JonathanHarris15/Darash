@@ -1,9 +1,10 @@
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from src.ui.main_window import MainWindow
 
 @pytest.fixture
 def main_window(qtbot):
+    QSettings("JehuReader", "MainWindow").clear()
     window = MainWindow()
     window.show()
     qtbot.addWidget(window)

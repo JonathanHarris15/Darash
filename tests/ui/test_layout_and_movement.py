@@ -112,16 +112,14 @@ def test_split_existing_panels(main_window, qtbot):
     assert len(main_window.center_panels) == 1
     first_panel = main_window.center_panels[0]
     
-    # Add another one forcing a split
-    main_window.add_reading_view(force_split=True)
+    # Add another reading view (tabs by default; drag-to-split is a gesture)
+    main_window.add_reading_view()
     
     assert len(main_window.center_panels) == 2
     
-    # Validate they are both visible and not tabbed initially (split)
-    # The left and right dock should stay visible
+    # Both panels should be tracked; left/right docks remain visible
     assert main_window.left_dock.isVisible()
     assert main_window.right_dock.isVisible()
-    
     assert first_panel.isVisible()
     assert main_window.center_panels[1].isVisible()
 
@@ -129,7 +127,7 @@ def test_close_tabified_panel(main_window, qtbot):
     # Start with 1 reading view
     assert len(main_window.center_panels) == 1
     # Add another one tabbed (default)
-    main_window.add_reading_view(force_split=False)
+    main_window.add_reading_view()
     
     assert len(main_window.center_panels) == 2
     

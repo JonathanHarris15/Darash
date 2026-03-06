@@ -105,6 +105,10 @@ class MainWindow(QMainWindow):
         
         # Keep track of active central panels
         self.center_panels = []
+        
+        from src.ui.components.reading_view_link_manager import ReadingViewLinkManager
+        self.link_manager = ReadingViewLinkManager(self)
+        self.split_link_buttons = []
 
         # Setup Docks
         self.setup_docks()
@@ -131,7 +135,45 @@ class MainWindow(QMainWindow):
         # Continuously monitor for native QTabBars and dynamically hide pseudo-tabs when tabbed natively
         self._tab_update_timer = QTimer(self)
         self._tab_update_timer.timeout.connect(self._update_dock_tabs)
-        self._tab_update_timer.start(250)
+        self._tab_update_timer.start(50)
+        
+        self._link_button_timer = QTimer(self)
+        self._link_button_timer.timeout.connect(self._update_link_buttons)
+        self._link_button_timer.start(200)
+
+    def _update_link_buttons(self):
+        # Clean up old
+        for btn in self.split_link_buttons:
+            btn.setParent(None)
+            btn.deleteLater()
+        self.split_link_buttons.clear()
+        
+        # Find active (frontmost) visible center panels sorted left-to-right
+        active_panels = []
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if not p.isVisible() or p.isFloating(): continue
+                # isVisible() is True for background tabs, but visibleRegion() is empty if hidden by a tab
+                if not p.visibleRegion().isEmpty():
+                    active_panels.append(p)
+            except RuntimeError:
+                pass
+                
+        active_panels.sort(key=lambda p: p.geometry().x())
+        
+        from src.ui.components.reading_view_panel import ReadingViewPanel
+        from src.ui.components.split_link_button import SplitLinkButton
+        
+        for i in range(len(active_panels) - 1):
+            left = active_panels[i]
+            right = active_panels[i+1]
+            
+            if isinstance(left.widget(), ReadingViewPanel) and isinstance(right.widget(), ReadingViewPanel):
+                btn = SplitLinkButton(left, right, self.link_manager, self.center_workspace)
+                self.split_link_buttons.append(btn)
+                btn.reposition()
+                btn.raise_()
 
     def _load_and_restore_layout(self):
         from PySide6.QtCore import QSettings
@@ -159,8 +201,7 @@ class MainWindow(QMainWindow):
                 for state in panels_state:
                     p_type = state.get("type")
                     p_name = state.get("objectName")
-                    p_title = state.get("title", "Panel")
-                    
+
                     if p_type == "ReadingView":
                         self.add_reading_view(object_name=p_name)
                         restored_any = True
@@ -172,25 +213,43 @@ class MainWindow(QMainWindow):
                         restored_any = True
             except Exception as e:
                 print("Failed to restore panels:", e)
-                
+
+        # Open a Reading View if nothing was restored (fresh install, placeholder-only,
+        # or a corrupted/empty saved layout).
         if not restored_any:
             self.add_reading_view()
-            
+
         state = settings.value("windowState")
         if state:
             self.restoreState(state)
-            
-        center_state = settings.value("center_workspace_state")
-        if center_state:
-            self.center_workspace.restoreState(center_state)
-            
+
+        # Only restore the center workspace Qt dock state when there are panels
+        # that match it. If we fell back to a fresh Reading View, restoring the
+        # old dock state would immediately hide it behind the placeholder layout.
+        if restored_any:
+            center_state = settings.value("center_workspace_state")
+            if center_state:
+                self.center_workspace.restoreState(center_state)
+
         self._is_applying_preset = False
+
+        # Deferred safety net: runs after the event loop starts and the window is
+        # fully shown. If somehow the center is still empty (e.g. restoreState ate
+        # the newly added dock), add a fresh Reading View.
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self._ensure_center_has_panel)
 
     def setup_docks(self):
         from PySide6.QtWidgets import QTabWidget
         # Sandbox for the center workspace
         self.center_workspace.setDockNestingEnabled(True)
-        self.center_workspace.setDockOptions(QMainWindow.AnimatedDocks | QMainWindow.AllowNestedDocks | QMainWindow.AllowTabbedDocks | QMainWindow.GroupedDragging | QMainWindow.ForceTabbedDocks)
+        self.center_workspace.setDockOptions(
+            QMainWindow.AnimatedDocks
+            | QMainWindow.AllowNestedDocks
+            | QMainWindow.AllowTabbedDocks
+            | QMainWindow.GroupedDragging
+            # NOTE: ForceTabbedDocks removed — required for drag-to-split
+        )
         self.center_workspace.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
         
         # Ensure left and right docks extend top-to-bottom completely
@@ -224,7 +283,7 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.right_dock)
         
         # Placeholder Dock -> Goes in Center Workspace
-        self.placeholder_dock = QDockWidget("Placeholder", self.center_workspace)
+        self.placeholder_dock = QDockWidget("", self.center_workspace)
         self.placeholder_dock.setObjectName("PlaceholderDock")
         self.placeholder_dock.setTitleBarWidget(QWidget())
         self.placeholder_dock.setWidget(PlaceholderPanel(self))
@@ -331,18 +390,38 @@ class MainWindow(QMainWindow):
         self.study_panel.activeOutlineChanged.connect(self.main_scene.set_active_outline)
         
         # Render updates
-        self.study_panel.dataChanged.connect(self.main_scene._render_study_overlays)
-        self.study_panel.dataChanged.connect(self.main_scene._render_outline_overlays)
-        self.study_panel.dataChanged.connect(self.main_scene.render_verses)
+        self.study_panel.dataChanged.connect(self._render_all_study_data)
         
         self.main_scene.studyDataChanged.connect(self.study_panel.refresh)
         self.main_scene.outlineCreated.connect(self.study_panel.set_active_outline)
 
+    def _render_all_study_data(self):
+        """Broadcast study panel data changes to all active reading scenes."""
+        self.main_scene._render_study_overlays()
+        self.main_scene._render_outline_overlays()
+        self.main_scene.render_verses()
+        
+        for p in self.center_panels:
+            try:
+                p.parent()
+                widget = p.widget()
+                if isinstance(widget, ReadingViewPanel):
+                    scene = widget.reader_widget.scene
+                    if scene != self.main_scene:
+                        scene._render_study_overlays()
+                        scene._render_outline_overlays()
+                        scene.render_verses()
+            except RuntimeError:
+                pass
+
     # --- Panel Management ---
-    def _add_center_dock(self, title, widget, object_name=None, force_split=False):
+    def _add_center_dock(self, title, widget, object_name=None):
         dock = QDockWidget(title, self.center_workspace)
         dock.setObjectName(object_name or f"CenterDock_{uuid.uuid4().hex[:8]}")
-        dock.setTitleBarWidget(PseudoTabTitleBar(title, dock, self))
+        # Suppress the default dock title bar with a 0-height empty widget.
+        # The native tab bar (top of center_workspace) already shows the panel
+        # name and close button. When floating, the OS window decoration takes over.
+        dock.setTitleBarWidget(QWidget())
         
         widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         dock.setWidget(widget)
@@ -353,21 +432,20 @@ class MainWindow(QMainWindow):
         self._clean_center_panels()
         
         if self.center_panels:
-            if force_split:
-                self.center_workspace.splitDockWidget(self.center_panels[-1], dock, Qt.Horizontal)
-            else:
-                self.center_workspace.tabifyDockWidget(self.center_panels[-1], dock)
+            self.center_workspace.tabifyDockWidget(self.center_panels[-1], dock)
+            self.center_panels.append(dock)
         else:
             if self.placeholder_dock.isVisible() and not self.placeholder_dock.isFloating():
                 self.center_workspace.tabifyDockWidget(self.placeholder_dock, dock)
             else:
                 self.center_workspace.addDockWidget(Qt.TopDockWidgetArea, dock)
+            # Append BEFORE _apply_current_percentages so it sees the new dock
+            # and correctly hides the placeholder.
+            self.center_panels.append(dock)
             self._is_applying_preset = True
             self._apply_current_percentages()
-            
-        self.center_panels.append(dock)
         
-        # When a dock is dragged to create a split screen, re-balance the center panels
+        # Re-balance whenever this dock moves, floats, or changes visibility
         dock.dockLocationChanged.connect(self._on_dock_location_changed)
         dock.topLevelChanged.connect(self._on_dock_location_changed)
         dock.visibilityChanged.connect(self._on_dock_location_changed)
@@ -383,33 +461,63 @@ class MainWindow(QMainWindow):
         # We process this synchronously without a timer because native Qt dragging can block event loops.
         self._is_applying_preset = True
         self._apply_current_percentages()
+        if hasattr(self, 'link_manager'):
+            self.link_manager.refresh_connections()
+        if hasattr(self, '_update_link_buttons'):
+            self._update_link_buttons()
+
+    def _ensure_center_has_panel(self):
+        """
+        Safety net called once after the event loop starts (singleShot 0).
+        If center_panels is empty (nothing was restored and nothing was added),
+        open a Reading View so the user never lands on the bare placeholder.
+        """
+        self._clean_center_panels()
+        if not self.center_panels:
+            self.add_reading_view()
 
     def _update_dock_tabs(self):
         from PySide6.QtWidgets import QTabBar
-        # 1. Update native QTabBar close buttons
+        # 1. Update native QTabBar close buttons and hide the placeholder's empty tab slot
         for tb in self.findChildren(QTabBar):
             if not getattr(tb, '_jehu_closable_setup', False):
                 tb.setTabsClosable(True)
                 tb.tabCloseRequested.connect(self._on_native_tab_close)
                 tb._jehu_closable_setup = True
-                
-        # 2. Update pseudo-tabs visibility
-        all_docks = self.center_panels + [self.left_dock, self.right_dock]
-        for p in all_docks:
+            # Fully hide any tab whose title is empty (the placeholder dock)
+            for i in range(tb.count()):
+                if tb.tabText(i).strip() == '':
+                    tb.setTabVisible(i, False)
+
+        # 2. Center panels: toggle title bar based on tabified state.
+        #    - Tabified → empty widget (native tab bar above handles title+close, no duplicate row)
+        #    - Split/standalone → None (restore Qt's default draggable title bar)
+        #    Only set when state changes to avoid 50ms thrashing.
+        self._clean_center_panels()
+        for p in self.center_panels:
             try:
-                # If deleted C++ object, skip
                 p.parent()
-                if p.isVisible() and not p.isFloating():
-                    # Hide pseudo-tab if natively tabified
-                    is_tabified = len(self.tabifiedDockWidgets(p)) > 0
-                    tb = p.titleBarWidget()
-                    if tb and hasattr(tb, 'is_pseudo_tab'):
-                        tb.setVisible(not is_tabified)
-                elif p.isFloating():
-                    # Floating docks always show native title bar, but Qt forces our titleBarWidget if set
-                    tb = p.titleBarWidget()
-                    if tb and hasattr(tb, 'is_pseudo_tab'):
-                        tb.setVisible(True)
+                siblings = self.center_workspace.tabifiedDockWidgets(p)
+                is_tabified = len(siblings) > 0
+                last = getattr(p, '_title_bar_tabified', None)
+                if is_tabified != last:
+                    p._title_bar_tabified = is_tabified
+                    if is_tabified:
+                        empty = QWidget()
+                        empty._is_suppressor = True
+                        p.setTitleBarWidget(empty)
+                    else:
+                        p.setTitleBarWidget(None)  # restore default draggable title bar
+            except RuntimeError:
+                pass
+
+        # 3. Keep pseudo-tabs in sync for the left/right side docks only
+        for p in [self.left_dock, self.right_dock]:
+            try:
+                p.parent()
+                tb = p.titleBarWidget()
+                if tb and hasattr(tb, 'is_pseudo_tab'):
+                    tb.setVisible(p.isVisible() and not p.isFloating())
             except RuntimeError:
                 pass
 
@@ -428,9 +536,26 @@ class MainWindow(QMainWindow):
             except RuntimeError:
                 pass
 
-    def add_reading_view(self, force_split=False, object_name=None):
-        panel = ReadingViewPanel(self.main_scene, self.main_scene.study_manager)
-        self._add_center_dock("Reading View", panel, object_name=object_name, force_split=force_split)
+    def add_reading_view(self, object_name=None):
+        from src.scene.reader_scene import ReaderScene
+        # Share expensive loaded dictionaries / indexes with secondary scenes
+        shared = {
+            'loader': self.main_scene.loader,
+            'study_manager': self.main_scene.study_manager,
+            'symbol_manager': self.main_scene.symbol_manager,
+            'strongs_manager': self.main_scene.strongs_manager
+        }
+        scene = ReaderScene(self, shared_resources=shared)
+        
+        panel = ReadingViewPanel(scene, self.main_scene.study_manager)
+        dock = self._add_center_dock("Reading View", panel, object_name=object_name)
+        
+        # Connect the new scene to the global study panel
+        # When a scene modifies data (adds a bookmark), it emits studyDataChanged.
+        # study_panel.dataChanged is the global bus that tells all scenes to re-render.
+        scene.studyDataChanged.connect(self.study_panel.dataChanged.emit)
+        scene.studyDataChanged.connect(self.study_panel.refresh)
+        scene.outlineCreated.connect(self.study_panel.set_active_outline)
 
     def add_note_panel(self, note_key, ref, object_name=None):
         # Provide a fallback if opening from empty
@@ -650,7 +775,7 @@ class MainWindow(QMainWindow):
         self._clean_center_panels()
         valid_centers = [p for p in self.center_panels if p.isVisible() and not p.isFloating()]
         if len(valid_centers) < 2:
-            self.add_reading_view(force_split=True)
+            self.add_reading_view()
         self._apply_layout_preset(0.10, 0.10)
 
     def _open_symbols_dialog(self):

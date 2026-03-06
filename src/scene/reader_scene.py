@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGraphicsScene, QMenu
+from PySide6.QtWidgets import QGraphicsScene
 from PySide6.QtCore import Qt, QRectF, QTimer, Signal, QPointF
 from PySide6.QtGui import QColor, QFont, QCursor, QTextCursor, QAction
 
@@ -42,6 +42,7 @@ from src.core.constants import (
 import bisect
 import os
 import time
+from src.utils.menu_utils import create_menu
 
 class ReaderScene(QGraphicsScene):
     """
@@ -61,7 +62,7 @@ class ReaderScene(QGraphicsScene):
     studyDataChanged = Signal()
     outlineCreated = Signal(str) # node_id
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, shared_resources=None):
         super().__init__(parent)
         
         self.scroll_y = 0.0
@@ -80,12 +81,17 @@ class ReaderScene(QGraphicsScene):
         self.last_emitted_ref = ""
         self.sentence_break_enabled = False
         self.target_sentence_break_enabled = False
-        
-        self.loader = VerseLoader()
-        self.study_manager = StudyManager(loader=self.loader)
-        self.symbol_manager = SymbolManager()
-        self.strongs_manager = StrongsManager()
-        self.strongs_manager.index_usages(self.loader)
+        if shared_resources:
+            self.loader = shared_resources.get('loader')
+            self.study_manager = shared_resources.get('study_manager')
+            self.symbol_manager = shared_resources.get('symbol_manager')
+            self.strongs_manager = shared_resources.get('strongs_manager')
+        else:
+            self.loader = VerseLoader()
+            self.study_manager = StudyManager(loader=self.loader)
+            self.symbol_manager = SymbolManager()
+            self.strongs_manager = StrongsManager()
+            self.strongs_manager.index_usages(self.loader)
         
         self.pixmap_cache = {} 
         self.verse_number_items = {} 
@@ -389,7 +395,7 @@ class ReaderScene(QGraphicsScene):
         
         heading_data = self._get_heading_at_pos(event.scenePos())
         if heading_data:
-            menu = QMenu(view); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
+            menu = create_menu(view)
             suggest_act = QAction("Get suggested symbols", menu)
             suggest_act.triggered.connect(lambda: self._show_suggested_symbols_dialog(heading_data))
             menu.addAction(suggest_act); menu.exec(global_pos); event.accept(); return
@@ -450,7 +456,7 @@ class ReaderScene(QGraphicsScene):
     def _on_verse_num_context_menu(self, item, screen_pos):
         if item.ref not in self.selected_refs: self._on_verse_num_clicked(item, False)
         view = self.views()[0]
-        menu = QMenu(view); menu.setStyleSheet("QMenu { background-color: #333; color: white; }")
+        menu = create_menu(view)
         
         marks = [("❤ Heart", "heart"), ("? Question Mark", "question"), ("!! Attention", "attention"), ("★ Star", "star")]
         for label, m_type in marks:

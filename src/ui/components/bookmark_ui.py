@@ -1,9 +1,10 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, 
-    QLabel, QMenu, QColorDialog, QScrollArea, QInputDialog
+    QLabel, QColorDialog, QScrollArea, QInputDialog
 )
 from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QPoint
 from PySide6.QtGui import QColor, QAction
+from src.utils.menu_utils import create_menu
 
 class BookmarkWidget(QFrame):
     clicked = Signal(str, str, str) # book, chap, verse
@@ -87,17 +88,9 @@ class BookmarkWidget(QFrame):
         super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
-        # Ensure sidebar is raised
-        p = self.parent()
-        while p:
-            if isinstance(p, QScrollArea):
-                p.raise_()
-                break
-            p = p.parent()
-
+        # pos is already a global screen position (from event.globalPos())
         self._menu_active = True
-        menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background-color: #333; color: white; border: 1px solid #555; } QMenu::item:selected { background-color: #555; }")
+        menu = create_menu(self)
         
         set_title_act = QAction("Set Title", self)
         set_title_act.triggered.connect(self._set_title)
@@ -111,7 +104,7 @@ class BookmarkWidget(QFrame):
         delete_act.triggered.connect(lambda: self.deleted.emit(self.ref))
         menu.addAction(delete_act)
         
-        menu.exec(self.mapToGlobal(pos))
+        menu.exec(pos)
         self._menu_active = False
         
         # Trigger leave logic if mouse is no longer over the widget

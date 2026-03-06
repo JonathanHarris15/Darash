@@ -1,11 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, 
-    QLabel, QMenu, QColorDialog, QInputDialog, QMessageBox, QStyle,
+    QLabel, QColorDialog, QInputDialog, QMessageBox, QStyle,
     QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon, QCursor
 import os
+from src.utils.menu_utils import create_menu
 from src.ui.components.outline_dialog import OutlineDialog
 from src.ui.components.outline_editor import OutlineEditor
 
@@ -26,10 +27,7 @@ class StudyPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        title = QLabel("STUDY OVERVIEW")
-        title.setStyleSheet("font-weight: bold; color: #aaa; margin-bottom: 5px;")
-        layout.addWidget(title)
-        
+
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(15)
@@ -481,8 +479,7 @@ class StudyPanel(QWidget):
     def _on_context_menu(self, pos):
         selected_items = self.tree.selectedItems()
         if not selected_items: return
-        menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background-color: #333; color: white; } QMenu::item:selected { background-color: #555; }")
+        menu = create_menu(self)
         if len(selected_items) > 1:
             symbol_items = []
             for item in selected_items:
@@ -508,9 +505,9 @@ class StudyPanel(QWidget):
             add_sub_act = QAction("New Sub-folder", self); add_sub_act.triggered.connect(lambda: self._add_folder(f_path)); menu.addAction(add_sub_act)
             menu.addSeparator(); del_folder_act = QAction("Delete Folder", self); del_folder_act.triggered.connect(lambda: self._delete_folder(f_path)); menu.addAction(del_folder_act)
         elif itype == "mark":
-            idx = item.data(0, Qt.UserRole + 2)
-            color_act = QAction("Change Color", self); color_act.triggered.connect(lambda: self._change_mark_color(idx)); menu.addAction(color_act)
-            del_act = QAction("Delete Mark", self); del_act.triggered.connect(lambda: self._delete_mark(idx)); menu.addAction(del_act)
+            mark_data = item.data(0, Qt.UserRole + 1)
+            color_act = QAction("Change Color", self); color_act.triggered.connect(lambda: self._change_mark_color_by_data(mark_data)); menu.addAction(color_act)
+            del_act = QAction("Delete Mark", self); del_act.triggered.connect(lambda: self._delete_mark(mark_data)); menu.addAction(del_act)
         elif itype == "mark_group":
             indices = item.data(0, Qt.UserRole + 1)
             color_act = QAction("Change Group Color", self); color_act.triggered.connect(lambda: self._change_group_color(indices)); menu.addAction(color_act)
@@ -524,7 +521,7 @@ class StudyPanel(QWidget):
                 if len(parts) >= 3:
                     go_act = QAction("Go to Reference", self); go_act.triggered.connect(lambda: self.jumpRequested.emit(parts[0], parts[1], parts[2])); menu.addAction(go_act)
             open_act = QAction("Open Note Editor", self); open_act.triggered.connect(lambda: self._open_note(key)); menu.addAction(open_act)
-            move_menu = QMenu("Move to Folder", self); move_menu.setStyleSheet("QMenu { background-color: #333; color: white; } QMenu::item:selected { background-color: #555; }")
+            move_menu = create_menu(self, "Move to Folder")
             root_act = QAction("(Notes Root)", self); root_act.triggered.connect(lambda: self._move_note(key, "")); move_menu.addAction(root_act)
             for f_path in sorted(self.study_manager.data.get("note_folders", [])):
                 f_act = QAction(f_path, self); f_act.triggered.connect(lambda checked=False, p=f_path: self._move_note(key, p)); move_menu.addAction(f_act)
@@ -550,8 +547,22 @@ class StudyPanel(QWidget):
         if color.isValid():
             self.study_manager.save_state(); self.study_manager.data["marks"][idx]["color"] = color.name(); self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
 
-    def _delete_mark(self, idx):
-        self.study_manager.save_state(); self.study_manager.data["marks"].pop(idx); self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+    def _change_mark_color_by_data(self, mark_data):
+        color = QColorDialog.getColor(Qt.yellow, self, "Select Mark Color")
+        if color.isValid():
+            self.study_manager.save_state()
+            mark_data["color"] = color.name()
+            self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+
+    def _delete_mark(self, mark_data):
+        """Delete a single mark by object identity, not by index (index may be stale)."""
+        self.study_manager.save_state()
+        marks = self.study_manager.data["marks"]
+        for i, m in enumerate(marks):
+            if m is mark_data:
+                marks.pop(i)
+                break
+        self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
 
     def _change_group_color(self, indices):
         color = QColorDialog.getColor(Qt.yellow, self, "Select Group Color")
@@ -642,8 +653,11 @@ class StudyPanel(QWidget):
             else: expanded_selected.append(item)
         for item in expanded_selected:
             itype = item.data(0, Qt.UserRole)
-            if itype == "mark": to_del["marks"].append(item.data(0, Qt.UserRole + 2))
-            elif itype == "mark_group": to_del["marks"].extend(item.data(0, Qt.UserRole + 1))
+            if itype == "mark": to_del["marks"].append(item.data(0, Qt.UserRole + 1))
+            elif itype == "mark_group":
+                all_marks = self.study_manager.data["marks"]
+                for idx in item.data(0, Qt.UserRole + 1):
+                    if idx < len(all_marks): to_del["marks"].append(all_marks[idx])
             elif itype == "symbol": to_del["symbols"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "note": to_del["notes"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "note_folder": to_del["note_folders"].append(item.data(0, Qt.UserRole + 1))
@@ -653,7 +667,8 @@ class StudyPanel(QWidget):
             elif itype == "logical_mark": to_del["logical_marks"].append(item.data(0, Qt.UserRole + 1))
             elif itype == "outline": to_del["outlines"].append(item.data(0, Qt.UserRole + 1))
         if to_del["marks"]:
-            for idx in sorted(list(set(to_del["marks"])), reverse=True): self.study_manager.data["marks"].pop(idx)
+            marks_to_remove = set(id(m) for m in to_del["marks"])
+            self.study_manager.data["marks"] = [m for m in self.study_manager.data["marks"] if id(m) not in marks_to_remove]
         for key in to_del["symbols"]:
             if key in self.study_manager.data["symbols"]: del self.study_manager.data["symbols"][key]
         for key in to_del["logical_marks"]:

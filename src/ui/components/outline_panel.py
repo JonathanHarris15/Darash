@@ -323,11 +323,8 @@ class OutlinePanel(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(4)
         
-        # 1. Header with Title and Formatting Options
+        # 1. Header with Formatting Options
         header_layout = QHBoxLayout()
-        title_lbl = QLabel("OUTLINE EDITOR")
-        title_lbl.setStyleSheet("font-weight: bold; color: #aaa; letter-spacing: 1px; font-size: 10px;")
-        header_layout.addWidget(title_lbl)
         header_layout.addStretch()
         
         self.ref_format_combo = QComboBox()

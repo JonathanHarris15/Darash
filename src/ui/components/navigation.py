@@ -25,11 +25,8 @@ class NavigationDock(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        # Header with Title and Strongs Toggle
+        # Header with Toggle buttons
         header_layout = QHBoxLayout()
-        title = QLabel("BIBLE NAVIGATION")
-        title.setStyleSheet("font-weight: bold; color: #aaa;")
-        header_layout.addWidget(title)
         header_layout.addStretch()
         
         self.btn_strongs = QPushButton("א") # Aleph

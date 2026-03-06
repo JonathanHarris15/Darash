@@ -26,6 +26,11 @@ class SceneOverlayManager:
         self._render_symbols_layer()
         self._render_notes_layer()
         self._render_arrows_layer()
+        
+        # Force a full repaint of the visible scene area. Qt only invalidates
+        # per-item bounding rects when removeItem() is called, which can leave
+        # ghost pixels from semi-transparent (alpha) fills and anti-aliased edges.
+        scene.update(scene.sceneRect())
 
     def _render_marks_layer(self):
         scene = self.scene

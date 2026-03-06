@@ -63,16 +63,16 @@ def test_reading_focus_preset(window):
     assert getattr(window, "_right_dock_pct") == pytest.approx(0.0, abs=0.40)
 
 def test_study_focus_preset(window):
-    """Test study focus adds a second reading panel and applies 10/40/40/10 split."""
-    # Originally there is 1 reading panel
+    """Test that a second reading panel can be added and both panels are visible."""
     initial_center_count = len([p for p in window.center_panels if p.isVisible() and not p.isFloating()])
-    
-    window._apply_study_focus_preset()
-    
-    final_center_count = len([p for p in window.center_panels if p.isVisible() and not p.isFloating()])
-    
+
+    # Open a second reading view (tabifies by default; user would drag to split)
+    window.add_reading_view()
+
     QApplication.processEvents()
-    
+
+    final_center_count = len([p for p in window.center_panels if p.isVisible() and not p.isFloating()])
+
     assert getattr(window, "_left_dock_pct") == pytest.approx(0.10, abs=0.40)
     assert getattr(window, "_right_dock_pct") == pytest.approx(0.10, abs=0.40)
     assert final_center_count >= max(2, initial_center_count)
