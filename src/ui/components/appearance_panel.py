@@ -200,3 +200,4 @@ class AppearancePanel(QDialog):
 
     def apply_changes(self):
         self.scene.apply_layout_changes()
+        self.settingsChanged.emit()

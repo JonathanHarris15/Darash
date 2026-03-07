@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         
         # Appearance Dialog (Standalone window)
         self.appearance_dialog = AppearancePanel(self.main_scene, self)
+        self.appearance_dialog.settingsChanged.connect(self._broadcast_appearance_settings)
         
         # Menu Bar
         self.setup_menu()
@@ -398,6 +399,38 @@ class MainWindow(QMainWindow):
         
         self.main_scene.studyDataChanged.connect(self.study_panel.refresh)
         self.main_scene.outlineCreated.connect(self.study_panel.set_active_outline)
+        self.main_scene.noteOpenRequested.connect(self.add_note_panel)
+
+    def _broadcast_appearance_settings(self):
+        """Copy all appearance settings from main_scene to every secondary reading view."""
+        src = self.main_scene
+        for p in self.center_panels:
+            try:
+                p.parent()
+                widget = p.widget()
+                if not isinstance(widget, ReadingViewPanel):
+                    continue
+                scene = widget.reader_widget.scene
+                if scene is src:
+                    continue
+                # Copy target values
+                scene.target_font_size = src.target_font_size
+                scene.target_font_family = src.target_font_family
+                scene.target_line_spacing = src.target_line_spacing
+                scene.target_verse_num_size = src.target_verse_num_size
+                scene.target_side_margin = src.target_side_margin
+                scene.target_tab_size = src.target_tab_size
+                scene.target_arrow_opacity = src.target_arrow_opacity
+                scene.target_verse_mark_size = src.target_verse_mark_size
+                scene.target_logical_mark_opacity = src.target_logical_mark_opacity
+                scene.target_sentence_break_enabled = src.target_sentence_break_enabled
+                scene.text_color = src.text_color
+                scene.ref_color = src.ref_color
+                scene.logical_mark_color = src.logical_mark_color
+                scene.setBackgroundBrush(src.backgroundBrush())
+                scene.apply_layout_changes()
+            except RuntimeError:
+                pass
 
     def _render_all_study_data(self):
         """Broadcast study panel data changes to all active reading scenes."""
@@ -635,6 +668,7 @@ class MainWindow(QMainWindow):
         scene.studyDataChanged.connect(self.study_panel.dataChanged.emit)
         scene.studyDataChanged.connect(self.study_panel.refresh)
         scene.outlineCreated.connect(self.study_panel.set_active_outline)
+        scene.noteOpenRequested.connect(self.add_note_panel)
 
     def add_note_panel(self, note_key, ref, object_name=None):
         # Provide a fallback if opening from empty
@@ -654,30 +688,77 @@ class MainWindow(QMainWindow):
         
         dock = self._add_center_dock(f"Note - {ref}", editor, object_name=object_name)
         
-        editor.jumpRequested.connect(self._broadcast_jump)
+        editor.jumpRequested.connect(lambda book, ch, vs: self._handle_note_jump(book, ch, vs, dock))
+        editor.noteSaved.connect(lambda html: self._on_note_saved(note_key, editor))
         editor.finished.connect(lambda result: self._on_note_editor_finished(result, editor, note_key, dock))
+
+    def _handle_note_jump(self, book, chapter, verse, note_dock):
+        """Smart link navigation from inside a Note panel.
+
+        - No reading view open → open one and jump there.
+        - Reading view already split alongside note → just jump.
+        - Reading view exists but is tabbed/hidden → raise it to front then jump.
+        """
+        self._clean_center_panels()
+        reading_docks = []
+        for p in self.center_panels:
+            try:
+                p.parent()
+                if p is note_dock:
+                    continue
+                if isinstance(p.widget(), ReadingViewPanel):
+                    reading_docks.append(p)
+            except RuntimeError:
+                pass
+
+        if not reading_docks:
+            # No reading view — open one then jump
+            self.add_reading_view()
+            self._broadcast_jump(book, chapter, verse)
+            return
+
+        # Check if note is the ONLY visible non-tabbed panel (fullscreen-ish)
+        note_siblings = []
+        try:
+            note_siblings = self.center_workspace.tabifiedDockWidgets(note_dock)
+        except RuntimeError:
+            pass
+
+        reading_dock = reading_docks[0]
+        # Raise the reading view if it's tabbed or hidden
+        try:
+            reading_dock.show()
+            reading_dock.raise_()
+        except RuntimeError:
+            pass
+
+        self._broadcast_jump(book, chapter, verse)
+
+    def _on_note_saved(self, note_key, editor):
+        """Persist the note without closing the panel."""
+        if note_key.startswith("standalone_"):
+            self.main_scene.study_manager.data["notes"].setdefault(note_key, {})
+            self.main_scene.study_manager.data["notes"][note_key]["title"] = editor.get_title()
+            self.main_scene.study_manager.data["notes"][note_key]["text"] = editor.get_text()
+            self.main_scene.study_manager.save_study()
+        else:
+            ref_parts = note_key.split('|')
+            if len(ref_parts) >= 4:
+                self.main_scene.study_manager.add_note(
+                    ref_parts[0], ref_parts[1], ref_parts[2], int(ref_parts[3]),
+                    editor.get_text(), editor.get_title()
+                )
+        self.main_scene._render_study_overlays()
+        self.main_scene.studyDataChanged.emit()
+        self.study_panel.refresh()
 
     def _on_note_editor_finished(self, result, editor, note_key, dock):
         from PySide6.QtWidgets import QDialog
-        if result == QDialog.Accepted:
-            if note_key.startswith("standalone_"):
-                self.main_scene.study_manager.data["notes"].setdefault(note_key, {})
-                self.main_scene.study_manager.data["notes"][note_key]["title"] = editor.get_title()
-                self.main_scene.study_manager.data["notes"][note_key]["text"] = editor.get_text()
-                self.main_scene.study_manager.save_study()
-            else:
-                ref_parts = note_key.split('|')
-                if len(ref_parts) >= 4:
-                    self.main_scene.study_manager.add_note(ref_parts[0], ref_parts[1], ref_parts[2], int(ref_parts[3]), 
-                                               editor.get_text(), editor.get_title())
-            self.main_scene._render_study_overlays()
-            self.main_scene.studyDataChanged.emit()
-        elif result == NoteEditor.DELETE_CODE:
+        if result == NoteEditor.DELETE_CODE:
             self.main_scene.study_manager.delete_note(note_key)
             self.main_scene._render_study_overlays()
             self.main_scene.studyDataChanged.emit()
-            
-        dock.close()
+            dock.close()
 
     def add_outline_panel(self, outline_id, object_name=None, is_restoring=False):
         if not outline_id:

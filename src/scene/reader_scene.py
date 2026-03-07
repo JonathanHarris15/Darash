@@ -61,6 +61,7 @@ class ReaderScene(QGraphicsScene):
     bookmarksUpdated = Signal()
     studyDataChanged = Signal()
     outlineCreated = Signal(str) # node_id
+    noteOpenRequested = Signal(str, str) # note_key, ref
 
     def __init__(self, parent=None, shared_resources=None):
         super().__init__(parent)
@@ -355,16 +356,8 @@ class ReaderScene(QGraphicsScene):
         return pix_item
 
     def open_note_by_key(self, note_key, ref):
-        if note_key in self.open_editors:
-            self.open_editors[note_key].activateWindow(); self.open_editors[note_key].raise_(); return
-        note_data = self.study_manager.data["notes"].get(note_key, "")
-        existing_text = note_data.get("text", "") if isinstance(note_data, dict) else note_data
-        existing_title = note_data.get("title", "") if isinstance(note_data, dict) else ""
-        editor = NoteEditor(existing_text, ref, initial_title=existing_title)
-        editor.jumpRequested.connect(self.jump_to)
-        self.open_editors[note_key] = editor
-        editor.finished.connect(lambda result: self._on_note_editor_finished(result, editor, note_key))
-        editor.show()
+        """Emit signal so MainWindow can open the note in the center dock."""
+        self.noteOpenRequested.emit(note_key, ref)
 
     def _on_note_editor_finished(self, result, editor, note_key):
         from PySide6.QtWidgets import QDialog
