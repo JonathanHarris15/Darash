@@ -94,6 +94,16 @@ class VerseLoader:
             text = text.replace(f" {char}", char)
         return text
 
+    def _normalize_book_name(self, name: str) -> str:
+        name = name.strip()
+        if name.startswith("1 "): name = "I " + name[2:]
+        elif name.startswith("2 "): name = "II " + name[2:]
+        elif name.startswith("3 "): name = "III " + name[2:]
+        elif name.startswith("First "): name = "I " + name[6:]
+        elif name.startswith("Second "): name = "II " + name[7:]
+        elif name.startswith("Third "): name = "III " + name[6:]
+        return name
+
     def load_translation(self, translation_id: str) -> bool:
         """Loads a translation into the cache if not already present."""
         if translation_id in self.translation_cache:
@@ -121,7 +131,7 @@ class VerseLoader:
             
             trans_data = {}
             for book_elem in root.findall('b'):
-                book_name = book_elem.get('n')
+                book_name = self._normalize_book_name(book_elem.get('n', ''))
                 trans_data[book_name] = {}
                 for chap_elem in book_elem.findall('c'):
                     chap_num = chap_elem.get('n')
@@ -153,7 +163,8 @@ class VerseLoader:
             
             trans_data = {}
             books_data = raw_data.get('books', {})
-            for book_name, chapters in books_data.items():
+            for raw_book_name, chapters in books_data.items():
+                book_name = self._normalize_book_name(raw_book_name)
                 trans_data[book_name] = {}
                 for chap_idx, verses in enumerate(chapters):
                     chap_num = str(chap_idx + 1)

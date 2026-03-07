@@ -195,6 +195,11 @@ class LayoutEngine:
         for i, verse in enumerate(chunk_verses):
             ref = verse['ref']
             
+            if ref not in scene.verse_pos_map:
+                y_top = 0.0 if i == 0 else scene.verse_y_map.get(chunk_verses[i-1]['ref'], (0.0, 0.0))[1]
+                scene.verse_y_map[ref] = (y_top, y_top)
+                continue
+
             if scene.sentence_break_enabled:
                 # Iterate through all sentences of this verse
                 s_idx = 0

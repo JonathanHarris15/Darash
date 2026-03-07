@@ -85,5 +85,13 @@ class TestVerseLoader(unittest.TestCase):
         verse_invalid = loader.get_verse("Genesis", 2, 1)
         self.assertIsNone(verse_invalid)
 
+    def test_normalize_book_name(self):
+        loader = VerseLoader(json_path=self.temp_file.name)
+        self.assertEqual(loader._normalize_book_name("1 Samuel"), "I Samuel")
+        self.assertEqual(loader._normalize_book_name("2 Kings"), "II Kings")
+        self.assertEqual(loader._normalize_book_name("3 John"), "III John")
+        self.assertEqual(loader._normalize_book_name("First Peter"), "I Peter")
+        self.assertEqual(loader._normalize_book_name("Genesis"), "Genesis")
+
 if __name__ == '__main__':
     unittest.main()
