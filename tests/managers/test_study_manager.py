@@ -22,19 +22,15 @@ class TestStudyManager(unittest.TestCase):
         self.assertIsNotNone(self.manager.data)
         self.assertIn("symbols", self.manager.data)
         self.assertIn("marks", self.manager.data)
-        self.assertEqual(self.manager.current_study_name, "default_study")
 
-    def test_load_and_save_study(self):
-        self.manager.load_study("test_study")
-        self.assertEqual(self.manager.current_study_name, "test_study")
-        
+    def test_load_and_save_data(self):
         # Modify data and save
         self.manager.data["symbols"]["test_key"] = "test_symbol"
-        self.manager.save_study()
+        self.manager.save_data()
         
         # Load in a new manager
         new_manager = StudyManager(loader=self.mock_loader, base_dir=self.base_dir)
-        new_manager.load_study("test_study")
+        new_manager.load_data()
         
         self.assertIn("test_key", new_manager.data["symbols"])
         self.assertEqual(new_manager.data["symbols"]["test_key"], "test_symbol")

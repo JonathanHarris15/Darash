@@ -50,14 +50,30 @@ class SceneIndentationManager:
                 
                 scene.study_manager.data["verse_indent"][ref] = new_indent
                 
+                # Update visual block format
                 if ref in scene.verse_pos_map:
+                    # We need to update the indentation for ALL blocks belonging to this verse/sentence.
+                    # This includes secondary translation blocks that follow the primary.
                     pos = scene.verse_pos_map[ref]
                     block = doc.findBlock(pos)
-                    fmt = block.blockFormat()
-                    fmt.setLeftMargin(new_indent * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
                     
-                    cursor = QTextCursor(block)
-                    cursor.setBlockFormat(fmt)
+                    while block.isValid():
+                        fmt = block.blockFormat()
+                        fmt.setLeftMargin(new_indent * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
+                        
+                        cursor = QTextCursor(block)
+                        cursor.setBlockFormat(fmt)
+                        
+                        # Move to next block. 
+                        # Stop if we hit a block that belongs to the NEXT verse or sentence.
+                        block = block.next()
+                        if not block.isValid(): break
+                        
+                        # If the next block has its OWN mapping in verse_pos_map, 
+                        # it's a separate entity (next sentence or next verse), so stop.
+                        next_pos = block.position()
+                        is_mapped = any(p == next_pos for p in scene.verse_pos_map.values())
+                        if is_mapped: break
 
             # Targeted update: only update positions of items actually moved
             # Instead of updating EVERYTHING, we update the target items
@@ -86,7 +102,7 @@ class SceneIndentationManager:
 
     def on_verse_num_released(self):
         scene = self.scene
-        scene.study_manager.save_study()
+        scene.study_manager.save_data()
         
         if hasattr(scene, "_last_drag_tabs_diff"):
             del scene._last_drag_tabs_diff

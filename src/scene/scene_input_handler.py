@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QPointF, QObject, QTimer
 from PySide6.QtGui import QColor, QCursor, QTextCursor, QGuiApplication
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QMenu
 from src.scene.components.reader_items import ArrowItem, OutlineDividerItem
 
 class SceneInputHandler(QObject):
@@ -15,10 +15,8 @@ class SceneInputHandler(QObject):
         self._last_drag_tabs_diff = 0
         self._drag_start_indents = {}
         self.d_key_pressed = False
-        
-        # Arrow State
-        self.is_drawing_snake_arrow = False
-        
+        self._last_hovered_word_key = None
+
         # Strongs Hover State
         self.strongs_hover_timer = QTimer(self)
         self.strongs_hover_timer.setSingleShot(True)
@@ -49,11 +47,6 @@ class SceneInputHandler(QObject):
             self._start_arrow_drawing()
             return True
 
-        if key == Qt.Key_S and not self.is_drawing_snake_arrow and not event.isAutoRepeat():
-            self.is_drawing_snake_arrow = True
-            self._start_arrow_drawing()
-            return True
-
         if key == Qt.Key_Q:
             self._handle_strongs_lookup()
             return True
@@ -74,9 +67,6 @@ class SceneInputHandler(QObject):
     def handle_key_release(self, event):
         scene = self.scene
         if event.key() == Qt.Key_A and scene.is_drawing_arrow and not event.isAutoRepeat():
-            self._finish_arrow_drawing()
-            return True
-        if event.key() == Qt.Key_S and self.is_drawing_snake_arrow and not event.isAutoRepeat():
             self._finish_arrow_drawing()
             return True
         if event.key() == Qt.Key_D and not event.isAutoRepeat():
@@ -141,6 +131,14 @@ class SceneInputHandler(QObject):
         scene = self.scene
         if scene.is_drawing_arrow:
             self._draw_temp_arrow(event.scenePos())
+            
+        key_at_pos = scene._get_word_key_at_pos(event.scenePos())
+        if key_at_pos != self._last_hovered_word_key:
+            self._last_hovered_word_key = key_at_pos
+            if key_at_pos:
+                scene.overlay_manager.on_word_hover(key_at_pos)
+            else:
+                scene.overlay_manager.on_word_hover_leave()
         
         if scene.strongs_enabled:
             sn_str, _ = scene._get_strongs_at_pos(event.scenePos())
@@ -198,15 +196,35 @@ class SceneInputHandler(QObject):
         if key_str in scene.study_manager.data["symbols"]:
             del scene.study_manager.data["symbols"][key_str]
             modified = True
-        if key_str in scene.study_manager.data.get("arrows", {}):
-            del scene.study_manager.data["arrows"][key_str]
+
+        # Arrow deletion: handle both start-key and end-key (ghost arrows)
+        arrows = scene.study_manager.data.get("arrows", {})
+        if key_str in arrows:
+            del arrows[key_str]
             modified = True
+        else:
+            # Search for ghost arrows where this word is the end_key
+            start_keys_to_remove = []
+            for s_key, arrow_list in arrows.items():
+                new_list = [
+                    a for a in arrow_list
+                    if not (a.get('end_key') == key_str and a.get('type') == 'ghost')
+                ]
+                if len(new_list) < len(arrow_list):
+                    modified = True
+                    if new_list:
+                        arrows[s_key] = new_list
+                    else:
+                        start_keys_to_remove.append(s_key)
+            for sk in start_keys_to_remove:
+                del arrows[sk]
+
         if "logical_marks" in scene.study_manager.data and key_str in scene.study_manager.data["logical_marks"]:
             del scene.study_manager.data["logical_marks"][key_str]
             modified = True
             
         if modified:
-            scene.study_manager.save_study()
+            scene.study_manager.save_data()
             scene._render_study_overlays()
             scene.studyDataChanged.emit()
 
@@ -225,18 +243,58 @@ class SceneInputHandler(QObject):
         scene = self.scene
         mouse_pos = scene.last_mouse_scene_pos
         end_key = scene._get_word_key_at_pos(mouse_pos)
+        start_key = scene.arrow_start_key
+
+        if not end_key or end_key == start_key:
+            scene.is_drawing_arrow = False
+            scene.arrow_start_key = None
+            scene.arrow_start_center = None
+            self._clear_temp_arrow()
+            scene._render_study_overlays()
+            scene.studyDataChanged.emit()
+            return
+
+        # Show type-selection menu at the current cursor position
+        view = scene.views()[0]
+        screen_pos = view.viewport().mapToGlobal(
+            view.mapFromScene(mouse_pos)
+        )
         
-        if end_key and end_key != scene.arrow_start_key:
-            color = QColor("white")
-            color.setAlphaF(0.6)
-            arrow_type = "snake" if self.is_drawing_snake_arrow else "straight"
-            scene.study_manager.add_arrow(scene.arrow_start_key, end_key, color.name(QColor.HexArgb), arrow_type=arrow_type)
-        
+        from src.utils.menu_utils import create_menu
+        menu = create_menu(view, "Arrow Type")
+        act_standard = menu.addAction("Standard")
+        act_snake    = menu.addAction("Snake")
+        act_ghost    = menu.addAction("Ghost")
+
+        chosen = menu.exec(screen_pos)
+
+        # Now clean up drawing state
         scene.is_drawing_arrow = False
-        self.is_drawing_snake_arrow = False
         scene.arrow_start_key = None
         scene.arrow_start_center = None
         self._clear_temp_arrow()
+
+        if chosen is None:
+            # User dismissed — no arrow created
+            scene._render_study_overlays()
+            scene.studyDataChanged.emit()
+            return
+
+        color = QColor("white")
+        color.setAlphaF(0.6)
+
+        if chosen == act_standard:
+            arrow_type = "straight"
+        elif chosen == act_snake:
+            arrow_type = "snake"
+        else:
+            arrow_type = "ghost"
+
+        scene.study_manager.add_arrow(
+            start_key, end_key,
+            color.name(QColor.HexArgb),
+            arrow_type=arrow_type
+        )
         scene._render_study_overlays()
         scene.studyDataChanged.emit()
 

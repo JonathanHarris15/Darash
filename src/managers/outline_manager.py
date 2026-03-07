@@ -12,7 +12,7 @@ class OutlineManager:
         # Ensure outlines exist in study data
         if "outlines" not in self.study_manager.data:
             self.study_manager.data["outlines"] = []
-            self.study_manager.save_study()
+            self.study_manager.save_data()
 
     def get_outlines(self) -> List[Dict]:
         return self.study_manager.data.get("outlines", [])
@@ -49,7 +49,7 @@ class OutlineManager:
             new_outline["split_levels"] = [1]
 
         self.study_manager.data["outlines"].append(new_outline)
-        self.study_manager.save_study()
+        self.study_manager.save_data()
         return new_outline
 
     def _calculate_range_split(self, start_ref, end_ref):
@@ -115,7 +115,7 @@ class OutlineManager:
                 parent["split_levels"].append(new_split_level)
             
             # Sort children by range? (Optional but helpful)
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return new_section
         return None
 
@@ -127,7 +127,7 @@ class OutlineManager:
             if summary is not None: node["summary"] = summary
             if range_start: node["range"]["start"] = range_start
             if range_end: node["range"]["end"] = range_end
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return True
         return False
 
@@ -138,12 +138,12 @@ class OutlineManager:
         for i, outline in enumerate(outlines):
             if outline["id"] == node_id:
                 outlines.pop(i)
-                self.study_manager.save_study()
+                self.study_manager.save_data()
                 return True
         
         # Check children
         if self._delete_node_recursive(outlines, node_id):
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return True
         return False
 
@@ -200,7 +200,7 @@ class OutlineManager:
                     if "split_levels" in parent and len(parent["split_levels"]) > 0:
                         parent["split_levels"].pop(0)
                         
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return True
         return False
 
@@ -245,7 +245,7 @@ class OutlineManager:
                 if "split_levels" in parent:
                     parent["split_levels"] = []
 
-        self.study_manager.save_study()
+        self.study_manager.save_data()
         return True
 
     def _find_parent_and_index(self, nodes, target_id):
@@ -341,7 +341,7 @@ class OutlineManager:
             
             parent["split_levels"].insert(idx, new_level)
             
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return parent # Return parent to trigger refresh
             
         else:
@@ -353,7 +353,7 @@ class OutlineManager:
             new_split_level = parent_level + 1
             innermost["split_levels"] = [new_split_level]
             
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return innermost
 
     def cycle_level(self, ref_before: str, ref_after: str, forward: bool, loader):
@@ -373,7 +373,7 @@ class OutlineManager:
                 new_level = max(0, current_level - 1)
             
             node["split_levels"][split_idx] = new_level
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return True
         return False
 
@@ -471,7 +471,7 @@ class OutlineManager:
             else:
                 return False
 
-        self.study_manager.save_study()
+        self.study_manager.save_data()
         return True
 
     def move_split_by_id(self, parent_id: str, split_idx: int, new_ref_before: str, new_ref_after: str, loader):
@@ -496,7 +496,7 @@ class OutlineManager:
                 self._propagate_end_change(c1, new_ref_before)
                 self._propagate_start_change(c2, new_ref_after)
                 
-                self.study_manager.save_study()
+                self.study_manager.save_data()
                 return True
         return False
 
@@ -637,7 +637,7 @@ class OutlineManager:
 
         apply_shift(root)
         if changed:
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             return True
         return False
 
@@ -655,7 +655,7 @@ class OutlineManager:
             # Propagate to last child recursively
             self._propagate_end_change(node, new_ref)
             
-        self.study_manager.save_study()
+        self.study_manager.save_data()
         return True
 
     def _propagate_start_change(self, node: Dict, new_start: str):

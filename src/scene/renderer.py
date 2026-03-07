@@ -2,11 +2,12 @@ import bisect
 from PySide6.QtGui import QPen, QColor, QBrush
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem
-from src.scene.components.reader_items import VerseNumberItem, OutlineDividerItem, SentenceHandleItem
+from src.scene.components.reader_items import VerseNumberItem, OutlineDividerItem, SentenceHandleItem, TranslationIndicatorItem
 
 class OverlayRenderer:
     def __init__(self, scene):
         self.scene = scene
+        self.translation_indicator_items = [] # Track indicators for cleanup
 
     def render_verses(self):
         scene = self.scene
@@ -22,11 +23,55 @@ class OverlayRenderer:
         
         self._render_visible_verse_numbers()
         
+        active_translations = [scene.primary_translation] + scene.enabled_interlinear
+        if len(active_translations) > 1:
+            self._render_interlinear_dividers()
+        else:
+            # Clear them if they exist
+            if hasattr(scene, "interlinear_divider_items"):
+                for it in scene.interlinear_divider_items:
+                    scene.removeItem(it)
+                scene.interlinear_divider_items.clear()
+            
         if scene.strongs_enabled:
             self._render_strongs_overlays()
             
         if scene.outlines_enabled or scene.active_outline_id:
             self._render_outline_overlays()
+
+    def _render_interlinear_dividers(self):
+        scene = self.scene
+        if not hasattr(scene, "interlinear_divider_items"):
+            scene.interlinear_divider_items = []
+            
+        for it in scene.interlinear_divider_items:
+            scene.removeItem(it)
+        scene.interlinear_divider_items.clear()
+        
+        # Less faint, slightly thicker line
+        pen = QPen(QColor(100, 100, 100, 150), 1.0) 
+        
+        # Draw line at the bottom of each verse's stack in the visible chunk
+        for i in range(scene.chunk_start_idx, scene.chunk_end_idx):
+            verse = scene.loader.flat_verses[i]
+            ref = verse['ref']
+            if ref not in scene.verse_y_map: continue
+            
+            y_top, y_bottom = scene.verse_y_map[ref]
+            
+            # Don't draw divider for the last verse in the chunk
+            if i == scene.chunk_end_idx - 1: continue
+            
+            # Position it exactly between verses
+            line_y = y_bottom + (scene.font_size * 0.25) # Centered in the large margin
+            
+            line = QGraphicsLineItem(scene.side_margin, line_y, scene.last_width - scene.side_margin, line_y)
+            line.setPen(pen)
+            line.setZValue(-2)
+            line.setAcceptedMouseButtons(Qt.NoButton)
+            line.setVisible(scene._is_rect_visible(line.boundingRect()))
+            scene.addItem(line)
+            scene.interlinear_divider_items.append(line)
 
     def _render_visible_verse_numbers(self):
         scene = self.scene
@@ -51,6 +96,13 @@ class OverlayRenderer:
         verse_indents = scene.study_manager.data.get("verse_indent", {})
         verse_marks = scene.study_manager.data.get("verse_marks", {})
         
+        # Clear old indicators
+        for it in self.translation_indicator_items:
+            scene.removeItem(it)
+        self.translation_indicator_items.clear()
+        
+        active_translations = [scene.primary_translation] + scene.enabled_interlinear
+
         for i in range(start_idx, end_idx):
             char_pos, ref = scene.pos_verse_map[i]
             visible_refs.add(ref)
@@ -92,6 +144,52 @@ class OverlayRenderer:
                     it.is_selected = is_selected
                     it.is_search_result = is_search
                     it.update()
+            
+            # --- Render Translation Labels if multiple translations active ---
+            if len(active_translations) > 1:
+                # Primary translation label
+                block = doc.findBlock(scene.verse_pos_map[ref])
+                rect = layout.blockBoundingRect(block)
+                indent = verse_indents.get(ref + "|0" if scene.sentence_break_enabled else ref, verse_indents.get(ref, 0))
+                
+                # Calculate the exact baseline of the first line of the block
+                block_layout = block.layout()
+                baseline_y = rect.top()
+                if block_layout.lineCount() > 0:
+                    first_line = block_layout.lineAt(0)
+                    baseline_y += first_line.y() + first_line.ascent()
+                else:
+                    baseline_y += scene.font_size
+                    
+                p_label = TranslationIndicatorItem(scene.primary_translation, scene, scene.ref_color)
+                p_label.setPos(scene.side_margin + (indent * scene.tab_size) + 28, baseline_y)
+                scene.addItem(p_label)
+                self.translation_indicator_items.append(p_label)
+                
+                # Secondary translation labels
+                curr_block = block.next()
+                if scene.sentence_break_enabled:
+                    s_idx = 1
+                    while f"{ref}|{s_idx}" in scene.verse_pos_map:
+                        curr_block = curr_block.next()
+                        s_idx += 1
+                
+                for tid in scene.enabled_interlinear:
+                    if curr_block.isValid():
+                        t_rect = layout.blockBoundingRect(curr_block)
+                        t_block_layout = curr_block.layout()
+                        t_baseline_y = t_rect.top()
+                        if t_block_layout.lineCount() > 0:
+                            t_first_line = t_block_layout.lineAt(0)
+                            t_baseline_y += t_first_line.y() + t_first_line.ascent()
+                        else:
+                            t_baseline_y += scene.font_size
+                            
+                        t_label = TranslationIndicatorItem(tid, scene, QColor(120, 120, 120))
+                        t_label.setPos(scene.side_margin + (indent * scene.tab_size) + 28, t_baseline_y)
+                        scene.addItem(t_label)
+                        self.translation_indicator_items.append(t_label)
+                        curr_block = curr_block.next()
                 
             # Handle additional sentence handles for indentation
             if scene.sentence_break_enabled:

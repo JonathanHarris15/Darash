@@ -172,7 +172,86 @@ class SnakeArrowItem(QGraphicsPathItem):
         painter.setBrush(QBrush(self.color))
         painter.drawPath(self.head_path)
 
+class GhostArrowIconItem(QGraphicsObject):
+    """
+    A small icon placed at the top-right corner of a word that is part of a
+    ghost arrow connection. Invisible arrows; interactions happen via hover.
+    """
+    SIZE = 9  # icon diameter in pixels
+
+    def __init__(self, word_rect, own_key, partner_key, ghost_manager, parent=None):
+        super().__init__(parent)
+        self.word_rect = word_rect          # QRectF of the linked word
+        self.own_key = own_key
+        self.partner_key = partner_key
+        self.ghost_manager = ghost_manager  # SceneOverlayManager
+        self._hovered = False
+        self.setZValue(25)
+        self.setAcceptedMouseButtons(Qt.NoButton)
+        # Position at top-right corner of the word
+        self.setPos(word_rect.right() - self.SIZE / 2,
+                    word_rect.top() - self.SIZE / 2)
+
+    def boundingRect(self):
+        return QRectF(0, 0, self.SIZE, self.SIZE)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+        # Outer circle
+        alpha = 230 if self._hovered else 160
+        color = QColor(180, 220, 255, alpha)
+        painter.setPen(QPen(QColor(100, 170, 255, alpha), 1.2))
+        painter.setBrush(QBrush(color))
+        r = self.SIZE
+        painter.drawEllipse(0, 0, r, r)
+        # Inner cross (⊗-like)
+        painter.setPen(QPen(QColor(40, 80, 140, alpha), 1.0))
+        mid = r / 2
+        margin = 2.5
+        painter.drawLine(QPointF(mid, margin), QPointF(mid, r - margin))
+        painter.drawLine(QPointF(margin, mid), QPointF(r - margin, mid))
+
+    def set_hovered(self, hovered: bool):
+        if self._hovered != hovered:
+            self._hovered = hovered
+            self.update()
+
+
+class TranslationIndicatorItem(QGraphicsObject):
+    """Tiny label indicating translation, anchored to the right edge of the margin."""
+    def __init__(self, text, scene, color, parent=None):
+        super().__init__(parent)
+        self.text = text
+        self.color = color
+        
+        # Scale directly with scene font size (approx 30%)
+        from PySide6.QtGui import QFont
+        size = max(6, int(scene.font_size * 0.32))
+        self.font = QFont(scene.font_family, size)
+        self.font.setBold(True)
+        
+        from PySide6.QtGui import QFontMetrics
+        metrics = QFontMetrics(self.font)
+        self._width = metrics.horizontalAdvance(self.text)
+        self._height = metrics.height()
+        self._ascent = metrics.ascent()
+        self.setZValue(11)
+        self.setAcceptedMouseButtons(Qt.NoButton)
+
+    def boundingRect(self):
+        # Anchor at (0,0) as the BOTTOM-RIGHT corner of the baseline.
+        # X goes from -width to 0. Y goes from -ascent to descent.
+        return QRectF(-self._width, -self._ascent, self._width, self._height)
+
+    def paint(self, painter, option, widget=None):
+        painter.setFont(self.font)
+        painter.setPen(self.color)
+        painter.setOpacity(0.6)
+        # origin Y is the baseline
+        painter.drawText(QPointF(-self._width, 0), self.text)
+
 class VerseNumberItem(QGraphicsObject):
+
     """Clickable and draggable verse number item."""
     dragged = Signal(float) # dx
     clicked = Signal(bool) # shift pressed

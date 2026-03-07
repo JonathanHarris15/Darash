@@ -302,7 +302,7 @@ class OutlineCell(QFrame):
 
     def _save_changes(self):
         self.node["summary"] = self.summary_edit.toPlainText()
-        self.panel.outline_manager.study_manager.save_study()
+        self.panel.outline_manager.study_manager.save_data()
         self.contentChanged.emit()
 
 class OutlinePanel(QWidget):
@@ -547,7 +547,7 @@ class OutlinePanel(QWidget):
                 parent["split_levels"] = [1] * (len(parent["children"]) - 1)
                 focus_id = sibling["id"]
 
-        self.outline_manager.study_manager.save_study()
+        self.outline_manager.study_manager.save_data()
         self._structure_hash = None # Force rebuild to show new nodes
         self.refresh()
         self.outlineChanged.emit()
@@ -578,7 +578,7 @@ class OutlinePanel(QWidget):
             node = self.outline_manager.get_node(self.root_node_id)
             if node:
                 node["title"] = self.title_edit.text()
-                self.outline_manager.study_manager.save_study()
+                self.outline_manager.study_manager.save_data()
                 self.outlineChanged.emit()
 
     def _format_ref_parts(self, start, end):

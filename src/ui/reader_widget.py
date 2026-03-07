@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QGraphicsView, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QGraphicsView, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtGui import QPainter
 from PySide6.QtCore import Qt, QTimer
 import re
@@ -38,13 +38,13 @@ class ReaderWidget(QWidget):
         self.scrollbar = JumpScrollBar(Qt.Vertical)
         self.scrollbar.setSingleStep(20)
         
-        # HUD Label
+        # HUD Labels & Buttons
         self.ref_label = ClickableLabel(self.view)
         self.ref_label.setCursor(Qt.PointingHandCursor)
         self.ref_label.setToolTip("Click to Bookmark")
         self.ref_label.setStyleSheet(f"background-color: rgba(30, 30, 30, 200); color: {TEXT_COLOR.name()}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
         self.ref_label.hide()
-        
+
         # --- Professional Loading Overlay ---
         self.overlay = QWidget(self.view)
         self.overlay.setStyleSheet(f"background-color: {OVERLAY_BACKGROUND_COLOR};")
@@ -123,21 +123,21 @@ class ReaderWidget(QWidget):
         self.reposition_ref_label()
 
     def reposition_ref_label(self) -> None:
-        if not self.ref_label.isVisible(): return
         margin = 20
-        self.ref_label.move(margin, self.view.height() - self.ref_label.height() - margin)
+        if self.ref_label.isVisible():
+            self.ref_label.move(margin, self.view.height() - self.ref_label.height() - margin)
 
     def show_generic_loading(self):
         self.loading_subtitle.setText("Recalculating Layout...")
         self.info_label.setText("")
-        self._display_overlay()
+        self.show_loading()
 
     def show_settings_loading(self, font_size: int, line_spacing: float) -> None:
         self.loading_subtitle.setText("Updating Typography...")
         self.info_label.setText(f"Font: {font_size}px  |  Spacing: {line_spacing:.1f}")
-        self._display_overlay()
+        self.show_loading()
 
-    def _display_overlay(self):
+    def show_loading(self):
         self.overlay.resize(self.view.size())
         self.overlay.show()
 
@@ -155,7 +155,7 @@ class ReaderWidget(QWidget):
         # Show loading screen immediately when resize starts
         self.loading_subtitle.setText("Adjusting to Window Size...")
         self.info_label.setText("")
-        self._display_overlay()
+        self.show_loading()
         
         self.reposition_ref_label()
         

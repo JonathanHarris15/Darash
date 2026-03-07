@@ -84,7 +84,7 @@ class SceneInteractionManager(QObject):
                 "group_id": group_id
             })
         elif modified:
-            scene.study_manager.save_study()
+            scene.study_manager.save_data()
 
     def on_add_bookmark_requested(self):
         scene = self.scene

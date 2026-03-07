@@ -1,62 +1,198 @@
 # Jehu-Reader Architecture
+<!-- COMPRESSED CONTEXT — keep this file exhaustively current. Every new file, class, signal, or feature boundary must be recorded here. An agent reading only this file must know exactly which file(s) to open. -->
+
+---
 
 ## Core Principles
 
-1.  **High Modularity:** Files must be short, focused, and represent a single logical entity.
-    *   **Limits:** Aim for under 300 lines; never exceed 500 lines. The "God Object" anti-pattern is strictly forbidden.
-2.  **Domain-Driven Structure:** Code is organized into folders representing architectural layers or features.
-3.  **Explicit Data Flow:** State flows deterministically. UI components use signals/methods rather than direct engine state modification.
+1. **High Modularity:** Files must be short, focused, and represent a single logical entity.
+   - **Soft Limit:** 300 lines. **Hard Limit:** 500 lines. Exceed this → split immediately.
+2. **Domain-Driven Structure:** Code is organized into domain folders (`core`, `managers`, `scene`, `ui`, `utils`).
+3. **Explicit Data Flow:** State flows deterministically. UI components use signals/methods, never direct engine state mutation.
+4. **ReaderScene is a Facade:** Heavy logic belongs in specialized scene managers, not in `reader_scene.py`.
 
-## Project Map
+---
 
-### `src/core/` (The Foundation)
-*   `constants.py`: Global styling, layout constants, and Bible metadata (Books, Sections).
-*   `verse_loader.py`: Bible data parser. Handles JSON ingestion and provides the `flat_verses` index used by the virtual coordinate system.
-*   `main.py`: Application entry point.
+## Domain Map
 
-### `src/managers/` (Data & Logic Controllers)
-*   `study_manager.py`: The primary data orchestrator. Handles saving/loading study files (JSON), undo/redo, and manages marks, notes, and symbols.
-*   `outline_manager.py`: Specialized logic for tree-based book outlines, splitting, and merging.
-*   `strongs_manager.py`: Dictionary and usage indexing for Strong's numbers.
-*   `symbol_manager.py`: Handles custom icon libraries and bindings.
+| Domain | Folder | Purpose |
+|---|---|---|
+| Foundation | `src/core/` | Constants, data parsing, app entry point |
+| Data & Logic | `src/managers/` | State orchestration, persistence, domain algorithms |
+| Graphics Engine | `src/scene/` | Virtual layout, rendering, overlays, input |
+| Visual Shell | `src/ui/` | Top-level window, docks, sidebar widgets |
+| Helpers | `src/utils/` | Pure utility functions with no Qt state |
 
-### `src/scene/` (The Graphics Engine)
-*   `reader_scene.py`: A facade class that coordinates all scene-specific engines.
-*   `layout_engine.py`: **The Heart of the Reader.** Calculates `QTextDocument` structures, word-wrap, sentence-breaking, and mapping between document positions and verse references.
-*   `renderer.py`: Viewport-aware rendering logic for verse numbers, outlines, and highlights.
-*   `scene_indentation_manager.py`: Manages real-time dragging logic for verse and sentence indents.
-*   `scene_input_handler.py`: Centralized event handling for mouse and keyboard.
-*   `scene_overlay_manager.py`: Draws dynamic graphical items (marks, symbols, arrows).
-*   `scene_outline_manager.py`: Interactive logic for creating and splitting outlines.
-*   `scene_search_manager.py`: Logic for search highlights and navigation.
-*   `scene_settings_manager.py`: Handles persistent appearance settings and font synchronization.
-*   `components/reader_items.py`: Individual `QGraphicsItem` definitions (VerseNumberItem, SentenceHandleItem, ArrowItem, etc.).
+---
 
-### `src/ui/` (The Visual Shell)
-*   `main_window.py`: Top-level assembly. Coordinates the sidebar and the reader view.
-*   `reader_widget.py`: The container for the GraphicsView, housing HUD overlays like the search bar and navigation labels.
-*   `components/`: Standard PySide6 widgets for specific tasks (AppearancePanel, NoteEditor, OutlinePanel, etc.).
+## Full File Registry
 
-### `src/utils/` (Helpers)
-*   `reader_utils.py`: Geometric and text-layout utilities (calculating text bounding rects, word indexing).
-*   `snake_path_finder.py`: Algorithm for drawing snaking arrows that avoid text overlap.
+### `src/core/`
 
-## State Management & Coordinate Systems
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `constants.py` | — | Global styling tokens, color palette, font sizes, Bible book list, section metadata |
+| `verse_loader.py` | `VerseLoader` | Parses Bible JSON/XML. Supports multi-translation chapter loading with caching. |
+| `search_engine.py` | `SearchEngine`, `SearchParser` | Logical-operator search parsing (`AND`, `OR`, `NOT`), scoped searches (verse/chapter/book), returns ranked result lists |
+| `main.py` | — | Application entry point. Instantiates `QApplication` and `MainWindow` |
 
-### 1. The Virtual Coordinate System
-Instead of a global pixel-based coordinate system (which would be unstable due to variable verse lengths and window resizing), Jehu-Reader uses a **Virtual Verse Index**:
-*   `virtual_scroll_y` ranges from `0.0` to `len(total_verses)`.
-*   The `LayoutEngine` generates a local "chunk" of physical geometry around the current focus.
-*   Vertical boundaries for every verse (and sentence) are mapped in `verse_y_map`, enabling physical-to-virtual translation.
+---
 
-### 2. Sentence-Breaking & Sub-References
-When "Break at Sentences" is enabled, verses are split into multiple text blocks.
-*   **Sub-Ref System**: Data is stored using a `|sIndex` suffix (e.g., `Genesis 1:1|0`, `Genesis 1:1|1`).
-*   **Independent Indentation**: Each sub-reference maintains its own indent level in the `StudyManager`.
-*   **Hanging Indents**: All lines within a sentence block share the same left margin, while verse numbers and sentence ticks sit in the reserved margin.
+### `src/managers/`
 
-## Refactoring Guidelines
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `study_manager.py` | `StudyManager` | **Primary data orchestrator.** Saves/loads study JSON, undo/redo stack, manages marks, notes, symbols, indentation state |
+| `outline_manager.py` | `OutlineManager` | Tree-based book outline CRUD, splitting verses into outline sections, merging, scrubbing metadata |
+| `strongs_manager.py` | `StrongsManager` | Strong's number dictionary lookups, cross-reference indexing |
+| `symbol_manager.py` | `SymbolManager` | Custom icon library registration, symbol-to-verse bindings |
 
-1.  **Do not bloat existing files:** If a new feature requires more than 50 lines of code, evaluate whether it belongs in a new module in `src/scene/` or `src/ui/components/`.
-2.  **ReaderScene Facade:** `ReaderScene` should strictly be a coordinator. Add heavy logic to specialized managers.
-3.  **Validation**: Always ensure `pytest` passes after architectural changes. Use `tests/` structure that mirrors `src/`.
+**`StudyManager` key signals:** `marks_changed`, `notes_changed`, `symbols_changed`, `state_changed`
+
+---
+
+### `src/scene/`
+
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `reader_scene.py` | `ReaderScene` | **Facade coordinator only.** Owns all scene managers, routes events, exposes top-level API to `ReaderWidget` |
+| `layout_engine.py` | `LayoutEngine` | **Heart of the reader.** Computes `QTextDocument` word-wrap, virtual↔physical mapping, and multi-translation verse stacking. |
+| `renderer.py` | `Renderer` | Viewport-aware painting: verse numbers, outline bands, selection highlights, search highlights, bookmarks |
+| `scene_input_handler.py` | `SceneInputHandler` | Centralised mouse & keyboard event dispatch. Delegates to interaction/indentation/outline managers |
+| `scene_interaction_manager.py` | `SceneInteractionManager` | Click logic: word selection, right-click context menu, mark application, symbol placement, arrow initiation |
+| `scene_indentation_manager.py` | `SceneIndentationManager` | Live drag logic for adjusting verse/sentence indentation handles |
+| `scene_overlay_manager.py` | `SceneOverlayManager` | Draws dynamic `QGraphicsItem` overlays: marks, symbols, arrows (including ghost arrows), hover highlights |
+| `scene_outline_manager.py` | `SceneOutlineManager` | Interactive outline creation, splitting, and visual feedback within the scene |
+| `scene_search_manager.py` | `SceneSearchManager` | Applies/clears search highlight items, manages navigation state within the visible chunk |
+| `scene_settings_manager.py` | `SceneSettingsManager` | Reads/writes appearance settings (fonts, spacing, colors), syncs font changes across the scene |
+| `components/reader_items.py` | `VerseNumberItem`, `SentenceHandleItem`, `ArrowItem`, `GhostArrowIconItem`, `GhostArrowMarkerItem`, `SymbolItem`, `MarkItem` | All individual `QGraphicsItem` subclasses used inside the scene |
+
+---
+
+### `src/ui/`
+
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `main_window.py` | `MainWindow` | Top-level `QMainWindow`. Assembles all docks/panels, handles menu bar, layout presets, dock visibility |
+| `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar) |
+| `components/activity_bar.py` | `ActivityBar` | Left-edge icon bar that toggles panel visibility (similar to VS Code sidebar icons) |
+| `components/appearance_panel.py` | `AppearancePanel` | Dock widget for font, spacing, color, and display settings |
+| `components/bookmark_ui.py` | `BookmarkPanel`, `BookmarkItem` | Displays, creates, and navigates bookmarks; integrates with `StudyManager` |
+| `components/center_split_manager.py` | `CenterSplitManager` | Manages the central `QSplitter` containing multiple `ReaderWidget` instances; handles add/remove/reorder |
+| `components/clickable_label.py` | `ClickableLabel` | `QLabel` subclass that emits `clicked` signal |
+| `components/jump_scrollbar.py` | `JumpScrollbar` | Custom scrollbar that shows search result positions and chapter tick marks |
+| `components/mark_popup.py` | `MarkPopup` | Floating popup for selecting mark colors and styles |
+| `components/navigation.py` | `NavigationBar` | Book/chapter/verse navigation controls (dropdowns + prev/next buttons) |
+| `components/note_editor.py` | `NoteEditor` | Rich-text note editor with markdown-style formatting toolbar, link handling, indentation, list cycling |
+| `components/outline_dialog.py` | `OutlineDialog` | Modal dialog for creating/naming a new outline |
+| `components/outline_panel.py` | `OutlinePanel` | Central-area panel displaying and editing a single book outline tree |
+| `components/placeholder_panel.py` | `PlaceholderPanel` | Empty dock used as a layout anchor when no panel is active |
+| `components/reading_view_link_manager.py` | `ReadingViewLinkManager` | Manages scroll synchronization between linked `ReaderWidget` instances |
+| `components/reading_view_panel.py` | `ReadingViewPanel` | Thin wrapper panel that houses a `ReaderWidget` inside the central splitter |
+| `components/search_bar.py` | `SearchBar` | Floating HUD search input, operator buttons, scope toggles |
+| `components/split_link_button.py` | `SplitLinkButton` | Toggle button shown between split views to enable/disable scroll linking |
+| `components/split_overlay.py` | `SplitOverlay` | Transparent drag target overlay shown when dragging a panel to split the view |
+| `components/strongs_ui.py` | `StrongsPanel` | Dock widget displaying Strong's dictionary entries and cross-references |
+| `components/study_panel.py` | `StudyPanel` | **Primary sidebar.** Study overview tree: outlines list, marks legend, notes list. Emits `outline_deleted` |
+| `components/suggested_symbols_dialog.py` | `SuggestedSymbolsDialog` | Dialog that shows AI/rule-based suggested symbols for a selection |
+| `components/symbol_dialog.py` | `SymbolDialog` | Full symbol library browser and picker dialog |
+| `components/translation_selector.py` | `TranslationSelector` | Dropdown for toggling and reordering translations via drag-and-drop |
+
+---
+
+### `src/utils/`
+
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `reader_utils.py` | — | Geometric helpers: text bounding-rect calculation, word index mapping, hit-testing utilities |
+| `snake_path_finder.py` | `SnakePathFinder` | Algorithm for computing snaking arrow paths that navigate around text blocks |
+| `menu_utils.py` | — | Helpers for building and styling `QMenu` instances consistently |
+
+---
+
+## Test Registry (`tests/`)
+
+Mirrors `src/` structure. Add new test files here as features are built.
+
+| Test File | Covers |
+|---|---|
+| `tests/core/test_verse_loader.py` | `VerseLoader` parsing, flat index, lookups |
+| `tests/core/test_search_engine.py` | `SearchEngine` query parsing, logical ops, scoped search |
+| `tests/core/test_multi_translation_loader.py` | `VerseLoader` multi-format and interlinear loading |
+| `tests/managers/test_study_manager.py` | Mark/note save-load, undo/redo |
+| `tests/managers/test_outline_manager_scrubbing.py` | Outline split, merge, scrub operations |
+| `tests/scene/test_scene_interactions.py` | `SceneInteractionManager` click/select logic |
+| `tests/scene/test_scene_overlay.py` | `SceneOverlayManager` arrow/mark item creation |
+| `tests/ui/test_layout_and_movement.py` | Dock layout, panel movement |
+| `tests/ui/test_main_window_layout.py` | Layout preset percentages |
+| `tests/ui/test_main_window_placeholder.py` | Placeholder dock positioning |
+| `tests/ui/test_restore_layout_fallback.py` | Layout restore / fallback logic |
+| `tests/ui/test_widget_resize.py` | Widget resize behaviour |
+| `tests/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
+
+---
+
+## Virtual Coordinate System
+
+- `virtual_scroll_y ∈ [0.0, len(flat_verses)]` — stable identifier for scroll position independent of zoom/font.
+- `LayoutEngine` computes a physical "chunk" of geometry around the current virtual position.
+- `verse_y_map`: `{ref → (top_px, bottom_px)}` — physical boundary of every verse/sentence in the current chunk.
+- Use `LayoutEngine.virtual_to_physical()` / `physical_to_virtual()` for all coordinate conversions.
+
+## Sentence-Breaking & Sub-References
+
+- When "Break at Sentences" is on, verses split into multiple `QTextDocument` blocks.
+- Data stored with `|sIndex` suffix: `"Genesis 1:1|0"`, `"Genesis 1:1|1"`.
+- Each sub-ref has an independent indent stored in `StudyManager`.
+
+---
+
+## Feature → File Lookup (Quick Reference)
+
+| Feature / Symptom | Primary File(s) |
+|---|---|
+| App won't start / entry point | `core/main.py` |
+| Bible data missing / wrong | `core/verse_loader.py` |
+| Search logic / operators | `core/search_engine.py` |
+| Mark/note persistence or undo | `managers/study_manager.py` |
+| Outline tree operations | `managers/outline_manager.py` |
+| Strong's data | `managers/strongs_manager.py` |
+| Symbol library | `managers/symbol_manager.py` |
+| Word layout / line breaks | `scene/layout_engine.py` |
+| Interlinear / Translations | `ui/components/translation_selector.py`, `core/verse_loader.py` |
+| Verse numbers / highlights painted | `scene/renderer.py` |
+| Mouse clicks / keyboard shortcuts | `scene/scene_input_handler.py` |
+| Right-click menu / word selection | `scene/scene_interaction_manager.py` |
+| Indent drag handles | `scene/scene_indentation_manager.py` |
+| Arrows / marks / symbols on scene | `scene/scene_overlay_manager.py` |
+| Outline visual bands in scene | `scene/scene_outline_manager.py` |
+| Search highlight items | `scene/scene_search_manager.py` |
+| Font / color / spacing settings | `scene/scene_settings_manager.py` |
+| `QGraphicsItem` definitions | `scene/components/reader_items.py` |
+| Top-level window / docks / menu | `ui/main_window.py` |
+| GraphicsView container / HUD | `ui/reader_widget.py` |
+| Multiple reading views / splits | `ui/components/center_split_manager.py` |
+| Scroll sync between views | `ui/components/reading_view_link_manager.py` |
+| Navigation bar dropdowns | `ui/components/navigation.py` |
+| Note editor (rich text) | `ui/components/note_editor.py` |
+| Outline tree panel (central) | `ui/components/outline_panel.py` |
+| Study overview sidebar | `ui/components/study_panel.py` |
+| Strong's panel | `ui/components/strongs_ui.py` |
+| Appearance settings panel | `ui/components/appearance_panel.py` |
+| Bookmarks panel | `ui/components/bookmark_ui.py` |
+| Symbol picker | `ui/components/symbol_dialog.py` |
+| Mark color picker | `ui/components/mark_popup.py` |
+| Custom scrollbar | `ui/components/jump_scrollbar.py` |
+| Geometry / hit-test helpers | `utils/reader_utils.py` |
+| Arrow path algorithm | `utils/snake_path_finder.py` |
+| Menu styling helpers | `utils/menu_utils.py` |
+
+---
+
+## Refactoring Rules
+
+1. **File too large?** If a file exceeds 500 lines, split it. Create the new module in the same domain folder and update this file's registry immediately.
+2. **New feature?** Add it to the domain folder that matches its concern. Record the new file in the registry above and the Feature Lookup table.
+3. **New `QGraphicsItem`?** Add the class to `scene/components/reader_items.py` unless it has significant standalone logic.
+4. **`ReaderScene`** must never grow. Route new logic to a new or existing scene manager.
+5. After every structural change, run `pytest` and update this document before closing the session.

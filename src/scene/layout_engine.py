@@ -1,4 +1,4 @@
-from PySide6.QtGui import QTextCursor, QTextBlockFormat, QTextCharFormat
+from PySide6.QtGui import QTextCursor, QTextBlockFormat, QTextCharFormat, QFont, QColor
 from PySide6.QtCore import Qt, QRectF
 import re
 from src.core.constants import BIBLE_SECTIONS, VERSE_NUMBER_RESERVED_WIDTH
@@ -82,53 +82,112 @@ class LayoutEngine:
         scene.heading_rects = []
         scene._pending_headings = []
 
-        chunk_verses = scene.loader.flat_verses[start_idx:end_idx]
+        # Prepare formatting for secondary translations
+        interlinear_fmt = QTextBlockFormat()
+        interlinear_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
+        interlinear_fmt.setBottomMargin(2)
         
+        interlinear_char_fmt = QTextCharFormat()
+        interlinear_char_fmt.setFont(QFont(scene.font_family, scene.font_size))
+        interlinear_char_fmt.setForeground(QColor(150, 150, 150)) # Dimmed grey
+
+        chunk_verses = scene.loader.flat_verses[start_idx:end_idx]
+        active_translations = [scene.primary_translation] + scene.enabled_interlinear
+        
+        # We need to fetch multi-translation data in chunks per chapter to be efficient
+        # But for simplicity in the current loop, we'll fetch per verse if not already cached
+        # Better: Group verses by book/chapter and fetch multi-translation data for each chapter block.
+        
+        current_multi_data = {}
+        last_fetched_chap = (None, None)
+
         for i, verse in enumerate(chunk_verses):
-            if verse['book'] != last_book:
+            book, chap = verse['book'], verse['chapter']
+            
+            # Fetch multi-data if we moved to a new chapter
+            if (book, chap) != last_fetched_chap:
+                current_multi_data = scene.loader.load_chapter_multi(book, int(chap), active_translations)
+                last_fetched_chap = (book, chap)
+
+            if book != last_book:
                 cursor.insertBlock(header_fmt)
                 cursor.setCharFormat(header_char_fmt)
-                cursor.insertText(verse['book'])
-                scene._pending_headings.append((cursor.block().blockNumber(), "book", verse['book']))
-                last_book, last_chap = verse['book'], None
+                cursor.insertText(book)
+                scene._pending_headings.append((cursor.block().blockNumber(), "book", book))
+                last_book, last_chap = book, None
 
-            if verse['chapter'] != last_chap:
+            if chap != last_chap:
                 cursor.insertBlock(chap_fmt)
                 cursor.setCharFormat(chap_char_fmt)
-                cursor.insertText(f"{verse['book']} {verse['chapter']}")
-                scene._pending_headings.append((cursor.block().blockNumber(), "chapter", f"{verse['book']} {verse['chapter']}"))
-                last_chap = verse['chapter']
+                cursor.insertText(f"{book} {chap}")
+                scene._pending_headings.append((cursor.block().blockNumber(), "chapter", f"{book} {chap}"))
+                last_chap = chap
                 
-            # Split text into sentences if enabled
-            if scene.sentence_break_enabled:
-                # Split by .!? followed by space or end of string
-                # Handles multiple spaces and non-breaking spaces
-                sentences = [s.strip() for s in re.split(r'(?<=[.!?])[\s\u00A0]+', verse['text']) if s.strip()]
-            else:
-                sentences = [verse['text']]
+            v_num = verse['verse_num']
+            verse_multi = current_multi_data.get(v_num, {})
+            
+            # Render each translation in the stack
+            for tid in active_translations:
+                v_data = verse_multi.get(tid)
+                if not v_data: continue
                 
-            for s_idx, s_text in enumerate(sentences):
-                # Use sub-reference for sentence-level indentation
-                s_ref = f"{verse['ref']}|{s_idx}" if scene.sentence_break_enabled else verse['ref']
-                indent_level = verse_indents.get(s_ref, verse_indents.get(verse['ref'], 0))
+                is_primary = (tid == scene.primary_translation)
+                v_text = v_data['text']
                 
-                verse_fmt = QTextBlockFormat()
-                verse_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
-                verse_fmt.setBottomMargin(scene.font_size * 0.5 if s_idx == len(sentences) - 1 else 2)
-                verse_fmt.setLeftMargin(indent_level * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
-                
-                cursor.insertBlock(verse_fmt)
-                cursor.setCharFormat(verse_char_fmt)
-                
-                # Only map the start of the verse for global navigation
-                if s_idx == 0:
-                    scene.verse_pos_map[verse['ref']] = cursor.position()
-                    scene.pos_verse_map.append((cursor.position(), verse['ref']))
-                
-                # Store position for each sentence if needed for indentation dragging
-                scene.verse_pos_map[s_ref] = cursor.position()
-                
-                cursor.insertText(s_text)
+                # Split text into sentences if enabled (usually only for primary)
+                if scene.sentence_break_enabled and is_primary:
+                    sentences = [s.strip() for s in re.split(r'(?<=[.!?])[\s\u00A0]+', v_text) if s.strip()]
+                else:
+                    sentences = [v_text]
+                    
+                for s_idx, s_text in enumerate(sentences):
+                    # Use sub-reference for sentence-level indentation
+                    s_ref = f"{verse['ref']}|{s_idx}" if (scene.sentence_break_enabled and is_primary) else verse['ref']
+                    
+                    # For secondary translations, we should use the indent of the primary verse's first sentence
+                    # or the primary verse itself, to keep them "grouped" with the marker.
+                    if not is_primary:
+                        lookup_ref = f"{verse['ref']}|0" if scene.sentence_break_enabled else verse['ref']
+                        indent_level = verse_indents.get(lookup_ref, verse_indents.get(verse['ref'], 0))
+                    else:
+                        indent_level = verse_indents.get(s_ref, verse_indents.get(verse['ref'], 0))
+                    
+                    block_fmt = QTextBlockFormat()
+                    is_last_in_verse = (tid == active_translations[-1])
+                    
+                    if is_primary:
+                        block_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
+                        # If primary is the only one, use standard margin.
+                        # If more translations exist, use small margin between them.
+                        if len(active_translations) == 1:
+                            block_fmt.setBottomMargin(scene.font_size * 0.5 if s_idx == len(sentences) - 1 else 2)
+                        else:
+                            block_fmt.setBottomMargin(2)
+                        cursor.setCharFormat(verse_char_fmt)
+                    else:
+                        block_fmt.setLineHeight(float(scene.line_spacing * 100), int(QTextBlockFormat.ProportionalHeight.value))
+                        # Last translation in the stack gets a large margin to separate from next verse
+                        if is_last_in_verse:
+                            block_fmt.setBottomMargin(scene.font_size * 1.5)
+                        else:
+                            block_fmt.setBottomMargin(1)
+                        cursor.setCharFormat(interlinear_char_fmt)
+                    
+                    block_fmt.setLeftMargin(indent_level * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
+                    
+                    cursor.insertBlock(block_fmt)
+                    
+                    # Only map the primary translation for global navigation & overlays
+                    if is_primary:
+                        if s_idx == 0:
+                            scene.verse_pos_map[verse['ref']] = cursor.position()
+                            scene.pos_verse_map.append((cursor.position(), verse['ref']))
+                        scene.verse_pos_map[s_ref] = cursor.position()
+                    
+                    # Track the position of the last block added to this verse stack
+                    scene.verse_stack_end_pos[verse['ref']] = cursor.position()
+                    
+                    cursor.insertText(s_text)
 
         cursor.endEditBlock()
         
@@ -182,18 +241,24 @@ class LayoutEngine:
                 block = doc.findBlock(pos)
                 rect = layout.blockBoundingRect(block)
                 
+                # Bottom should be the bottom of the LAST block in the translation stack
+                last_pos = scene.verse_stack_end_pos.get(ref, pos)
+                last_block = doc.findBlock(last_pos)
+                last_rect = layout.blockBoundingRect(last_block)
+                
                 # Simplified boundary logic: Each verse owns the space from the 
                 # bottom of the previous verse to its own bottom.
                 if i == 0:
                     y_top = 0.0
                 else:
                     prev_ref = chunk_verses[i-1]['ref']
-                    y_top = layout.blockBoundingRect(doc.findBlock(scene.verse_pos_map[prev_ref])).bottom()
+                    # Previous verse's bottom bound is already calculated
+                    y_top = scene.verse_y_map[prev_ref][1]
 
                 if i == len(chunk_verses) - 1:
                     y_bottom = layout.documentSize().height()
                 else:
-                    y_bottom = rect.bottom()
+                    y_bottom = last_rect.bottom()
 
                 scene.verse_y_map[ref] = (y_top, y_bottom)
 

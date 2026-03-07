@@ -124,6 +124,7 @@ class ReaderScene(QGraphicsScene):
         self.drag_hard_max = None
         
         self.verse_pos_map = {}
+        self.verse_stack_end_pos = {} # Map of ref -> position of the last block in stack
         self.verse_y_map = {} # ref -> (y_top, y_bottom)
         self.pos_verse_map = []
         self.search_results = []
@@ -366,7 +367,7 @@ class ReaderScene(QGraphicsScene):
             if note_key.startswith("standalone_"):
                 self.study_manager.data["notes"][note_key]["title"] = editor.get_title()
                 self.study_manager.data["notes"][note_key]["text"] = editor.get_text()
-                self.study_manager.save_study()
+                self.study_manager.save_data()
             else:
                 ref_parts = note_key.split('|')
                 self.study_manager.add_note(ref_parts[0], ref_parts[1], ref_parts[2], int(ref_parts[3]), 

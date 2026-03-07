@@ -28,6 +28,8 @@ class SceneSettingsManager:
         scene.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
         scene.logical_mark_opacity = settings.get("logical_mark_opacity", LOGICAL_MARK_OPACITY_DEFAULT)
         scene.sentence_break_enabled = settings.get("sentence_break_enabled", False)
+        scene.primary_translation = settings.get("primary_translation", "ESV")
+        scene.enabled_interlinear = settings.get("enabled_interlinear", [])
         
         scene.target_font_size = scene.font_size
         scene.target_line_spacing = scene.line_spacing
@@ -39,6 +41,10 @@ class SceneSettingsManager:
         scene.target_verse_mark_size = scene.verse_mark_size
         scene.target_logical_mark_opacity = scene.logical_mark_opacity
         scene.target_sentence_break_enabled = scene.sentence_break_enabled
+        
+        # Initialize target settings to match current settings
+        scene.target_primary_translation = scene.primary_translation
+        scene.target_enabled_interlinear = list(scene.enabled_interlinear)
 
     def save_settings(self):
         scene = self.scene
@@ -53,11 +59,14 @@ class SceneSettingsManager:
         settings["verse_mark_size"] = scene.verse_mark_size
         settings["logical_mark_opacity"] = scene.logical_mark_opacity
         settings["sentence_break_enabled"] = scene.sentence_break_enabled
+        settings["primary_translation"] = scene.primary_translation
+        settings["enabled_interlinear"] = scene.enabled_interlinear
+        
         settings["text_color"] = scene.text_color.name()
         settings["ref_color"] = scene.ref_color.name()
         settings["logical_mark_color"] = scene.logical_mark_color.name()
         settings["bg_color"] = scene.backgroundBrush().color().name()
-        scene.study_manager.save_study()
+        scene.study_manager.save_data()
 
     def update_fonts(self):
         scene = self.scene
@@ -79,6 +88,8 @@ class SceneSettingsManager:
         scene.verse_mark_size = scene.target_verse_mark_size
         scene.logical_mark_opacity = scene.target_logical_mark_opacity
         scene.sentence_break_enabled = scene.target_sentence_break_enabled
+        scene.primary_translation = scene.target_primary_translation
+        scene.enabled_interlinear = scene.target_enabled_interlinear
         
         self.update_fonts()
         self.save_settings()

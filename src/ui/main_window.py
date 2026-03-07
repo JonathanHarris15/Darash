@@ -82,8 +82,7 @@ class MainWindow(QMainWindow):
         from src.scene.reader_scene import ReaderScene
         self.main_scene = ReaderScene()
         
-        study_name = self.main_scene.study_manager.current_study_name
-        self.setWindowTitle(f"Jehu Reader - {study_name}")
+        self.setWindowTitle("Jehu Reader")
 
         # Main Layout Structure
         # Create a nested QMainWindow to act as a sandbox for the central docks
@@ -740,7 +739,7 @@ class MainWindow(QMainWindow):
             self.main_scene.study_manager.data["notes"].setdefault(note_key, {})
             self.main_scene.study_manager.data["notes"][note_key]["title"] = editor.get_title()
             self.main_scene.study_manager.data["notes"][note_key]["text"] = editor.get_text()
-            self.main_scene.study_manager.save_study()
+            self.main_scene.study_manager.save_data()
         else:
             ref_parts = note_key.split('|')
             if len(ref_parts) >= 4:
@@ -835,15 +834,6 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(appearance_act)
 
         file_menu.addSeparator()
-        new_study_act = QAction("New Study", self)
-        new_study_act.triggered.connect(self._on_new_study)
-        file_menu.addAction(new_study_act)
-        
-        open_study_act = QAction("Open Study", self)
-        open_study_act.triggered.connect(self._on_open_study)
-        file_menu.addAction(open_study_act)
-        
-        file_menu.addSeparator()
         exit_act = QAction("Exit", self)
         exit_act.triggered.connect(self.close)
         file_menu.addAction(exit_act)
@@ -851,31 +841,6 @@ class MainWindow(QMainWindow):
         manage_symbols_act = QAction("Manage Symbols...", self)
         manage_symbols_act.triggered.connect(self._open_symbols_dialog)
         symbols_menu.addAction(manage_symbols_act)
-
-    def _on_new_study(self):
-        name, ok = QInputDialog.getText(self, "New Study", "Enter study name:")
-        if ok and name:
-            self.main_scene.study_manager.load_study(name)
-            self.main_scene.load_settings()
-            self.main_scene.recalculate_layout(self.main_scene.last_width)
-            self.main_scene._render_study_overlays()
-            self.setWindowTitle(f"Jehu Reader - {name}")
-            self.study_panel.refresh()
-
-    def _on_open_study(self):
-        base_dir = self.main_scene.study_manager.base_dir
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-            
-        study_dir = QFileDialog.getExistingDirectory(self, "Open Study", base_dir)
-        if study_dir:
-            name = os.path.basename(study_dir)
-            self.main_scene.study_manager.load_study(name)
-            self.main_scene.load_settings()
-            self.main_scene.recalculate_layout(self.main_scene.last_width)
-            self.main_scene._render_study_overlays()
-            self.setWindowTitle(f"Jehu Reader - {name}")
-            self.study_panel.refresh()
 
     def _apply_layout_preset(self, left_pct, right_pct, close_extras=False):
         self._left_dock_pct = left_pct
@@ -994,5 +959,5 @@ class MainWindow(QMainWindow):
         if self.right_dock.isVisible() and not self.right_dock.isFloating():
             settings.setValue("right_dock_pct", self.right_dock.width() / total_w)
             
-        self.main_scene.study_manager.save_study()
+        self.main_scene.study_manager.save_data()
         super().closeEvent(event)

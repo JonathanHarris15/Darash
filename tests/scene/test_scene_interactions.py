@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from src.scene.reader_scene import ReaderScene
@@ -44,16 +44,24 @@ class TestSceneInteractionArrows(unittest.TestCase):
         # Ensure a temporary arrow was created
         self.mock_scene.addItem.assert_called()
 
-    def test_finish_arrow_drawing(self):
+    @patch('src.utils.menu_utils.create_menu')
+    def test_finish_arrow_drawing(self, mock_create_menu):
         # Set up an ongoing draw
         self.mock_scene.is_drawing_arrow = True
         self.mock_scene.arrow_start_key = "Genesis|1|1|0"
         self.mock_scene.arrow_start_center = QPointF(50, 50)
-        self.handler.is_drawing_snake_arrow = False
         
         # Simulate releasing 'A' over a different word
         self.mock_scene._get_word_key_at_pos.return_value = "Genesis|1|1|5"
         
+        # Set up the mock menu to return the standard action so we get a straight arrow
+        mock_menu_instance = MagicMock()
+        mock_create_menu.return_value = mock_menu_instance
+        # Suppose the first addAction is Standard
+        mock_act_standard = MagicMock()
+        mock_menu_instance.addAction.side_effect = [mock_act_standard, MagicMock(), MagicMock()]
+        mock_menu_instance.exec.return_value = mock_act_standard
+
         event = QKeyEvent(QKeyEvent.KeyRelease, Qt.Key_A, Qt.NoModifier)
         handled = self.handler.handle_key_release(event)
         

@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QGridLayout
+from PySide6.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QPushButton
 from PySide6.QtCore import Qt
 from src.ui.reader_widget import ReaderWidget
 from src.ui.components.search_bar import SearchBar
@@ -11,6 +11,7 @@ class ReadingViewPanel(QWidget):
     """
     def __init__(self, scene, study_manager, parent=None):
         super().__init__(parent)
+        self.scene = scene
         
         self.layout = QGridLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -18,10 +19,42 @@ class ReadingViewPanel(QWidget):
         
         self.reader_widget = ReaderWidget(scene=scene)
         
-        self.search_bar = SearchBar()
+        # --- Top HUD Layout (Translation Button + Search Bar) ---
+        hud_container = QWidget()
+        hud_layout = QHBoxLayout(hud_container)
+        hud_layout.setContentsMargins(0, 0, 0, 0)
+        hud_layout.setSpacing(0)
         
-        # 1. Search Bar (Top)
-        self.layout.addWidget(self.search_bar, 0, 0)
+        self.trans_button = QPushButton(self.scene.primary_translation)
+        self.trans_button.setCursor(Qt.PointingHandCursor)
+        self.trans_button.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #888;
+                border: 1px solid #333;
+                border-right: none;
+                border-radius: 0px;
+                padding: 4px 8px;
+                font-size: 10px;
+                font-weight: bold;
+                height: 28px;
+            }
+            QPushButton:hover {
+                background-color: #333;
+                color: #64c8ff;
+            }
+        """)
+        self.trans_button.clicked.connect(self._show_translation_menu)
+        
+        self.search_bar = SearchBar()
+        # Ensure search bar styling matches or integrates well
+        self.search_bar.setStyleSheet(self.search_bar.styleSheet() + " QLineEdit { border-left: 1px solid #333; border-radius: 0px; }")
+        
+        hud_layout.addWidget(self.trans_button)
+        hud_layout.addWidget(self.search_bar, 1) # Search bar takes remaining space
+        
+        # 1. HUD (Top)
+        self.layout.addWidget(hud_container, 0, 0)
         
         # 2. Reader Widget (Bottom)
         self.layout.addWidget(self.reader_widget, 1, 0)
@@ -67,3 +100,19 @@ class ReadingViewPanel(QWidget):
     def _update_scrollbar_matches(self, current, total):
         scene = self.reader_widget.scene
         self.reader_widget.scrollbar.set_matches(scene.search_marks_y, len(scene.loader.flat_verses))
+
+    def _show_translation_menu(self):
+        from src.ui.components.translation_selector import TranslationSelector
+        self.trans_selector = TranslationSelector(self.scene, self)
+        self.trans_selector.settingsChanged.connect(self._on_translation_settings_changed)
+        
+        # Position below the button
+        pos = self.trans_button.mapToGlobal(self.trans_button.rect().bottomLeft())
+        self.trans_selector.move(pos)
+        self.trans_selector.show()
+
+    def _on_translation_settings_changed(self):
+        self.reader_widget.show_loading()
+        self.trans_button.setText(self.scene.target_primary_translation)
+        self.trans_button.adjustSize()
+        self.scene.settings_manager.apply_layout_changes()

@@ -1,0 +1,44 @@
+{
+    "symbols": {},
+    "marks": [],
+    "notes": {},
+    "note_folders": [],
+    "bookmarks": [
+        {
+            "ref": "Genesis 1:11",
+            "book": "Genesis",
+            "chapter": "1",
+            "verse": "11",
+            "color": "#0078D7",
+            "title": ""
+        }
+    ],
+    "arrows": {},
+    "verse_indent": {
+        "Genesis 1:1": 0,
+        "Genesis 1:2": 0
+    },
+    "verse_marks": {},
+    "logical_marks": {},
+    "settings": {
+        "sentence_break_enabled": false,
+        "font_size": 22,
+        "line_spacing": 1.4999999999999987,
+        "font_family": "Times New Roman",
+        "verse_num_size": 14,
+        "side_margin": 40,
+        "tab_size": 40,
+        "arrow_opacity": 0.6,
+        "verse_mark_size": 18,
+        "logical_mark_opacity": 0.5,
+        "primary_translation": "ESV",
+        "enabled_interlinear": [
+            "NIV"
+        ],
+        "text_color": "#dcdcdc",
+        "ref_color": "#64c8ff",
+        "logical_mark_color": "#ffffff",
+        "bg_color": "#1e1e1e"
+    },
+    "outlines": []
+}

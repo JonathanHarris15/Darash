@@ -1,3 +1,4 @@
+
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -24,7 +25,7 @@ class MockStudyManager:
         self.data = data or {"outlines": []}
         self.loader = MockLoader()
         
-    def save_study(self):
+    def save_data(self):
         pass
 
 @pytest.fixture

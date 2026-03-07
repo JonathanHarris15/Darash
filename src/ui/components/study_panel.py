@@ -529,14 +529,14 @@ class StudyPanel(QWidget):
     def _change_mark_color(self, idx):
         color = QColorDialog.getColor(Qt.yellow, self, "Select Mark Color")
         if color.isValid():
-            self.study_manager.save_state(); self.study_manager.data["marks"][idx]["color"] = color.name(); self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+            self.study_manager.save_state(); self.study_manager.data["marks"][idx]["color"] = color.name(); self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _change_mark_color_by_data(self, mark_data):
         color = QColorDialog.getColor(Qt.yellow, self, "Select Mark Color")
         if color.isValid():
             self.study_manager.save_state()
             mark_data["color"] = color.name()
-            self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+            self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _delete_mark(self, mark_data):
         """Delete a single mark by object identity, not by index (index may be stale)."""
@@ -546,23 +546,23 @@ class StudyPanel(QWidget):
             if m is mark_data:
                 marks.pop(i)
                 break
-        self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+        self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _change_group_color(self, indices):
         color = QColorDialog.getColor(Qt.yellow, self, "Select Group Color")
         if color.isValid():
             self.study_manager.save_state()
             for idx in indices: self.study_manager.data["marks"][idx]["color"] = color.name()
-            self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+            self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _delete_group(self, indices):
         self.study_manager.save_state()
         for idx in sorted(indices, reverse=True): self.study_manager.data["marks"].pop(idx)
-        self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+        self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _delete_symbol(self, key):
         self.study_manager.save_state()
-        if key in self.study_manager.data["symbols"]: del self.study_manager.data["symbols"][key]; self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+        if key in self.study_manager.data["symbols"]: del self.study_manager.data["symbols"][key]; self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _add_standalone_note(self, folder=""):
         key = self.study_manager.add_standalone_note(title="", text="", folder=folder); self.refresh(); self._open_note(key)
@@ -590,7 +590,7 @@ class StudyPanel(QWidget):
         if key in self.study_manager.data["arrows"]:
             self.study_manager.data["arrows"][key].pop(idx)
             if not self.study_manager.data["arrows"][key]: del self.study_manager.data["arrows"][key]
-            self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+            self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
 
     def _delete_bookmark(self, ref): self.study_manager.delete_bookmark(ref); self.dataChanged.emit(); self.refresh()
 
@@ -598,7 +598,7 @@ class StudyPanel(QWidget):
         self.study_manager.save_state()
         if "logical_marks" in self.study_manager.data and key in self.study_manager.data["logical_marks"]:
             del self.study_manager.data["logical_marks"][key]
-            self.study_manager.save_study()
+            self.study_manager.save_data()
             self.dataChanged.emit()
             self.refresh()
 
@@ -687,4 +687,4 @@ class StudyPanel(QWidget):
                 if not self.study_manager.data["arrows"][key]: del self.study_manager.data["arrows"][key]
         for ref in to_del["bookmarks"]: self.study_manager.delete_bookmark(ref)
         for ref in to_del["verse_marks"]: self.study_manager.set_verse_mark(ref, None)
-        self.study_manager.save_study(); self.dataChanged.emit(); self.refresh()
+        self.study_manager.save_data(); self.dataChanged.emit(); self.refresh()
