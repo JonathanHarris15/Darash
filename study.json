@@ -1,153 +1,55 @@
 {
     "symbols": {},
     "marks": [],
-    "notes": {},
+    "notes": {
+        "Genesis|1|1|5": {
+            "title": "Example Note",
+            "text": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\np, li { white-space: pre-wrap; }\nhr { height: 1px; border-width: 0; }\nli.unchecked::marker { content: \"\\2610\"; }\nli.checked::marker { content: \"\\2612\"; }\n</style></head><body style=\" font-family:'Segoe UI','Arial','sans-serif'; font-size:12pt; font-weight:400; font-style:normal;\">\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">This is an example note that I have written to test the exporting of notes.</p>\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p>\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Roman'; font-size:9pt;\">This is another font</span></p>\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Times New Roman'; font-size:9pt;\">This is the best font obviously</span></p>\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Times New Roman';\">But it is way too small at a 9 point font, 12 pt font is </span><span style=\" font-family:'Times New Roman'; text-decoration: underline;\">much</span><span style=\" font-family:'Times New Roman';\"> better. </span><span style=\" font-family:'Times New Roman'; font-weight:700;\">Bold </span><span style=\" font-family:'Times New Roman';\">This is a test</span></p>\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Times New Roman';\"><br /></p>\n<ul style=\"margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 1;\">\n<li style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Bullet</li>\n<li style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Bullet</li>\n<li style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Another Bullet\n<ul type=\"circle\" style=\"margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 2;\">\n<li style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Sub Bullet</li>\n<li style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Epic Sub Bullet</li></ul></li></ul>\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" background-color:#7c7c00;\">Highlight</span></p>\n<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p>\n<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><a href=\"bible:Mark+6\"><span style=\" text-decoration: underline; color:#4fc3f7;\">Mark 6</span></a><span style=\" color:#e8e8e8;\"> This is a hyper link</span></p></body></html>",
+            "folder": ""
+        }
+    },
     "note_folders": [],
     "bookmarks": [],
     "arrows": {},
-    "verse_indent": {
-        "Genesis 1:1": 0,
-        "Genesis 1:2": 0
-    },
+    "verse_indent": {},
     "verse_marks": {},
     "logical_marks": {},
     "settings": {
         "sentence_break_enabled": false,
-        "font_size": 22,
-        "line_spacing": 1.4999999999999987,
-        "font_family": "Times New Roman",
-        "verse_num_size": 14,
-        "side_margin": 40,
-        "tab_size": 40,
-        "arrow_opacity": 0.6,
-        "verse_mark_size": 18,
-        "logical_mark_opacity": 0.5,
-        "primary_translation": "NASB",
-        "enabled_interlinear": [
-            "ESV"
-        ],
-        "text_color": "#dcdcdc",
-        "ref_color": "#64c8ff",
-        "logical_mark_color": "#ffffff",
-        "bg_color": "#1e1e1e"
+        "primary_translation": "ESV",
+        "enabled_interlinear": []
     },
     "outlines": [
         {
-            "id": "9dd189a3-ff27-4d83-9294-a5b90b07488c",
-            "title": "Romans Outline",
-            "summary": "THelksjdf ",
+            "id": "f92d9464-6151-4558-b7fb-1c3fe57cf838",
+            "title": "Genesis 1",
+            "summary": "Section 1",
             "range": {
-                "start": "Romans 5:1",
-                "end": "Romans 5:17"
+                "start": "Genesis 1:1",
+                "end": "Genesis 1:11"
             },
             "children": [
                 {
-                    "id": "86a9ede2-c5a9-4c97-881d-a10050d33b9d",
-                    "title": "Group: Section 1 A & Section 1 B",
-                    "summary": "",
+                    "id": "c34164d5-e66a-44cf-9c0c-db38cfca401e",
+                    "title": "Section 1",
                     "range": {
-                        "start": "Romans 5:1",
-                        "end": "Romans 5:6g"
+                        "start": "Genesis 1:1",
+                        "end": "Genesis 1:6"
                     },
-                    "children": [
-                        {
-                            "id": "32c0e010-07df-4f2c-920c-fe42de3df3c5",
-                            "title": "Section 1 A",
-                            "range": {
-                                "start": "Romans 5:1",
-                                "end": "Romans 5:3"
-                            },
-                            "children": [],
-                            "expanded": true
-                        },
-                        {
-                            "id": "300e2649-c35d-4bd5-8478-3e3c48073eaf",
-                            "title": "Section 1 B",
-                            "range": {
-                                "start": "Romans 5:4",
-                                "end": "Romans 5:6g"
-                            },
-                            "children": [],
-                            "expanded": true
-                        }
-                    ],
+                    "children": [],
                     "expanded": true,
-                    "split_levels": [
-                        2
-                    ]
+                    "summary": "sub 1\t"
                 },
                 {
-                    "id": "b1661068-1eef-4704-9077-161da2dc8c2f",
-                    "title": "Group: Section 2 A & Section 2 B",
-                    "summary": "",
+                    "id": "51a1277c-3517-4297-a3ec-89ea406645ae",
+                    "title": "Section 2",
                     "range": {
-                        "start": "Romans 5:6h",
-                        "end": "Romans 5:17"
+                        "start": "Genesis 1:7",
+                        "end": "Genesis 1:11"
                     },
-                    "children": [
-                        {
-                            "id": "54c2c192-e865-424c-91d9-978538a1ebf6",
-                            "title": "Section 2 A",
-                            "range": {
-                                "start": "Romans 5:6h",
-                                "end": "Romans 5:9"
-                            },
-                            "children": [],
-                            "expanded": true
-                        },
-                        {
-                            "id": "f458ea51-9fad-46a3-b4ae-a87ba82eacaf",
-                            "title": "Section 2 B",
-                            "range": {
-                                "start": "Romans 5:10",
-                                "end": "Romans 5:13"
-                            },
-                            "children": [],
-                            "expanded": true
-                        },
-                        {
-                            "id": "fe0ffab3-8768-4325-9abd-3683321c579b",
-                            "title": "",
-                            "summary": "",
-                            "range": {
-                                "start": "Romans 5:14",
-                                "end": "Romans 5:17"
-                            },
-                            "children": [
-                                {
-                                    "id": "06164e45-e1a0-4e15-b736-db59cdc87b15",
-                                    "title": "",
-                                    "summary": "",
-                                    "range": {
-                                        "start": "Romans 5:14",
-                                        "end": "Romans 5:15"
-                                    },
-                                    "children": [],
-                                    "expanded": true
-                                },
-                                {
-                                    "id": "868c6530-a520-468f-96f1-a70f9317fe6e",
-                                    "title": "",
-                                    "summary": "",
-                                    "range": {
-                                        "start": "Romans 5:16",
-                                        "end": "Romans 5:17"
-                                    },
-                                    "children": [],
-                                    "expanded": true
-                                }
-                            ],
-                            "expanded": true,
-                            "split_levels": [
-                                3
-                            ]
-                        }
-                    ],
+                    "children": [],
                     "expanded": true,
-                    "split_levels": [
-                        1,
-                        1
-                    ]
+                    "summary": "sub 2"
                 }
             ],
             "expanded": true,

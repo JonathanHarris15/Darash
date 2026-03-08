@@ -2,12 +2,15 @@ import re
 import os
 import time
 from typing import Dict, List, Optional, Any, Tuple
+from src.utils.path_utils import get_resource_path
 
 class StrongsManager:
     """
     Manages Strong's Concordance data: parsing the dictionary and indexing usages.
     """
-    def __init__(self, xhtml_path: str = "resources/strongs-dictionary.xhtml"):
+    def __init__(self, xhtml_path: Optional[str] = None):
+        if xhtml_path is None:
+            xhtml_path = get_resource_path("resources/strongs-dictionary.xhtml")
         self.dictionary: Dict[str, Dict[str, str]] = {} # "H123": {word, translit, definition, lang}
         self.usages: Dict[str, List[str]] = {} # "H123": ["Genesis 1:1", ...]
         self._load_dictionary(xhtml_path)

@@ -62,10 +62,7 @@ class OverlayRenderer:
             # Don't draw divider for the last verse in the chunk
             if i == scene.chunk_end_idx - 1: continue
             
-            # Position it exactly between verses
-            line_y = y_bottom + (scene.font_size * 0.25) # Centered in the large margin
-            
-            line = QGraphicsLineItem(scene.side_margin, line_y, scene.last_width - scene.side_margin, line_y)
+            line = QGraphicsLineItem(scene.side_margin, y_bottom, scene.last_width - scene.side_margin, y_bottom)
             line.setPen(pen)
             line.setZValue(-2)
             line.setAcceptedMouseButtons(Qt.NoButton)
@@ -263,29 +260,8 @@ class OverlayRenderer:
             base_ref = m.group(1)
             letters = m.group(2)
 
-            if base_ref in scene.verse_pos_map:
-                pos = scene.verse_pos_map[base_ref]
-                first_block = doc.findBlock(pos)
-                
-                last_block = first_block
-                if scene.sentence_break_enabled:
-                    s_idx = 1
-                    while True:
-                        s_ref = f"{base_ref}|{s_idx}"
-                        if s_ref in scene.verse_pos_map:
-                            last_block = doc.findBlock(scene.verse_pos_map[s_ref])
-                            s_idx += 1
-                        else:
-                            break
-                
-                rect_first = layout.blockBoundingRect(first_block)
-                rect_last = layout.blockBoundingRect(last_block)
-                
-                prev_block = first_block.previous()
-                y_top = (layout.blockBoundingRect(prev_block).bottom() + rect_first.top()) / 2 if prev_block.isValid() else rect_first.top() - 5
-                
-                next_block = last_block.next()
-                y_bottom = (rect_last.bottom() + layout.blockBoundingRect(next_block).top()) / 2 if next_block.isValid() else rect_last.bottom() + 5
+            if base_ref in scene.verse_y_map:
+                y_top, y_bottom = scene.verse_y_map[base_ref]
                 
                 if not letters:
                     return y_top, y_bottom, None, None
@@ -295,6 +271,7 @@ class OverlayRenderer:
                 if not v_data or word_idx >= len(v_data['tokens']): return y_top, y_bottom, None, None
                 
                 def get_inline_metrics(v_data, w_index):
+                    pos = scene.verse_pos_map[base_ref]
                     w_offset = scene._get_word_offset_in_verse(v_data, w_index)
                     rects = scene._get_text_rects(pos + w_offset, len(v_data['tokens'][w_index][0]))
                     if not rects: return None
@@ -444,7 +421,21 @@ class OverlayRenderer:
         for i in range(start_idx, end_idx):
             char_pos, ref = scene.pos_verse_map[i]
             
-            verse = scene.loader.get_verse_by_ref(ref)
+            # Use the actual displayed primary translation, not raw ESV base data
+            verse = None
+            if scene.primary_translation in scene.loader.translation_cache:
+                v_parts = ref.split()
+                if len(v_parts) >= 2:
+                    book_name = " ".join(v_parts[:-1])
+                    c_v = v_parts[-1].split(":")
+                    if len(c_v) == 2:
+                        chapter, v_num = c_v[0], c_v[1]
+                        verse = scene.loader.translation_cache[scene.primary_translation].get(
+                            book_name, {}).get(chapter, {}).get(v_num)
+
+            if not verse:
+                verse = scene.loader.get_verse_by_ref(ref)
+                
             if not verse: continue
             
             v_start = scene.verse_pos_map[ref]

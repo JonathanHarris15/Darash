@@ -10,6 +10,7 @@
 2. **Domain-Driven Structure:** Code is organized into domain folders (`core`, `managers`, `scene`, `ui`, `utils`).
 3. **Explicit Data Flow:** State flows deterministically. UI components use signals/methods, never direct engine state mutation.
 4. **ReaderScene is a Facade:** Heavy logic belongs in specialized scene managers, not in `reader_scene.py`.
+13. **Exporting:** Only Notes and Outlines are exportable. Reading View content extraction is unsupported to maintain UI simplicity.
 
 ---
 
@@ -104,9 +105,21 @@
 
 | File | Key Class / Contents | Responsibility |
 |---|---|---|
+| `exporter.py` | `Exporter` | Static helper for PDF (QPrinter) and DOCX (python-docx) generation |
+| `export_manager.py` | `ExportManager` | Orchestrates content extraction (Notes/Outlines) and export dialog flow |
 | `reader_utils.py` | — | Geometric helpers: text bounding-rect calculation, word index mapping, hit-testing utilities |
 | `snake_path_finder.py` | `SnakePathFinder` | Algorithm for computing snaking arrow paths that navigate around text blocks |
 | `menu_utils.py` | — | Helpers for building and styling `QMenu` instances consistently |
+| `path_utils.py` | — | Centralized cross-platform path resolution for resources and user data |
+| `update_manager.py` | `UpdateManager` | Handles version checking via GitHub API, downloads updates, and performs self-replacement on Windows |
+
+---
+
+### `docs/`
+
+| File | Key Class / Contents | Responsibility |
+|---|---|---|
+| `features_guide.md` | — | Comprehensive guide for end-users explaining all project features and usage. |
 
 ---
 
@@ -129,6 +142,10 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/ui/test_restore_layout_fallback.py` | Layout restore / fallback logic |
 | `tests/ui/test_widget_resize.py` | Widget resize behaviour |
 | `tests/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
+| `tests/utils/test_reader_utils.py` | Bounding rect calculations, coordinate mapping |
+| `tests/utils/test_exporter.py` | PDF and DOCX generation with various options |
+| `tests/utils/test_export_manager.py` | `ExportManager` dialog triggering and content extraction logic |
+| `tests/utils/test_update_manager.py` | `UpdateManager` version comparison and parsing logic |
 
 ---
 
@@ -169,12 +186,16 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` |
 | Top-level window / docks / menu | `ui/main_window.py` |
 | GraphicsView container / HUD | `ui/reader_widget.py` |
 | Multiple reading views / splits | `ui/components/center_split_manager.py` |
 | Scroll sync between views | `ui/components/reading_view_link_manager.py` |
-| Navigation bar dropdowns | `ui/components/navigation.py` |
-| Note editor (rich text) | `ui/components/note_editor.py` |
+| Navigation bar dropdowns | ui/components/navigation.py |
+| Export (Notes/Outlines) | utils/export_manager.py, ui/components/export_dialog.py |
+| Note editor (rich text) | ui/components/note_editor.py |
+185: | User Guide / Features | docs/features_guide.md |
+
 | Outline tree panel (central) | `ui/components/outline_panel.py` |
 | Study overview sidebar | `ui/components/study_panel.py` |
 | Strong's panel | `ui/components/strongs_ui.py` |

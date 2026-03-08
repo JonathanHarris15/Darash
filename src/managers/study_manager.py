@@ -1,8 +1,7 @@
 import json
 import os
 from typing import Dict, List, Any, Optional
-# Delayed import to avoid circular dependency if OutlineManager imports StudyManager for typing
-# from src.managers.outline_manager import OutlineManager
+from src.utils.path_utils import get_user_data_path
 
 class StudyManager:
     """
@@ -28,7 +27,9 @@ class StudyManager:
             "outlines": []  # List of outline trees {id, title, range, children}
         }
 
-    def __init__(self, loader=None, base_dir: str = "."):
+    def __init__(self, loader=None, base_dir: Optional[str] = None):
+        if base_dir is None:
+            base_dir = get_user_data_path("study_data")
         self.base_dir = base_dir
         self.loader = loader
         self.data = self._get_default_data()

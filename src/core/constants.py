@@ -86,3 +86,8 @@ BIBLE_SECTIONS = [
     {"name": "Gospels", "books": ["Matthew", "Mark", "Luke", "John", "Acts"], "color": QColor(255, 100, 255, 150)},
     {"name": "Letters", "books": ["Romans", "I Corinthians", "II Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians", "I Thessalonians", "II Thessalonians", "I Timothy", "II Timothy", "Titus", "Philemon", "Hebrews", "James", "I Peter", "II Peter", "I John", "II John", "III John", "Jude", "Revelation of John"], "color": QColor(100, 255, 255, 150)}
 ]
+
+# Application Info
+APP_VERSION = "0.1.0"
+GITHUB_REPO = "jono1/Jehu-Reader"  # Updated from user/Jehu-Reader to match local path
+GITHUB_API_LATEST_RELEASE = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"

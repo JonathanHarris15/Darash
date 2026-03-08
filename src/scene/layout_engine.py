@@ -32,6 +32,7 @@ class LayoutEngine:
         scene.verse_pos_map.clear()
         scene.verse_y_map.clear()
         scene.pos_verse_map.clear()
+        scene.verse_stack_end_pos = {}
         
         # Clear old verse number items
         for it in scene.verse_number_items.values():
@@ -229,10 +230,7 @@ class LayoutEngine:
                     if i == len(chunk_verses) - 1 and next_block.isValid() == False:
                         y_bottom = layout.documentSize().height()
                     else:
-                        # For internal sentences, we use the block's bottom
-                        # unless it's the last sentence of a verse, then we might want to include headers?
-                        # No, the NEXT verse's first sentence will own the headers above it via the 'y_top' logic.
-                        y_bottom = rect.bottom()
+                        y_bottom = (rect.bottom() + layout.blockBoundingRect(next_block).top()) / 2
 
                     scene.verse_y_map[s_ref] = (y_top, y_bottom)
                     s_idx += 1
@@ -263,7 +261,8 @@ class LayoutEngine:
                 if i == len(chunk_verses) - 1:
                     y_bottom = layout.documentSize().height()
                 else:
-                    y_bottom = last_rect.bottom()
+                    next_block = last_block.next()
+                    y_bottom = (last_rect.bottom() + layout.blockBoundingRect(next_block).top()) / 2 if next_block.isValid() else last_rect.bottom()
 
                 scene.verse_y_map[ref] = (y_top, y_bottom)
 

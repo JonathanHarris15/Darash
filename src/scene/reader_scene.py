@@ -234,26 +234,9 @@ class ReaderScene(QGraphicsScene):
         return ref + "|0" # Default to first sentence
 
     def _get_verse_y_midpoint(self, ref_before, ref_after):
-        doc = self.main_text_item.document()
-        layout = doc.documentLayout()
-        
-        # Bottom of verse_before (find last sentence if split)
-        pos1 = self.verse_pos_map[ref_before]
-        last_block1 = doc.findBlock(pos1)
-        if self.sentence_break_enabled:
-            s_idx = 1
-            while f"{ref_before}|{s_idx}" in self.verse_pos_map:
-                last_block1 = doc.findBlock(self.verse_pos_map[f"{ref_before}|{s_idx}"])
-                s_idx += 1
-        
-        y_bottom1 = layout.blockBoundingRect(last_block1).bottom()
-        
-        # Top of verse_after (always first sentence)
-        pos2 = self.verse_pos_map[ref_after]
-        block2 = doc.findBlock(pos2)
-        y_top2 = layout.blockBoundingRect(block2).top()
-        
-        return (y_bottom1 + y_top2) / 2
+        if ref_before in self.verse_y_map:
+            return self.verse_y_map[ref_before][1]
+        return 0
 
     def _get_first_verse_y_top(self, ref):
         doc = self.main_text_item.document()
@@ -759,3 +742,17 @@ class ReaderScene(QGraphicsScene):
                     if word_idx != -1 and any(c.isalnum() for c in verse_data['tokens'][word_idx][0]):
                         return f"{verse_data['book']}|{verse_data['chapter']}|{verse_data['verse_num']}|{word_idx}"
         return None
+
+    def _get_strongs_at_pos(self, scene_pos):
+        pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(scene_pos), Qt.FuzzyHit)
+        if pos != -1:
+            ref = self._get_ref_from_pos(pos)
+            if ref:
+                verse_data = self.loader.get_verse_by_ref(ref)
+                if verse_data:
+                    word_idx = self._get_word_idx_from_pos(verse_data, pos - self.verse_pos_map[ref])
+                    if word_idx != -1 and word_idx < len(verse_data['tokens']):
+                        token = verse_data['tokens'][word_idx]
+                        if len(token) > 1 and token[1]:
+                            return token[1], None
+        return None, None

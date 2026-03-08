@@ -3,6 +3,7 @@ import os
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple, Any
 from src.core.constants import OT_BOOKS, NT_BOOKS
+from src.utils.path_utils import get_resource_path
 
 class VerseLoader:
     """
@@ -10,11 +11,8 @@ class VerseLoader:
     Provides methods for structured, flat, and multi-translation access to verses.
     """
     def __init__(self, json_path: Optional[str] = None):
-        # Base path for relative data lookups
-        self.base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        
         if json_path is None:
-            json_path = os.path.join(self.base_path, "data", "mdbible-main", "mdbible-main", "json", "ESV.json")
+            json_path = get_resource_path(os.path.join("data", "mdbible-main", "mdbible-main", "json", "ESV.json"))
         
         self.primary_translation = "ESV" # Default
         self.data: Dict[str, Dict[str, Dict[str, Any]]] = {}
@@ -110,13 +108,13 @@ class VerseLoader:
             return True
         
         # 1. Check for XML in data/BibleTranslations
-        xml_path = os.path.join(self.base_path, "data", "BibleTranslations", "bible-master", "bible-master", "bible", "translations", f"{translation_id}.xml")
+        xml_path = get_resource_path(os.path.join("data", "BibleTranslations", "bible-master", "bible-master", "bible", "translations", f"{translation_id}.xml"))
         if os.path.exists(xml_path):
             return self._load_xml_translation(translation_id, xml_path)
             
         # 2. Check for JSON in the same dir as ESV (if it's not ESV)
         # (Assuming other translations might be JSON as well)
-        json_path = os.path.join(self.base_path, "data", "mdbible-main", "mdbible-main", "json", f"{translation_id}.json")
+        json_path = get_resource_path(os.path.join("data", "mdbible-main", "mdbible-main", "json", f"{translation_id}.json"))
         if os.path.exists(json_path):
             # We don't want to overwrite self.data (primary index), just load into cache
             return self._load_json_to_cache(translation_id, json_path)
@@ -229,14 +227,14 @@ class VerseLoader:
             found.add(self.primary_translation)
             
         # 1. XML translations
-        xml_dir = os.path.join(self.base_path, "data", "BibleTranslations", "bible-master", "bible-master", "bible", "translations")
+        xml_dir = get_resource_path(os.path.join("data", "BibleTranslations", "bible-master", "bible-master", "bible", "translations"))
         if os.path.exists(xml_dir):
             for f in os.listdir(xml_dir):
                 if f.endswith(".xml"):
                     found.add(f[:-4])
                     
         # 2. JSON translations
-        json_dir = os.path.join(self.base_path, "data", "mdbible-main", "mdbible-main", "json")
+        json_dir = get_resource_path(os.path.join("data", "mdbible-main", "mdbible-main", "json"))
         if os.path.exists(json_dir):
             for f in os.listdir(json_dir):
                 if f.endswith(".json"):

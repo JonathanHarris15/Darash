@@ -154,6 +154,8 @@ def _icon_label(char: str) -> QIcon:
 # Toolbar factory
 # ---------------------------------------------------------------------------
 
+from src.utils.path_utils import get_resource_path
+
 class _FormattingToolBar(QToolBar):
     """A compact Rich-Text formatting toolbar embedded above the editor."""
 
@@ -162,50 +164,53 @@ class _FormattingToolBar(QToolBar):
         self.editor = editor
         self.setMovable(False)
         self.setIconSize(QSize(16, 16))
-        self.setStyleSheet("""
-            QToolBar {
+        
+        arrow_icon_path = get_resource_path("resources/icons/arrow_down_white.svg").replace("\\", "/")
+        
+        self.setStyleSheet(f"""
+            QToolBar {{
                 background: #2a2a2a;
                 border-bottom: 1px solid #444;
                 spacing: 2px;
                 padding: 2px 4px;
-            }
-            QToolButton {
+            }}
+            QToolButton {{
                 background: transparent;
                 border: 1px solid transparent;
                 border-radius: 3px;
                 padding: 3px 5px;
                 color: #ccc;
                 font-size: 12px;
-            }
-            QToolButton:hover {
+            }}
+            QToolButton:hover {{
                 background: #3a3a3a;
                 border-color: #555;
-            }
-            QToolButton:checked {
+            }}
+            QToolButton:checked {{
                 background: #005a9e;
                 border-color: #007acc;
                 color: white;
-            }
-            QComboBox, QFontComboBox {
+            }}
+            QComboBox, QFontComboBox {{
                 background: #333;
                 color: #ccc;
                 border: 1px solid #555;
                 border-radius: 3px;
                 padding: 2px 4px;
                 min-width: 60px;
-            }
-            QComboBox::drop-down, QFontComboBox::drop-down {
+            }}
+            QComboBox::drop-down, QFontComboBox::drop-down {{
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 16px;
                 border-left: 1px solid #555;
                 background: transparent;
-            }
-            QComboBox::down-arrow, QFontComboBox::down-arrow {
-                image: url(resources/icons/arrow_down_white.svg);
+            }}
+            QComboBox::down-arrow, QFontComboBox::down-arrow {{
+                image: url({arrow_icon_path});
                 width: 10px;
                 height: 6px;
-            }
+            }}
         """)
         self._build()
         editor.cursorPositionChanged.connect(self._sync_state)
@@ -540,6 +545,7 @@ class NoteEditor(QDialog):
     """
     noteSaved = Signal(str)
     jumpRequested = Signal(str, str, str)  # book, chapter, verse
+    exportRequested = Signal()
     DELETE_CODE = 10
 
     def __init__(self, initial_text="", ref="", parent=None, initial_title=""):
@@ -570,6 +576,7 @@ class NoteEditor(QDialog):
             ref_label.setStyleSheet("color: #888; font-size: 11px;")
             header_layout.addWidget(ref_label)
 
+        title_row = QHBoxLayout()
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Note title…")
         self.title_input.setText(initial_title)
@@ -587,7 +594,25 @@ class NoteEditor(QDialog):
                 border-bottom-color: #007acc;
             }
         """)
-        header_layout.addWidget(self.title_input)
+        title_row.addWidget(self.title_input, 1)
+
+        # Three-dot Export Button
+        self.menu_btn = QToolButton()
+        self.menu_btn.setText("⋮")
+        self.menu_btn.setStyleSheet("""
+            QToolButton {
+                background: transparent;
+                color: #888;
+                font-size: 18px;
+                border: none;
+            }
+            QToolButton:hover { color: white; }
+        """)
+        self.menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self.menu_btn.setMenu(self._build_export_menu())
+        title_row.addWidget(self.menu_btn)
+        
+        header_layout.addLayout(title_row)
         outer.addWidget(header)
 
         # ------------------------------------------------------------------
@@ -673,6 +698,17 @@ class NoteEditor(QDialog):
         # Load initial content
         # ------------------------------------------------------------------
         self._load_content(initial_text)
+
+    def _build_export_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu { background-color: #252525; color: #ccc; border: 1px solid #444; }
+            QMenu::item:selected { background-color: #333; }
+        """)
+        export_act = QAction("📤 Export Note...", self)
+        export_act.triggered.connect(self.exportRequested.emit)
+        menu.addAction(export_act)
+        return menu
 
     # ------------------------------------------------------------------
     # Content loading

@@ -2,13 +2,16 @@ import os
 import json
 import shutil
 from typing import Dict, Optional
+from src.utils.path_utils import get_user_data_path
 
 class SymbolManager:
     """
     Manages a library of symbols, their bindings to the number row (1-9),
     and global display settings like opacity.
     """
-    def __init__(self, base_dir: str = "symbols_library"):
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            base_dir = get_user_data_path("symbols_library")
         self.base_dir = base_dir
         self.config_path = os.path.join(self.base_dir, "config.json")
         self.symbols_dir = os.path.join(self.base_dir, "images")

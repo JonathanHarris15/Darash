@@ -122,6 +122,10 @@ class MainWindow(QMainWindow):
         self.appearance_dialog = AppearancePanel(self.main_scene, self)
         self.appearance_dialog.settingsChanged.connect(self._broadcast_appearance_settings)
         
+        # Export Manager
+        from src.utils.export_manager import ExportManager
+        self.export_manager = ExportManager(self)
+        
         # Menu Bar
         self.setup_menu()
         
@@ -529,8 +533,52 @@ class MainWindow(QMainWindow):
         self._clean_center_panels()
         
         if self.center_panels:
-            self.center_workspace.tabifyDockWidget(self.center_panels[-1], dock)
-            self.center_panels.append(dock)
+            # Find active visible center panels to determine if we are already split
+            active_panels = []
+            for p in self.center_panels:
+                try:
+                    if p.isVisible() and not p.isFloating() and not p.visibleRegion().isEmpty():
+                        active_panels.append(p)
+                except RuntimeError:
+                    pass
+
+            if len(active_panels) <= 1:
+                # 0 or 1 visible split area -> Split the screen
+                target = active_panels[0] if active_panels else self.center_panels[-1]
+                self.center_workspace.splitDockWidget(target, dock, Qt.Horizontal)
+                self.center_panels.append(dock)
+                self._is_applying_preset = True
+                self._apply_current_percentages()
+            else:
+                # >1 split area -> Stack on top based on priority
+                target = None
+                
+                # Priority 1: Outline
+                for p in active_panels:
+                    if isinstance(p.widget(), OutlinePanel):
+                        target = p
+                        break
+                        
+                # Priority 2: Note
+                if not target:
+                    for p in active_panels:
+                        if isinstance(p.widget(), NoteEditor):
+                            target = p
+                            break
+                            
+                # Priority 3: Reading View
+                if not target:
+                    for p in active_panels:
+                        if isinstance(p.widget(), ReadingViewPanel):
+                            target = p
+                            break
+                            
+                # Fallback: Just use the last active panel
+                if not target:
+                    target = active_panels[-1]
+
+                self.center_workspace.tabifyDockWidget(target, dock)
+                self.center_panels.append(dock)
         else:
             if self.placeholder_dock.isVisible() and not self.placeholder_dock.isFloating():
                 self.center_workspace.tabifyDockWidget(self.placeholder_dock, dock)
@@ -689,6 +737,7 @@ class MainWindow(QMainWindow):
         
         editor.jumpRequested.connect(lambda book, ch, vs: self._handle_note_jump(book, ch, vs, dock))
         editor.noteSaved.connect(lambda html: self._on_note_saved(note_key, editor))
+        editor.exportRequested.connect(lambda: self.export_manager.trigger_export_dialog("Notes"))
         editor.finished.connect(lambda result: self._on_note_editor_finished(result, editor, note_key, dock))
 
     def _handle_note_jump(self, book, chapter, verse, note_dock):
@@ -832,6 +881,19 @@ class MainWindow(QMainWindow):
         appearance_act = QAction("Appearance Settings", self)
         appearance_act.triggered.connect(self._show_appearance_settings)
         edit_menu.addAction(appearance_act)
+
+        file_menu.addSeparator()
+        
+        # --- Export Menu ---
+        export_menu = file_menu.addMenu("Export")
+        
+        export_notes_act = QAction("Export Notes...", self)
+        export_notes_act.triggered.connect(lambda: self.export_manager.trigger_export_dialog("Notes"))
+        export_menu.addAction(export_notes_act)
+        
+        export_outline_act = QAction("Export Outline...", self)
+        export_outline_act.triggered.connect(lambda: self.export_manager.trigger_export_dialog("Outlines"))
+        export_menu.addAction(export_outline_act)
 
         file_menu.addSeparator()
         exit_act = QAction("Exit", self)
