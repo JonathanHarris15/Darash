@@ -44,9 +44,9 @@ jobs:
         pyinstaller jehu_reader.spec
 
     # Windows-specific: Create Installer
-    - name: Set up Inno Setup
+    - name: Install Inno Setup
       if: matrix.os == 'windows-latest'
-      uses: MinchinWeb/setup-innosetup-action@v1
+      run: choco install innosetup
     - name: Run Inno Setup
       if: matrix.os == 'windows-latest'
       run: iscc installer/windows_setup.iss
