@@ -88,6 +88,7 @@
 | `components/outline_dialog.py` | `OutlineDialog` | Modal dialog for creating/naming a new outline |
 | `components/outline_panel.py` | `OutlinePanel` | Central-area panel displaying and editing a single book outline tree |
 | `components/placeholder_panel.py` | `PlaceholderPanel` | Empty dock used as a layout anchor when no panel is active |
+| `components/pseudo_tab_title_bar.py` | `PseudoTabTitleBar` | Custom title bar for docks that mimics a tabbed interface |
 | `components/reading_view_link_manager.py` | `ReadingViewLinkManager` | Manages scroll synchronization between linked `ReaderWidget` instances |
 | `components/reading_view_panel.py` | `ReadingViewPanel` | Thin wrapper panel that houses a `ReaderWidget` inside the central splitter |
 | `components/search_bar.py` | `SearchBar` | Floating HUD search input, operator buttons, scope toggles |
@@ -133,7 +134,9 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/core/test_search_engine.py` | `SearchEngine` query parsing, logical ops, scoped search |
 | `tests/core/test_multi_translation_loader.py` | `VerseLoader` multi-format and interlinear loading |
 | `tests/managers/test_study_manager.py` | Mark/note save-load, undo/redo |
+| `tests/managers/test_strongs_manager.py` | Strong's number indexing and top-word extraction |
 | `tests/managers/test_outline_manager_scrubbing.py` | Outline split, merge, scrub operations |
+| `tests/scene/test_layout_engine.py` | `LayoutEngine` geometry calculation, hit-testing, ref-finding |
 | `tests/scene/test_scene_interactions.py` | `SceneInteractionManager` click/select logic |
 | `tests/scene/test_scene_overlay.py` | `SceneOverlayManager` arrow/mark item creation |
 | `tests/ui/test_layout_and_movement.py` | Dock layout, panel movement |
@@ -143,6 +146,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/ui/test_widget_resize.py` | Widget resize behaviour |
 | `tests/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
 | `tests/utils/test_reader_utils.py` | Bounding rect calculations, coordinate mapping |
+| `tests/utils/test_snake_path_finder.py` | `SnakePathFinder` path algorithm validation |
 | `tests/utils/test_exporter.py` | PDF and DOCX generation with various options |
 | `tests/utils/test_export_manager.py` | `ExportManager` dialog triggering and content extraction logic |
 | `tests/utils/test_update_manager.py` | `UpdateManager` version comparison and parsing logic |
@@ -196,7 +200,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
-| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.1) |
 | Top-level window / docks / menu | `ui/main_window.py` |
 | GraphicsView container / HUD | `ui/reader_widget.py` |
 | Multiple reading views / splits | `ui/components/center_split_manager.py` |

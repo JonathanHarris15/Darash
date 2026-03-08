@@ -324,3 +324,45 @@ class LayoutEngine:
             })
             
         scene.sectionsUpdated.emit(section_data, total_verses)
+
+    def get_ref_from_pos(self, pos):
+        scene = self.scene
+        if not scene.pos_verse_map: return None
+        import bisect
+        idx = bisect.bisect_right(scene.pos_verse_map, (pos, "zzzzzz")) - 1
+        return scene.pos_verse_map[idx][1] if idx >= 0 else None
+
+    def get_sentence_ref_at_pos(self, scene_pos):
+        scene = self.scene
+        doc_pos = scene.main_text_item.mapFromScene(scene_pos)
+        pos = scene.main_text_item.document().documentLayout().hitTest(doc_pos, Qt.FuzzyHit)
+        if pos == -1: return None
+        
+        ref = self.get_ref_from_pos(pos)
+        if not ref: return None
+        if not scene.sentence_break_enabled: return ref
+        
+        block = scene.main_text_item.document().findBlock(pos)
+        block_pos = block.position()
+        
+        for s_ref, s_pos in scene.verse_pos_map.items():
+            if s_pos == block_pos and s_ref.startswith(ref + "|"):
+                return s_ref
+        
+        return ref + "|0"
+
+    def get_verse_y_midpoint(self, ref_before, ref_after):
+        scene = self.scene
+        if ref_before in scene.verse_y_map:
+            return scene.verse_y_map[ref_before][1]
+        return 0
+
+    def get_first_verse_y_top(self, ref):
+        scene = self.scene
+        if ref not in scene.verse_pos_map: return 0
+        doc = scene.main_text_item.document()
+        layout = doc.documentLayout()
+        block = doc.findBlock(scene.verse_pos_map[ref])
+        prev = block.previous()
+        rect = layout.blockBoundingRect(block)
+        return (layout.blockBoundingRect(prev).bottom() + rect.top()) / 2 if prev.isValid() else rect.top() - 5

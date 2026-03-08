@@ -208,43 +208,10 @@ class ReaderScene(QGraphicsScene):
             item.setVisible(self._is_rect_visible(item.sceneBoundingRect()))
 
     def _get_ref_from_pos(self, pos):
-        if not self.pos_verse_map: return None
-        idx = bisect.bisect_right(self.pos_verse_map, (pos, "zzzzzz")) - 1
-        return self.pos_verse_map[idx][1] if idx >= 0 else None
+        return self.layout_engine.get_ref_from_pos(pos)
     
     def _get_sentence_ref_at_pos(self, scene_pos):
-        doc_pos = self.main_text_item.mapFromScene(scene_pos)
-        pos = self.main_text_item.document().documentLayout().hitTest(doc_pos, Qt.FuzzyHit)
-        if pos == -1: return None
-        
-        # This is a bit tricky: find the verse ref, then if sentences are enabled, 
-        # find the block number and find our sub-ref.
-        ref = self._get_ref_from_pos(pos)
-        if not ref: return None
-        if not self.sentence_break_enabled: return ref
-        
-        block = self.main_text_item.document().findBlock(pos)
-        block_pos = block.position()
-        
-        # Search verse_pos_map for a sub-ref that matches this position
-        for s_ref, s_pos in self.verse_pos_map.items():
-            if s_pos == block_pos and s_ref.startswith(ref + "|"):
-                return s_ref
-        
-        return ref + "|0" # Default to first sentence
-
-    def _get_verse_y_midpoint(self, ref_before, ref_after):
-        if ref_before in self.verse_y_map:
-            return self.verse_y_map[ref_before][1]
-        return 0
-
-    def _get_first_verse_y_top(self, ref):
-        doc = self.main_text_item.document()
-        layout = doc.documentLayout()
-        block = doc.findBlock(self.verse_pos_map[ref])
-        prev = block.previous()
-        rect = layout.blockBoundingRect(block)
-        return (layout.blockBoundingRect(prev).bottom() + rect.top()) / 2 if prev.isValid() else rect.top() - 5
+        return self.layout_engine.get_sentence_ref_at_pos(scene_pos)
 
     def _get_text_rects(self, start, length):
         return get_text_rects(self.main_text_item, start, length)
@@ -344,20 +311,7 @@ class ReaderScene(QGraphicsScene):
         self.noteOpenRequested.emit(note_key, ref)
 
     def _on_note_editor_finished(self, result, editor, note_key):
-        from PySide6.QtWidgets import QDialog
-        if note_key in self.open_editors: del self.open_editors[note_key]
-        if result == QDialog.Accepted:
-            if note_key.startswith("standalone_"):
-                self.study_manager.data["notes"][note_key]["title"] = editor.get_title()
-                self.study_manager.data["notes"][note_key]["text"] = editor.get_text()
-                self.study_manager.save_data()
-            else:
-                ref_parts = note_key.split('|')
-                self.study_manager.add_note(ref_parts[0], ref_parts[1], ref_parts[2], int(ref_parts[3]), 
-                                           editor.get_text(), editor.get_title())
-            self._render_study_overlays(); self.studyDataChanged.emit()
-        elif result == NoteEditor.DELETE_CODE:
-            self.study_manager.delete_note(note_key); self._render_study_overlays(); self.studyDataChanged.emit()
+        self.interaction_manager.on_note_editor_finished(result, editor, note_key)
 
     def handle_search(self, text: str): self.search_manager.handle_search(text)
     def scroll_to_current_match(self): self.search_manager.scroll_to_current_match()
@@ -394,28 +348,9 @@ class ReaderScene(QGraphicsScene):
         super().contextMenuEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.is_dragging_divider:
-            self.is_dragging_divider = False
-            if self.drag_divider_ghost: 
-                if not self.drag_divider_ghost.isVisible() or getattr(self, '_current_drag_refs', (None, None)) == (None, None):
-                    self.removeItem(self.drag_divider_ghost); self.drag_divider_ghost = None; self.drag_divider_item = None
-                    self.views()[0].setCursor(Qt.ArrowCursor); event.accept(); return
-                
-                ref_before, ref_after = self._current_drag_refs
-                
-                if ref_after: # For boundaries, ref_before can be None
-                    item = self.drag_divider_item
-                    if item.split_idx == -2: 
-                        if self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], True, ref_after, self.loader):
-                            self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
-                    elif item.split_idx == -3: 
-                        if ref_before and self.study_manager.outline_manager.update_outline_boundary(item.parent_node["id"], False, ref_before, self.loader):
-                            self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
-                    elif item.split_idx >= 0 and ref_before:
-                        if self.study_manager.outline_manager.move_split_by_id(item.parent_node["id"], item.split_idx, ref_before, ref_after, self.loader):
-                            self.renderer._render_outline_overlays(); self.studyDataChanged.emit()
-                self.removeItem(self.drag_divider_ghost); self.drag_divider_ghost = None; self.drag_divider_item = None
-                self.views()[0].setCursor(Qt.ArrowCursor); event.accept(); return
+        if self.outline_manager.handle_mouse_release(event):
+            event.accept(); return
+            
         if event.button() != Qt.LeftButton: super().mouseReleaseEvent(event); return
         cursor = self.main_text_item.textCursor()
         if cursor.hasSelection():
@@ -496,135 +431,9 @@ class ReaderScene(QGraphicsScene):
 
     def mouseMoveEvent(self, event):
         self.last_mouse_scene_pos = event.scenePos()
-        if self.is_dragging_divider:
-            scene_pos = event.scenePos(); doc = self.main_text_item.document(); layout = doc.documentLayout()
-            best_gap_y, best_dist = -1, 1000
-            best_x = -1
-            best_pitch = 24
-            best_ref_before, best_ref_after = None, None
-            is_word_drag = bool(event.modifiers() & Qt.ControlModifier)
-            is_outer = self.drag_divider_item.split_idx < 0
-            
-            if is_word_drag:
-                for r, (y_top, y_bottom) in self.verse_y_map.items():
-                    if y_bottom < scene_pos.y() - 100 or y_top > scene_pos.y() + 100: continue
-                    idx = self.loader.get_verse_index(r)
-                    if idx < self.drag_bounds_min or (not is_outer and idx >= self.drag_bounds_max) or (is_outer and idx > self.drag_bounds_max): continue
-                    if self.drag_hard_min is not None and idx < self.drag_hard_min: continue
-                    if self.drag_hard_max is not None and idx >= self.drag_hard_max: continue
-                    
-                    v_data = self.loader.get_verse_by_ref(r)
-                    if not v_data: continue
-                    v_start_pos = self.verse_pos_map.get(r)
-                    if v_start_pos is None: continue
-                    
-                    for w_idx in range(len(v_data['tokens'])):
-                        w_offset = self._get_word_offset_in_verse(v_data, w_idx)
-                        rects = self._get_text_rects(v_start_pos + w_offset, len(v_data['tokens'][w_idx][0]))
-                        if not rects: continue
-                        rct = rects[-1]
-                        
-                        gap_x = rct.right()
-                        if w_idx + 1 < len(v_data['tokens']):
-                            n_offset = self._get_word_offset_in_verse(v_data, w_idx + 1)
-                            n_rects = self._get_text_rects(v_start_pos + n_offset, len(v_data['tokens'][w_idx + 1][0]))
-                            if n_rects:
-                                n_rct = n_rects[0]
-                                if abs(n_rct.center().y() - rct.center().y()) < 5:
-                                    gap_x = (rct.right() + n_rct.left()) / 2
-                                else:
-                                    gap_x += 4
-                        else:
-                            gap_x += 4
-                            
-                        gap_y = rct.center().y()
-                        pitch = rct.height() * self.line_spacing
-                        
-                        dist = ((scene_pos.x() - gap_x)**2 + (scene_pos.y() - gap_y)**2)**0.5
-                        if dist < best_dist and dist < 150:
-                            best_dist = dist
-                            best_x = gap_x
-                            best_gap_y = gap_y
-                            best_pitch = pitch
-                            best_ref_before = r + self.loader.word_idx_to_letters(w_idx)
-                            if w_idx < len(v_data['tokens']) - 1:
-                                best_ref_after = r + self.loader.word_idx_to_letters(w_idx + 1)
-                            else:
-                                next_idx = int(idx) + 1
-                                best_ref_after = self.loader.flat_verses[next_idx]['ref'] if next_idx < len(self.loader.flat_verses) else None
-            else:
-                if len(self.pos_verse_map) > 0:
-                    char_pos0, r0 = self.pos_verse_map[0]; idx0 = self.loader.get_verse_index(r0)
-                    if idx0 >= self.drag_bounds_min and idx0 <= self.drag_bounds_max:
-                        y_top0 = self._get_first_verse_y_top(r0)
-                        dist0 = abs(scene_pos.y() - y_top0)
-                        if dist0 < 50 and dist0 < best_dist: 
-                            best_dist, best_gap_y = dist0, y_top0
-                            best_ref_before, best_ref_after = None, r0
-                for i in range(len(self.pos_verse_map) - 1):
-                    char_pos1, r1 = self.pos_verse_map[i]; char_pos2, r2 = self.pos_verse_map[i+1]; idx_before = self.loader.get_verse_index(r1)
-                    if idx_before < self.drag_bounds_min or (not is_outer and idx_before >= self.drag_bounds_max) or (is_outer and idx_before > self.drag_bounds_max):
-                        continue
-                    if self.drag_hard_min is not None and idx_before < self.drag_hard_min: continue
-                    if self.drag_hard_max is not None and idx_before >= self.drag_hard_max: continue
-                    mid_y = self._get_verse_y_midpoint(r1, r2)
-                    dist = abs(scene_pos.y() - mid_y)
-                    if dist < 50 and dist < best_dist: 
-                        best_dist, best_gap_y = dist, mid_y
-                        best_ref_before, best_ref_after = r1, r2
-
-            if best_gap_y != -1: 
-                self._current_drag_refs = (best_ref_before, best_ref_after)
-                if is_word_drag:
-                    self.drag_divider_ghost.setLine(best_x, best_gap_y - best_pitch / 2, best_x, best_gap_y + best_pitch / 2)
-                else:
-                    self.drag_divider_ghost.setLine(self.side_margin, best_gap_y, self.sceneRect().width() - 10, best_gap_y)
-                self.drag_divider_ghost.show()
-            else: 
-                self._current_drag_refs = (None, None)
-                self.drag_divider_ghost.hide()
+        if self.outline_manager.handle_mouse_move(event):
             super().mouseMoveEvent(event); return
-        if self.active_outline_id:
-            scene_pos = event.scenePos(); tolerance = 25; found_gap = False
             
-            # Find the exact visual gap between whole verses (ignoring internal sentence breaks)
-            refs = list(self.verse_y_map.keys())
-            doc = self.main_text_item.document()
-            layout = doc.documentLayout()
-            
-            best_dist = tolerance
-            best_mid_y = None
-            
-            for i in range(len(refs) - 1):
-                # We skip checking anything that's too far away vertically to stay fast
-                _, prev_bottom = self.verse_y_map[refs[i]]
-                next_top, _ = self.verse_y_map[refs[i + 1]]
-                if scene_pos.y() < prev_bottom - 200 or scene_pos.y() > next_top + 200:
-                    continue
-                    
-                block2 = doc.findBlock(self.verse_pos_map[refs[i + 1]])
-                block1 = block2.previous()
-                if block1.isValid() and block2.isValid():
-                    mid_y = (layout.blockBoundingRect(block1).bottom() + layout.blockBoundingRect(block2).top()) / 2
-                else:
-                    mid_y = (prev_bottom + next_top) / 2
-                
-                dist = abs(scene_pos.y() - mid_y)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_mid_y = mid_y
-                    
-            if best_mid_y is not None:
-                if not self.ghost_line_item:
-                    from PySide6.QtGui import QPen; pen = QPen(QColor("#AAAAAA"), 1.0, Qt.DotLine); color = QColor("#AAAAAA"); color.setAlpha(80); pen.setColor(color)
-                    from PySide6.QtWidgets import QGraphicsLineItem; self.ghost_line_item = QGraphicsLineItem(self.side_margin, best_mid_y, self.sceneRect().width() - 10, best_mid_y)
-                    self.ghost_line_item.setPen(pen); self.addItem(self.ghost_line_item)
-                else: 
-                    self.ghost_line_item.setLine(self.side_margin, best_mid_y, self.sceneRect().width() - 10, best_mid_y)
-                found_gap = True
-                    
-            if not found_gap and self.ghost_line_item: self.removeItem(self.ghost_line_item); self.ghost_line_item = None
-        elif self.ghost_line_item: self.removeItem(self.ghost_line_item); self.ghost_line_item = None
         self.input_handler.handle_mouse_move(event); super().mouseMoveEvent(event)
 
     def keyReleaseEvent(self, event):

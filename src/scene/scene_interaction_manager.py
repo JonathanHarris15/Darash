@@ -110,3 +110,20 @@ class SceneInteractionManager(QObject):
         
         scene.open_note_by_key(note_key, ref)
         scene._clear_selection()
+
+    def on_note_editor_finished(self, result, editor, note_key):
+        from PySide6.QtWidgets import QDialog
+        scene = self.scene
+        if note_key in scene.open_editors: del scene.open_editors[note_key]
+        if result == QDialog.Accepted:
+            if note_key.startswith("standalone_"):
+                scene.study_manager.data["notes"][note_key]["title"] = editor.get_title()
+                scene.study_manager.data["notes"][note_key]["text"] = editor.get_text()
+                scene.study_manager.save_data()
+            else:
+                ref_parts = note_key.split('|')
+                scene.study_manager.add_note(ref_parts[0], ref_parts[1], ref_parts[2], int(ref_parts[3]), 
+                                           editor.get_text(), editor.get_title())
+            scene._render_study_overlays(); scene.studyDataChanged.emit()
+        elif result == NoteEditor.DELETE_CODE:
+            scene.study_manager.delete_note(note_key); scene._render_study_overlays(); scene.studyDataChanged.emit()
