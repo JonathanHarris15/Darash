@@ -15,7 +15,7 @@ OutputBaseFilename=JehuReader_Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-IconFilename=..\resources\icons\app_icon.ico
+SetupIconFile=..\resources\icons\app_icon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
