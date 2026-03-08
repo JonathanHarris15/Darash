@@ -25,6 +25,12 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+import os
+
+# Helper to provide icon if it exists
+def get_icon(path):
+    return path if os.path.exists(path) else None
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -45,13 +51,13 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['resources/icons/app_icon.ico'], # Note: User may need to provide this ico
+    icon=get_icon('resources/icons/app_icon.ico'),
 )
 
 app = BUNDLE(
     exe,
     name='JehuReader.app',
-    icon='resources/icons/app_icon.icns', # Mac icon (optional)
+    icon=get_icon('resources/icons/app_icon.icns'),
     bundle_identifier='com.jonathan.jehu-reader',
     info_plist={
         'NSHighResolutionCapable': 'True',
