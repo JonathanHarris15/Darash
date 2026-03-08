@@ -1,4 +1,4 @@
-name: Build and Release
+name: Multi-Platform Build and Release
 
 on:
   push:
@@ -10,7 +10,17 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: JehuReader.exe
+            release_name: JehuReader_Setup.exe
+          - os: macos-latest
+            artifact_name: JehuReader.app
+            release_name: JehuReader.dmg
 
     steps:
     - name: Checkout code
@@ -26,15 +36,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
+        if [ "$RUNNER_OS" == "macOS" ]; then pip install dmgbuild; fi
+      shell: bash
 
     - name: Build with PyInstaller
       run: |
         pyinstaller jehu_reader.spec
 
-    - name: Create Release
-      id: create_release
+    # Windows-specific: Create Installer
+    - name: Create Windows Setup
+      if: matrix.os == 'windows-latest'
+      uses: say8425/setup-innosetup@v1
+    - name: Run Inno Setup
+      if: matrix.os == 'windows-latest'
+      run: iscc installer/windows_setup.iss
+
+    # macOS-specific: Create DMG
+    - name: Create macOS DMG
+      if: matrix.os == 'macos-latest'
+      run: |
+        hdiutil create -volname "Jehu Reader" -srcfolder dist/JehuReader.app -ov -format UDZO dist/JehuReader.dmg
+
+    - name: Upload Release Assets
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/JehuReader.exe
+        files: |
+          dist/JehuReader_Setup.exe
+          dist/JehuReader.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

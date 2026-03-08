@@ -47,3 +47,14 @@ exe = EXE(
     entitlements_file=None,
     icon=['resources/icons/app_icon.ico'], # Note: User may need to provide this ico
 )
+
+app = BUNDLE(
+    exe,
+    name='JehuReader.app',
+    icon='resources/icons/app_icon.icns', # Mac icon (optional)
+    bundle_identifier='com.jonathan.jehu-reader',
+    info_plist={
+        'NSHighResolutionCapable': 'True',
+        'LSBackgroundOnly': 'False',
+    },
+)

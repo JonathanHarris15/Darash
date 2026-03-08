@@ -149,6 +149,16 @@ Mirrors `src/` structure. Add new test files here as features are built.
 
 ---
 
+## Packaging & Distribution
+
+| Folder / File | Type | Responsibility |
+|---|---|---|
+| `jehu_reader.spec` | PyInstaller | Cross-platform build config (Windows EXE & Mac APP) |
+| `installer/windows_setup.iss` | Inno Setup | Windows professional installer (Setup.exe) generation |
+| `.github/workflows/release.yml` | GitHub Action | Multi-OS build matrix (Windows/Mac), installer creation, and GitHub Release automation |
+
+---
+
 ## Virtual Coordinate System
 
 - `virtual_scroll_y ∈ [0.0, len(flat_verses)]` — stable identifier for scroll position independent of zoom/font.

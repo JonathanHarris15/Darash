@@ -55,46 +55,60 @@ class UpdateManager:
     @staticmethod
     def start_update(release_info):
         """
-        Downloads the latest executable and launches a detached batch script 
-        to replace the current running file.
+        Downloads the latest executable/installer and handles replacement.
         """
         assets = release_info.get('assets', [])
         download_url = None
         
-        # Look for the first .exe asset
+        # Detect platform asset
+        extension = ".exe" if sys.platform == "win32" else ".dmg"
         for asset in assets:
-            if asset['name'].lower().endswith('.exe'):
+            if asset['name'].lower().endswith(extension):
                 download_url = asset['browser_download_url']
                 break
         
         if not download_url:
-            print("[UpdateManager] No executable asset found in latest release.")
+            print(f"[UpdateManager] No {extension} asset found in latest release.")
             return False
 
         try:
-            current_exe = os.path.abspath(sys.executable)
-            if not current_exe.lower().endswith('.exe'):
-                print("[UpdateManager] Self-update is only supported when running as a compiled EXE.")
-                return False
-
-            # Prepare paths
             temp_dir = tempfile.gettempdir()
-            new_exe_path = os.path.join(temp_dir, "JehuReader_update.exe")
-            batch_script_path = os.path.join(temp_dir, "apply_jehu_update.bat")
+            filename = "JehuReader_update" + extension
+            new_file_path = os.path.join(temp_dir, filename)
 
             print(f"[UpdateManager] Downloading update from {download_url}...")
             
-            # Download new EXE
+            # Download new file
             req = urllib.request.Request(download_url)
             req.add_header('User-Agent', 'Jehu-Reader-Updater')
-            with urllib.request.urlopen(req) as response, open(new_exe_path, 'wb') as out_file:
+            with urllib.request.urlopen(req) as response, open(new_file_path, 'wb') as out_file:
                 out_file.write(response.read())
 
-            print(f"[UpdateManager] Update downloaded to {new_exe_path}. Preparing replacement.")
+            if sys.platform == "win32":
+                return UpdateManager._apply_windows_update(new_file_path)
+            elif sys.platform == "darwin":
+                # On Mac, just open the DMG
+                print("[UpdateManager] Opening DMG for manual installation.")
+                subprocess.Popen(["open", new_file_path])
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"[UpdateManager] Critical error during update: {e}")
+            return False
 
-            # Create the Windows batch script to handle replacement after this process exits
-            # Using 'timeout' to wait for the current process to close
-            batch_content = f"""@echo off
+    @staticmethod
+    def _apply_windows_update(new_exe_path):
+        """Windows-specific self-replacement logic using a batch script."""
+        current_exe = os.path.abspath(sys.executable)
+        if not current_exe.lower().endswith('.exe'):
+            print("[UpdateManager] Self-update only supported for compiled EXE.")
+            return False
+
+        temp_dir = tempfile.gettempdir()
+        batch_script_path = os.path.join(temp_dir, "apply_jehu_update.bat")
+        
+        batch_content = f"""@echo off
 echo Finalizing Jehu Reader update...
 timeout /t 2 /nobreak > nul
 del /f /q "{current_exe}"
@@ -102,18 +116,12 @@ move /y "{new_exe_path}" "{current_exe}"
 start "" "{current_exe}"
 del "%~f0"
 """
-            with open(batch_script_path, 'w') as f:
-                f.write(batch_content)
+        with open(batch_script_path, 'w') as f:
+            f.write(batch_content)
 
-            # Launch the batch script detached
-            print("[UpdateManager] Launching updater script and exiting...")
-            subprocess.Popen(
-                ["cmd.exe", "/c", batch_script_path],
-                creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS,
-                shell=True
-            )
-            
-            return True
-        except Exception as e:
-            print(f"[UpdateManager] Critical error during update: {e}")
-            return False
+        subprocess.Popen(
+            ["cmd.exe", "/c", batch_script_path],
+            creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS,
+            shell=True
+        )
+        return True
