@@ -89,5 +89,5 @@ BIBLE_SECTIONS = [
 
 # Application Info
 APP_VERSION = "0.1.0"
-GITHUB_REPO = "jono1/Jehu-Reader"  # Updated from user/Jehu-Reader to match local path
+GITHUB_REPO = "JonathanHarris15/Darash"  # Updated from user/Jehu-Reader to match local path
 GITHUB_API_LATEST_RELEASE = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
