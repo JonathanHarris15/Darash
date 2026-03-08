@@ -12,6 +12,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 OutputBaseFilename=JehuReader_Setup
+OutputDir=..\dist
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
