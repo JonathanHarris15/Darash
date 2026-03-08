@@ -2,6 +2,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 from src.utils.update_manager import UpdateManager
 from src.core.constants import APP_VERSION
+from src.ui.main_window import MainWindow
 
 def main():
     print(f"Starting Jehu Reader v{APP_VERSION}...")
