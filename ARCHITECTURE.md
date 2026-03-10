@@ -161,6 +161,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `jehu_reader.spec` | PyInstaller | Cross-platform build config (Windows EXE & Mac APP) |
 | `installer/windows_setup.iss` | Inno Setup | Windows professional installer (Setup.exe) generation |
 | `.github/workflows/release.yml` | GitHub Action | Multi-OS build matrix (Windows/Mac), installer creation, and GitHub Release automation |
+| `gh-release-tag/` | Gemini Skill | Custom command to automate version bumping, tagging, and pushing to GitHub |
 
 ---
 
@@ -201,7 +202,8 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
-| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.1) |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.2) |
+| Release Tagging / Build | `gh-release-tag/SKILL.md` (Gemini Skill) |
 | Top-level window / docks / menu | `ui/main_window.py` |
 | GraphicsView container / HUD | `ui/reader_widget.py` |
 | Multiple reading views / splits | `ui/components/center_split_manager.py` |
