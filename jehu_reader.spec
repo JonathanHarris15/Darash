@@ -2,11 +2,26 @@
 
 block_cipher = None
 
+import os
+
+# Helper to include files from junctions/subtrees that PyInstaller might skip
+def get_translation_files():
+    trans_dir = os.path.join('data', 'BibleTranslations', 'bible-master', 'bible-master', 'bible', 'translations')
+    files = []
+    if os.path.exists(trans_dir):
+        for f in os.listdir(trans_dir):
+            if f.endswith('.xml'):
+                # Source path, Destination path (relative to app root)
+                src = os.path.join(trans_dir, f)
+                dest = os.path.join('data', 'BibleTranslations', 'bible-master', 'bible-master', 'bible', 'translations')
+                files.append((src, dest))
+    return files
+
 added_files = [
     ('data', 'data'),
     ('resources', 'resources'),
     ('symbols_library', 'symbols_library'),
-]
+] + get_translation_files()
 
 a = Analysis(
     ['main.py'],
@@ -24,8 +39,6 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-import os
 
 # Helper to provide icon if it exists
 def get_icon(path):

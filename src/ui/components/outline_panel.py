@@ -147,7 +147,7 @@ class PrefixWidget(QLabel):
         if key == Qt.Key_Down:
             self.manipulateRequested.emit("down")
             return
-        if key == Qt.Key_Delete:
+        if key in (Qt.Key_Delete, Qt.Key_Backspace):
             self.manipulateRequested.emit("delete")
             return
         super().keyPressEvent(event)

@@ -139,6 +139,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/scene/test_layout_engine.py` | `LayoutEngine` geometry calculation, hit-testing, ref-finding |
 | `tests/scene/test_scene_interactions.py` | `SceneInteractionManager` click/select logic |
 | `tests/scene/test_scene_overlay.py` | `SceneOverlayManager` arrow/mark item creation |
+| `tests/scene/test_mac_delete_key.py` | Cross-platform Delete/Backspace key handling |
 | `tests/ui/test_layout_and_movement.py` | Dock layout, panel movement |
 | `tests/ui/test_main_window_layout.py` | Layout preset percentages |
 | `tests/ui/test_main_window_placeholder.py` | Placeholder dock positioning |

@@ -148,6 +148,11 @@ class TranslationSelector(QFrame):
         # New enabled interlinear follows the list order, excluding primary
         new_interlinear = [t for t in enabled_list if t != new_primary]
         
+        # Special case: if only one translation was active and we dragged a new primary,
+        # untoggle the old primary instead of making it interlinear.
+        if len(self.scene.enabled_interlinear) == 0 and new_primary != self.scene.primary_translation:
+             new_interlinear = []
+             
         # Update target settings in scene
         self.scene.target_primary_translation = new_primary
         self.scene.target_enabled_interlinear = new_interlinear

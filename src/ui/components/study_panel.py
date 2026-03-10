@@ -523,7 +523,7 @@ class StudyPanel(QWidget):
         if menu.actions(): menu.exec(self.tree.mapToGlobal(pos))
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Delete: self._delete_selected_items()
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace): self._delete_selected_items()
         else: super().keyPressEvent(event)
 
     def _change_mark_color(self, idx):

@@ -264,7 +264,8 @@ class OverlayRenderer:
                 y_top, y_bottom = scene.verse_y_map[base_ref]
                 
                 if not letters:
-                    return y_top, y_bottom, None, None
+                    visual_top = scene.layout_engine.get_first_verse_y_top(base_ref) if not is_end else y_top
+                    return visual_top, y_bottom, None, None
                 
                 word_idx = scene.loader.letters_to_word_idx(letters)
                 v_data = scene.loader.get_verse_by_ref(base_ref)
@@ -387,8 +388,7 @@ class OverlayRenderer:
                         if inline_pos:
                             draw_divider(inline_pos[1], child_divider_level, node, split_parent=node, split_idx=i, inline_pos=inline_pos)
                         else:
-                            mid_y = (child_bottom + next_child_top) / 2
-                            draw_divider(mid_y, child_divider_level, node, split_parent=node, split_idx=i)
+                            draw_divider(next_child_top, child_divider_level, node, split_parent=node, split_idx=i)
             
                 for child in children:
                     render_node(child, level + 1, node_is_active)

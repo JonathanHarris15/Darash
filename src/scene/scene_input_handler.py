@@ -39,7 +39,7 @@ class SceneInputHandler(QObject):
                 scene.studyDataChanged.emit()
             return True
 
-        if key == Qt.Key_Delete:
+        if key in (Qt.Key_Delete, Qt.Key_Backspace):
             self._handle_delete_key()
             return True
 

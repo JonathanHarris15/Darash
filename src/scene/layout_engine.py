@@ -212,7 +212,7 @@ class LayoutEngine:
                     block = doc.findBlock(pos)
                     rect = layout.blockBoundingRect(block)
                     
-                    # Calculate top bound: if first sentence of chunk, own from 0.0
+                    # Calculate top bound: if first sentence of chunk, own from 0.0 (respecting heading)
                     if s_idx == 0:
                         if i == 0:
                             y_top = 0.0
@@ -235,10 +235,22 @@ class LayoutEngine:
                     scene.verse_y_map[s_ref] = (y_top, y_bottom)
                     s_idx += 1
                 
-                # Main verse ref spans all its sentences
+                # Main verse ref spans all its sentences AND all interlinear blocks
                 first_s = f"{ref}|0"
-                last_s = f"{ref}|{s_idx-1}"
-                scene.verse_y_map[ref] = (scene.verse_y_map[first_s][0], scene.verse_y_map[last_s][1])
+                y_top = scene.verse_y_map[first_s][0]
+                
+                # Use the position of the VERY last block in the stack (primary or interlinear)
+                last_pos = scene.verse_stack_end_pos.get(ref, scene.verse_pos_map[first_s])
+                last_block = doc.findBlock(last_pos)
+                last_rect = layout.blockBoundingRect(last_block)
+                
+                next_block = last_block.next()
+                if i == len(chunk_verses) - 1 and not next_block.isValid():
+                    y_bottom = layout.documentSize().height()
+                else:
+                    y_bottom = (last_rect.bottom() + layout.blockBoundingRect(next_block).top()) / 2 if next_block.isValid() else last_rect.bottom()
+                
+                scene.verse_y_map[ref] = (y_top, y_bottom)
             else:
                 pos = scene.verse_pos_map[ref]
                 block = doc.findBlock(pos)
