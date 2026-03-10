@@ -162,6 +162,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `installer/windows_setup.iss` | Inno Setup | Windows professional installer (Setup.exe) generation |
 | `.github/workflows/release.yml` | GitHub Action | Multi-OS build matrix (Windows/Mac), installer creation, and GitHub Release automation |
 | `gh-release-tag/` | Gemini Skill | Custom command to automate version bumping, tagging, and pushing to GitHub |
+| `scripts/lab/` | `HotReloadHarness` | Standalone runners for UI components to enable rapid styling in isolation; includes hot-reload capability |
 
 ---
 
@@ -212,6 +213,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Export (Notes/Outlines) | utils/export_manager.py, ui/components/export_dialog.py |
 | Note editor (rich text) | ui/components/note_editor.py |
 185: | User Guide / Features | docs/features_guide.md |
+| **Create Lab / Styling** | **(Workflow)** `/create-lab` |
 
 | Outline tree panel (central) | `ui/components/outline_panel.py` |
 | Study overview sidebar | `ui/components/study_panel.py` |

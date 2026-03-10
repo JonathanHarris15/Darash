@@ -53,3 +53,12 @@ Audit the live codebase against `ARCHITECTURE.md` and bring the document up to d
 4. For any file referenced in the doc but absent from the codebase, remove its row.
 5. Cross-check the **Feature → File Lookup** table rows against the updated registry and correct any stale mappings.
 6. Write the updated `ARCHITECTURE.md`.
+
+### `/create-lab`
+Create a standalone runner (Lab) for a UI component to enable rapid styling and testing in isolation.
+
+**Steps:**
+1.  Identify the target component.
+2.  Generate a runner script in `scripts/lab/`.
+3.  Provide the command to run the isolated component.
+
