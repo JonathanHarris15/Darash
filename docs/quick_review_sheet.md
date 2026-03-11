@@ -8,3 +8,4 @@ Example: "release v0.1.5" and it would run through all of the necessary scripts 
 ## Commands
 
 `/create-lab` - Creates a new lab setup for the component that you choose
+`/check-health` - Runs a health check on the application

@@ -2,7 +2,6 @@ from PySide6.QtWidgets import QMenu
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import QAction, QPen, QColor
 from PySide6.QtWidgets import QGraphicsLineItem
-from src.ui.components.outline_dialog import OutlineDialog
 
 class SceneOutlineManager:
     """
@@ -18,18 +17,7 @@ class SceneOutlineManager:
         sorted_refs = sorted(list(scene.selected_refs), key=lambda r: scene.loader.get_verse_index(r))
         start_ref = sorted_refs[0]
         end_ref = sorted_refs[-1]
-        
-        dialog = OutlineDialog(None, title="Book Outline", start_ref=start_ref, end_ref=end_ref)
-        if dialog.exec():
-            data = dialog.get_data()
-            if data["title"]:
-                node = scene.study_manager.outline_manager.create_outline(
-                    data["start_ref"], data["end_ref"], data["title"]
-                )
-                scene.studyDataChanged.emit()
-                scene._render_outline_overlays()
-                scene.outlineCreated.emit(node["id"])
-                scene.set_active_outline(node["id"])
+        scene.showOutlineDialog.emit(start_ref, end_ref)
 
     def create_outline_from_selection(self):
         scene = self.scene
@@ -40,16 +28,7 @@ class SceneOutlineManager:
         end_ref = scene._get_ref_from_pos(start + length - 1)
         
         if not start_ref or not end_ref: return
-        
-        dialog = OutlineDialog(None, title="New Outline", start_ref=start_ref, end_ref=end_ref)
-        if dialog.exec():
-            data = dialog.get_data()
-            if data["title"]:
-                scene.study_manager.outline_manager.create_outline(
-                    data["start_ref"], data["end_ref"], data["title"]
-                )
-                scene.studyDataChanged.emit() 
-                scene._render_outline_overlays()
+        scene.showOutlineDialog.emit(start_ref, end_ref)
 
     def start_divider_drag(self, pos):
         from src.scene.components.reader_items import OutlineDividerItem

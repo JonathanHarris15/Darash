@@ -5,6 +5,10 @@ import re
 from src.scene.reader_scene import ReaderScene
 from src.ui.components.jump_scrollbar import JumpScrollBar
 from src.ui.components.clickable_label import ClickableLabel
+from src.ui.components.mark_popup import MarkPopup
+from src.ui.components.suggested_symbols_dialog import SuggestedSymbolsDialog
+from src.ui.components.outline_dialog import OutlineDialog
+from src.ui.components.strongs_ui import StrongsTooltip, StrongsVerboseDialog
 from src.core.constants import (
     TEXT_COLOR, OVERLAY_BACKGROUND_COLOR,
     RESIZE_DEBOUNCE_INTERVAL, SELECTION_COLOR
@@ -45,6 +49,10 @@ class ReaderWidget(QWidget):
         self.ref_label.setStyleSheet(f"background-color: rgba(30, 30, 30, 200); color: {TEXT_COLOR.name()}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
         self.ref_label.hide()
 
+        # UI Components
+        self.mark_popup = MarkPopup(self)
+        self.strongs_tooltip = StrongsTooltip(self)
+        
         # --- Professional Loading Overlay ---
         self.overlay = QWidget(self.view)
         self.overlay.setStyleSheet(f"background-color: {OVERLAY_BACKGROUND_COLOR};")
@@ -94,8 +102,48 @@ class ReaderWidget(QWidget):
         self.scrollbar.valueChanged.connect(self.scene.set_scroll_y)
         self.ref_label.clicked.connect(self._on_ref_label_clicked)
         
+        # UI Signals from Scene
+        self.scene.showMarkPopup.connect(self._on_show_mark_popup)
+        self.scene.showSuggestedSymbols.connect(self._on_show_suggested_symbols)
+        self.scene.showOutlineDialog.connect(self._on_show_outline_dialog)
+        self.scene.showStrongsTooltip.connect(self._on_show_strongs_tooltip)
+        self.scene.showStrongsVerboseDialog.connect(self._on_show_strongs_verbose_dialog)
+        
+        # MarkPopup Connections
+        self.mark_popup.markSelected.connect(self.scene.interaction_manager.on_mark_selected)
+        self.mark_popup.addNoteRequested.connect(self.scene.interaction_manager.on_add_note_requested)
+        self.mark_popup.addBookmarkRequested.connect(self.scene.interaction_manager.on_add_bookmark_requested)
+        self.mark_popup.createOutlineRequested.connect(self.scene.outline_manager.create_outline_from_selection)
+        
         self.total_count = len(self.scene.loader.flat_verses)
         self.scrollbar.setMaximum(self.total_count)
+
+    def _on_show_mark_popup(self, pos, ref):
+        self.mark_popup.show_at(pos.toPoint() if isinstance(pos, QPointF) else pos)
+
+    def _on_show_suggested_symbols(self, top_words, heading_text):
+        dialog = SuggestedSymbolsDialog(top_words, heading_text, self)
+        dialog.exec()
+
+    def _on_show_outline_dialog(self, start_ref, end_ref):
+        dialog = OutlineDialog(self, start_ref=start_ref, end_ref=end_ref)
+        if dialog.exec():
+            data = dialog.get_data()
+            if data["title"]:
+                self.scene.outline_manager.create_outline(data["start_ref"], data["end_ref"], data["title"])
+
+    def _on_show_strongs_tooltip(self, pos, text):
+        if text:
+            self.strongs_tooltip.set_text(text)
+            self.strongs_tooltip.move(pos.toPoint() if isinstance(pos, QPointF) else pos)
+            self.strongs_tooltip.show()
+        else:
+            self.strongs_tooltip.hide()
+
+    def _on_show_strongs_verbose_dialog(self, sn, entry, usages):
+        dialog = StrongsVerboseDialog(sn, entry, usages, self)
+        dialog.jumpRequested.connect(self.scene.jump_to)
+        dialog.show()
 
     def _on_ref_label_clicked(self):
         ref = self.ref_label.text()

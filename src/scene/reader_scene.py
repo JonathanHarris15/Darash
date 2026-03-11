@@ -18,12 +18,6 @@ from src.scene.scene_indentation_manager import SceneIndentationManager
 from src.scene.scene_outline_manager import SceneOutlineManager
 from src.scene.scene_settings_manager import SceneSettingsManager
 
-from src.ui.components.mark_popup import MarkPopup
-from src.ui.components.note_editor import NoteEditor
-from src.ui.components.strongs_ui import StrongsTooltip
-from src.ui.components.suggested_symbols_dialog import SuggestedSymbolsDialog
-from src.ui.components.outline_dialog import OutlineDialog
-
 from src.scene.components.reader_items import NoFocusTextItem, VerseNumberItem, SentenceHandleItem
 
 from src.utils.reader_utils import (
@@ -62,6 +56,13 @@ class ReaderScene(QGraphicsScene):
     studyDataChanged = Signal()
     outlineCreated = Signal(str) # node_id
     noteOpenRequested = Signal(str, str) # note_key, ref
+    
+    # Domain-safe UI signals
+    showMarkPopup = Signal(QPointF, str) # global_pos, ref
+    showSuggestedSymbols = Signal(list, str) # top_words, heading_text
+    showOutlineDialog = Signal(str, str) # start_ref, end_ref
+    showStrongsTooltip = Signal(QPointF, str) # global_pos, text
+    showStrongsVerboseDialog = Signal(str, dict, list) # sn, entry, usages
 
     def __init__(self, parent=None, shared_resources=None):
         super().__init__(parent)
@@ -107,7 +108,6 @@ class ReaderScene(QGraphicsScene):
         self.addItem(self.main_text_item)
         
         self.strongs_enabled = False
-        self.strongs_tooltip = StrongsTooltip()
         self.strongs_overlay_items = []
         
         self.outlines_enabled = False
@@ -168,11 +168,6 @@ class ReaderScene(QGraphicsScene):
         self.outline_manager = SceneOutlineManager(self)
         self.settings_manager = SceneSettingsManager(self)
 
-        self.mark_popup = MarkPopup()
-        self.mark_popup.markSelected.connect(self.interaction_manager.on_mark_selected)
-        self.mark_popup.addNoteRequested.connect(self.interaction_manager.on_add_note_requested)
-        self.mark_popup.addBookmarkRequested.connect(self.interaction_manager.on_add_bookmark_requested)
-        self.mark_popup.createOutlineRequested.connect(self.outline_manager.create_outline_from_selection)
         self.current_selection = None
         
         self._init_timers()
@@ -188,7 +183,7 @@ class ReaderScene(QGraphicsScene):
     def _init_timers(self):
         self.flash_timer = QTimer(self)
         self.flash_timer.setInterval(50)
-        self.flash_timer.timeout.connect(self._update_flash_fade)
+        self.flash_timer.timeout.connect(self.renderer.update_flash_fade)
         
         self.layout_timer = QTimer(self)
         self.layout_timer.setSingleShot(True)
@@ -199,54 +194,33 @@ class ReaderScene(QGraphicsScene):
         self.scroll_timer.setInterval(16)
         self.scroll_timer.timeout.connect(self.update_scroll_step)
 
-    def _is_rect_visible(self, r):
-        buffer = 800 
-        return not (r.bottom() < self.scroll_y - buffer or r.top() > self.scroll_y + self.view_height + buffer)
+    def _is_rect_visible(self, r): return self.renderer._is_rect_visible(r)
 
     def _update_item_visibility(self):
         for item in self.study_overlay_items + self.search_overlay_items + self.outline_overlay_items:
             item.setVisible(self._is_rect_visible(item.sceneBoundingRect()))
 
-    def _get_ref_from_pos(self, pos):
-        return self.layout_engine.get_ref_from_pos(pos)
-    
-    def _get_sentence_ref_at_pos(self, scene_pos):
-        return self.layout_engine.get_sentence_ref_at_pos(scene_pos)
-
-    def _get_text_rects(self, start, length):
-        return get_text_rects(self.main_text_item, start, length)
-
-    def _get_word_offset_in_verse(self, verse_data, word_idx):
-        return get_word_offset_in_verse(verse_data, word_idx)
-
-    def _get_word_idx_from_pos(self, verse_data, pos):
-        return get_word_idx_from_pos(verse_data, pos)
+    def _get_ref_from_pos(self, pos): return self.layout_engine.get_ref_from_pos(pos)
+    def _get_sentence_ref_at_pos(self, scene_pos): return self.layout_engine.get_sentence_ref_at_pos(scene_pos)
+    def _get_text_rects(self, start, length): return get_text_rects(self.main_text_item, start, length)
+    def _get_word_offset_in_verse(self, v_data, w_idx): return get_word_offset_in_verse(v_data, w_idx)
+    def _get_word_idx_from_pos(self, v_data, pos): return get_word_idx_from_pos(v_data, pos)
 
     def recalculate_layout(self, width: float, center_verse_idx: int = None) -> None:
         self.layout_engine.recalculate_layout(width, center_verse_idx=center_verse_idx)
 
-    def apply_layout_changes(self):
-        self.settings_manager.apply_layout_changes()
-
-    def render_verses(self) -> None:
-        self.renderer.render_verses()
-
-    def _render_outline_overlays(self):
-        self.renderer._render_outline_overlays()
-
-    def _render_search_overlays(self):
-        self.renderer._render_search_overlays()
+    def apply_layout_changes(self): self.settings_manager.apply_layout_changes()
+    def render_verses(self) -> None: self.renderer.render_verses()
+    def _render_outline_overlays(self): self.renderer._render_outline_overlays()
+    def _render_search_overlays(self): self.renderer._render_search_overlays()
 
     def set_outlines_enabled(self, enabled: bool):
         self.outlines_enabled = enabled
-        if not enabled:
-            self._clear_outline_overlays()
-        else:
-            self.renderer._render_outline_overlays()
+        if not enabled: self._clear_outline_overlays()
+        else: self.renderer._render_outline_overlays()
 
     def set_active_outline(self, outline_id: str):
-        self.active_outline_id = outline_id
-        self.renderer._render_outline_overlays()
+        self.active_outline_id = outline_id; self.renderer._render_outline_overlays()
 
     def _clear_outline_overlays(self):
         for it in self.outline_overlay_items:
@@ -258,10 +232,8 @@ class ReaderScene(QGraphicsScene):
 
     def set_strongs_enabled(self, enabled: bool):
         self.strongs_enabled = enabled
-        if not enabled:
-            self._clear_strongs_overlays(); self.strongs_tooltip.hide()
-        else:
-            self.render_verses()
+        if not enabled: self._clear_strongs_overlays()
+        else: self.render_verses()
 
     def _clear_strongs_overlays(self):
         for it in self.strongs_overlay_items:
@@ -284,34 +256,10 @@ class ReaderScene(QGraphicsScene):
                     if rects: return rects[0].center()
         return None
 
-    def _render_study_overlays(self):
-        self.overlay_manager.render_study_overlays()
-
-    def _create_symbol_item(self, symbol_name, target_rect, opacity):
-        from PySide6.QtWidgets import QGraphicsPixmapItem
-        from PySide6.QtGui import QPixmap
-        pix_path = self.symbol_manager.get_symbol_path(symbol_name)
-        if not os.path.exists(pix_path): return None
-        target_h = int(target_rect.height() * 1.8)
-        cache_key = (symbol_name, target_h)
-        if cache_key in self.pixmap_cache: scaled_pix = self.pixmap_cache[cache_key]
-        else:
-            orig_pix = QPixmap(pix_path)
-            scaled_pix = orig_pix.scaled(target_h, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.pixmap_cache[cache_key] = scaled_pix
-        pix_item = QGraphicsPixmapItem(scaled_pix); pix_item.setOpacity(opacity)
-        pix_item.setAcceptedMouseButtons(Qt.NoButton); pix_item.setZValue(5)
-        x_pos = target_rect.left() + (target_rect.width() - scaled_pix.width()) / 2
-        y_pos = target_rect.top() + (target_rect.height() - scaled_pix.height()) / 2
-        pix_item.setPos(x_pos, y_pos)
-        return pix_item
-
-    def open_note_by_key(self, note_key, ref):
-        """Emit signal so MainWindow can open the note in the center dock."""
-        self.noteOpenRequested.emit(note_key, ref)
-
-    def _on_note_editor_finished(self, result, editor, note_key):
-        self.interaction_manager.on_note_editor_finished(result, editor, note_key)
+    def _render_study_overlays(self): self.overlay_manager.render_study_overlays()
+    def _create_symbol_item(self, name, rect, opacity): return self.renderer.create_symbol_item(name, rect, opacity)
+    def open_note_by_key(self, note_key, ref): self.noteOpenRequested.emit(note_key, ref)
+    def _on_note_editor_finished(self, r, ed, key): self.interaction_manager.on_note_editor_finished(r, ed, key)
 
     def handle_search(self, text: str): self.search_manager.handle_search(text)
     def scroll_to_current_match(self): self.search_manager.scroll_to_current_match()
@@ -320,75 +268,40 @@ class ReaderScene(QGraphicsScene):
     def clear_search(self): self.search_manager.clear_search()
 
     def contextMenuEvent(self, event):
-        view = self.views()[0]
-        # event.screenPos() is the native OS screen position of the right-click
-        global_pos = event.screenPos()
-        
-        heading_data = self._get_heading_at_pos(event.scenePos())
-        if heading_data:
-            menu = create_menu(view)
-            suggest_act = QAction("Get suggested symbols", menu)
-            suggest_act.triggered.connect(lambda: self._show_suggested_symbols_dialog(heading_data))
+        view = self.views()[0]; global_pos = event.screenPos()
+        h_data = self.interaction_manager.get_heading_at_pos(event.scenePos())
+        if h_data:
+            menu = create_menu(view); suggest_act = QAction("Get suggested symbols", menu)
+            suggest_act.triggered.connect(lambda: self.interaction_manager.show_suggested_symbols_dialog(h_data))
             menu.addAction(suggest_act); menu.exec(global_pos); event.accept(); return
-            
         item = self.itemAt(event.scenePos(), view.transform())
         if isinstance(item, VerseNumberItem):
             item.contextMenuRequested.emit(QPointF(global_pos)); event.accept(); return
-            
         cursor = self.main_text_item.textCursor()
         if not cursor.hasSelection():
             pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit)
             if pos != -1:
                 cursor.setPosition(pos); cursor.select(QTextCursor.WordUnderCursor); self.main_text_item.setTextCursor(cursor)
-                
         if cursor.hasSelection():
             self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            self.mark_popup.show_at(global_pos); self.render_verses(); event.accept(); return
-            
+            self.showMarkPopup.emit(global_pos, self._get_ref_from_pos(cursor.selectionStart()))
+            self.render_verses(); event.accept(); return
         super().contextMenuEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.outline_manager.handle_mouse_release(event):
-            event.accept(); return
-            
+        if self.outline_manager.handle_mouse_release(event): event.accept(); return
         if event.button() != Qt.LeftButton: super().mouseReleaseEvent(event); return
         cursor = self.main_text_item.textCursor()
         if cursor.hasSelection():
             self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
             view = self.views()[0]; screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
-            self.mark_popup.show_at(screen_pos)
+            self.showMarkPopup.emit(screen_pos, self._get_ref_from_pos(cursor.selectionStart()))
         else: self.current_selection = None
         self.render_verses(); super().mouseReleaseEvent(event)
 
-    def _clear_verse_selection(self):
-        for it in self.verse_number_items.values(): it.is_selected = False; it.update()
-        for it in self.sentence_handle_items.values(): it.is_selected = False; it.update()
-        self.selected_verse_items = []; self.selected_refs.clear(); self.last_clicked_verse_idx = -1
-
-    def _on_verse_num_context_menu(self, item, screen_pos):
-        if item.ref not in self.selected_refs: self._on_verse_num_clicked(item, False)
-        view = self.views()[0]
-        menu = create_menu(view)
-        
-        marks = [("❤ Heart", "heart"), ("? Question Mark", "question"), ("!! Attention", "attention"), ("★ Star", "star")]
-        for label, m_type in marks:
-            act = QAction(label, menu)
-            act.triggered.connect(lambda checked=False, mt=m_type: self._set_selected_verse_mark(mt))
-            menu.addAction(act)
-            
-        menu.addSeparator()
-        clear_act = QAction("Clear Mark", menu); clear_act.triggered.connect(lambda: self._set_selected_verse_mark(None)); menu.addAction(clear_act)
-        menu.addSeparator()
-        outline_act = QAction("Create Outline", menu); outline_act.triggered.connect(self.outline_manager.create_outline_from_verse_selection); menu.addAction(outline_act)
-        
-        if isinstance(screen_pos, QPointF):
-            menu.exec(screen_pos.toPoint())
-        else:
-            menu.exec(screen_pos)
-
-    def _set_selected_verse_mark(self, mark_type):
-        for ref in self.selected_refs: self.study_manager.set_verse_mark(ref, mark_type)
-        self.render_verses(); self.studyDataChanged.emit()
+    def _clear_verse_selection(self): self.interaction_manager.clear_verse_selection()
+    def _on_verse_num_context_menu(self, item, screen_pos): self.interaction_manager.on_verse_num_context_menu(item, screen_pos)
+    def _set_selected_verse_mark(self, mark_type): self.interaction_manager.set_selected_verse_mark(mark_type)
 
     def wheelEvent(self, event) -> None:
         if self.input_handler.handle_wheel(event): event.accept(); return
@@ -413,8 +326,7 @@ class ReaderScene(QGraphicsScene):
 
     def mousePressEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
-        if not isinstance(item, VerseNumberItem) and not isinstance(item, SentenceHandleItem): 
-            self._clear_verse_selection()
+        if not isinstance(item, VerseNumberItem) and not isinstance(item, SentenceHandleItem): self._clear_verse_selection()
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
@@ -425,28 +337,18 @@ class ReaderScene(QGraphicsScene):
 
     def _on_add_bookmark_requested(self): self.interaction_manager.on_add_bookmark_requested()
     def _on_add_note_requested(self): self.interaction_manager.on_add_note_requested()
-
     def keyPressEvent(self, event):
         if not self.input_handler.handle_key_press(event): super().keyPressEvent(event)
 
     def mouseMoveEvent(self, event):
         self.last_mouse_scene_pos = event.scenePos()
-        if self.outline_manager.handle_mouse_move(event):
-            super().mouseMoveEvent(event); return
-            
+        if self.outline_manager.handle_mouse_move(event): super().mouseMoveEvent(event); return
         self.input_handler.handle_mouse_move(event); super().mouseMoveEvent(event)
 
     def keyReleaseEvent(self, event):
         if not self.input_handler.handle_key_release(event): super().keyReleaseEvent(event)
 
-    def _apply_symbol_at_mouse(self, number_key):
-        mouse_pos = self.last_mouse_scene_pos
-        key = self._get_word_key_at_pos(mouse_pos)
-        if not key: return
-        symbol_id = self.symbol_manager.get_binding(number_key)
-        if symbol_id:
-            parts = key.split('|')
-            if len(parts) >= 4: self.study_manager.add_symbol(parts[0], parts[1], parts[2], int(parts[3]), symbol_id); self._render_study_overlays(); self.studyDataChanged.emit()
+    def _apply_symbol_at_mouse(self, number_key): self.interaction_manager.apply_symbol_at_mouse(number_key)
 
     def check_chunk_boundaries(self):
         buffer = 100 
@@ -489,55 +391,9 @@ class ReaderScene(QGraphicsScene):
         target_idx = self.loader.get_verse_index(f"{book} {chapter}:{verse}")
         if target_idx != -1: self.set_scroll_y(target_idx); self.flash_verse(f"{book} {chapter}:{verse}")
 
-    def flash_verse(self, ref):
-        if ref not in self.verse_pos_map: return
-        pos = self.verse_pos_map[ref]; doc = self.main_text_item.document(); rects = self._get_text_rects(pos, doc.findBlock(pos).length())
-        for r in rects:
-            from PySide6.QtWidgets import QGraphicsRectItem; from PySide6.QtGui import QBrush
-            item = QGraphicsRectItem(r); item.setBrush(QBrush(QColor(100, 200, 255, 100))); item.setPen(Qt.NoPen); item.setZValue(-2) 
-            self.addItem(item); self.flash_items.append([item, 1.0])
-        if not self.flash_timer.isActive(): self.flash_timer.start()
-
-    def _update_flash_fade(self):
-        to_remove = []
-        for i, (item, opacity) in enumerate(self.flash_items):
-            new_opacity = opacity - 0.05
-            if new_opacity <= 0: self.removeItem(item); to_remove.append(i)
-            else: item.setOpacity(new_opacity); self.flash_items[i][1] = new_opacity
-        for i in sorted(to_remove, reverse=True): self.flash_items.pop(i)
-        if not self.flash_items: self.flash_timer.stop()
-
-    def _on_verse_num_clicked(self, item, shift):
-        flat_refs = [v['ref'] for v in self.loader.flat_verses]; item_idx = flat_refs.index(item.ref)
-        if not shift:
-            self._clear_verse_selection(); self.selected_verse_items = [item]; item.is_selected = True; item.update()
-            self.last_clicked_verse_idx = item_idx; self.selected_refs.add(item.ref)
-        else:
-            # Shift-select only works for full verse numbers
-            if not isinstance(item, VerseNumberItem) or isinstance(item, SentenceHandleItem):
-                self._clear_verse_selection(); self.selected_verse_items = [item]; item.is_selected = True; item.update()
-                self.selected_refs.add(item.ref); return
-                
-            if self.last_clicked_verse_idx == -1: self._on_verse_num_clicked(item, False)
-            else:
-                start, end = min(self.last_clicked_verse_idx, item_idx), max(self.last_clicked_verse_idx, item_idx)
-                for it in self.verse_number_items.values(): it.is_selected = False; it.update()
-                for it in self.sentence_handle_items.values(): it.is_selected = False; it.update()
-                self.selected_refs.clear(); self.selected_verse_items = []
-                for i in range(start, end + 1):
-                    ref = flat_refs[i]; self.selected_refs.add(ref); it = self.verse_number_items.get(ref)
-                    if it: it.is_selected = True; it.update(); self.selected_verse_items.append(it)
-
-    def _get_heading_at_pos(self, scene_pos):
-        doc_pos = self.main_text_item.mapFromScene(scene_pos)
-        for rect, h_type, h_text in self.heading_rects:
-            if rect.contains(doc_pos): return (h_type, h_text)
-        return None
-
-    def _show_suggested_symbols_dialog(self, heading_data):
-        top_words = self.strongs_manager.get_top_strongs_words(heading_data[0], heading_data[1], self.loader.flat_verses)
-        if top_words: SuggestedSymbolsDialog(top_words, heading_data[1], self.views()[0]).exec()
-
+    def flash_verse(self, ref): self.renderer.flash_verse(ref)
+    def _on_verse_num_clicked(self, item, shift): self.interaction_manager.on_verse_num_clicked(item, shift)
+    def _show_suggested_symbols_dialog(self, heading_data): self.interaction_manager.show_suggested_symbols_dialog(heading_data)
     def _start_divider_drag(self, pos): self.outline_manager.start_divider_drag(pos)
 
     def _get_word_key_at_pos(self, scene_pos):
@@ -562,6 +418,5 @@ class ReaderScene(QGraphicsScene):
                     word_idx = self._get_word_idx_from_pos(verse_data, pos - self.verse_pos_map[ref])
                     if word_idx != -1 and word_idx < len(verse_data['tokens']):
                         token = verse_data['tokens'][word_idx]
-                        if len(token) > 1 and token[1]:
-                            return token[1], None
+                        if len(token) > 1 and token[1]: return token[1], None
         return None, None

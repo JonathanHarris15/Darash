@@ -1,6 +1,5 @@
 from PySide6.QtCore import Qt, QPointF, QObject, QTimer
 from PySide6.QtGui import QColor, QCursor, QTextCursor, QGuiApplication
-from PySide6.QtWidgets import QDialog, QMenu
 from src.scene.components.reader_items import ArrowItem, OutlineDividerItem
 
 class SceneInputHandler(QObject):
@@ -120,7 +119,6 @@ class SceneInputHandler(QObject):
         if self.d_key_pressed:
             # Cycle division levels
             scene_pos = event.scenePos()
-            # QGraphicsSceneWheelEvent uses delta()
             delta = event.delta()
             if self.scene.outline_manager.cycle_divider_at_pos(scene_pos, delta):
                 return True
@@ -148,29 +146,25 @@ class SceneInputHandler(QObject):
                 dist = abs(diff.x()) + abs(diff.y())
                 if dist > 10:
                     self.strongs_hover_timer.stop()
-                    scene.strongs_tooltip.hide()
+                    scene.showStrongsTooltip.emit(event.scenePos(), None) # Hide current
                     self.last_strongs_pos = event.scenePos()
                     self.strongs_hover_timer.start()
             else:
-                if self.strongs_hover_timer.isActive() or scene.strongs_tooltip.isVisible():
+                if self.strongs_hover_timer.isActive():
                     self.strongs_hover_timer.stop()
-                    scene.strongs_tooltip.hide()
+                scene.showStrongsTooltip.emit(event.scenePos(), None) # Hide current
 
     def _handle_strongs_lookup(self):
         scene = self.scene
-        from src.ui.components.strongs_ui import StrongsVerboseDialog
-        view = scene.views()[0]
         mouse_pos = scene.last_mouse_scene_pos
         sn_str, _ = scene._get_strongs_at_pos(mouse_pos)
         if sn_str:
-            scene.strongs_tooltip.hide()
+            scene.showStrongsTooltip.emit(mouse_pos, None) # Hide
             sn = sn_str.split()[0]
             entry = scene.strongs_manager.get_entry(sn)
             if entry:
                 usages = scene.strongs_manager.get_usages(sn)
-                dialog = StrongsVerboseDialog(sn, entry, usages, view)
-                dialog.jumpRequested.connect(scene.jump_to)
-                dialog.show()
+                scene.showStrongsVerboseDialog.emit(sn, entry, usages)
 
     def _handle_delete_key(self):
         scene = self.scene
@@ -323,4 +317,5 @@ class SceneInputHandler(QObject):
             if entry:
                 view = scene.views()[0]
                 screen_pos = view.viewport().mapToGlobal(view.mapFromScene(self.last_strongs_pos))
-                scene.strongs_tooltip.show_entry(sn, entry, screen_pos)
+                # Emit signal with Strong's data and global position
+                scene.showStrongsTooltip.emit(screen_pos, f"{sn}: {entry.get('gloss', '')}")

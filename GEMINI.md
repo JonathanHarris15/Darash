@@ -62,3 +62,12 @@ Create a standalone runner (Lab) for a UI component to enable rapid styling and 
 2.  Generate a runner script in `scripts/lab/`.
 3.  Provide the command to run the isolated component.
 
+### `/check-health`
+Audit the codebase architecture for domain violations and file size limits.
+
+**Steps:**
+1. Run `python scripts/check_health.py`.
+2. Review any `[VIOLATION]` or `[CRITICAL]` outputs.
+3. Refactor code to maintain architectural integrity.
+
+

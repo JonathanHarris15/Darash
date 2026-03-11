@@ -1,6 +1,6 @@
 import pytest
 from src.ui.main_window import MainWindow
-from src.utils.export_manager import ExportManager
+from src.ui.export_manager import ExportManager
 from src.ui.components.export_dialog import ExportDialog
 
 def test_trigger_export_dialog_does_not_crash(qtbot, monkeypatch):
