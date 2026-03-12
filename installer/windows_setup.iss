@@ -1,6 +1,6 @@
 ; Inno Setup Script for Jehu Reader
 #define MyAppName "Jehu Reader"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.3"
 #define MyAppPublisher "Jonathan Harris"
 #define MyAppExeName "JehuReader.exe"
 

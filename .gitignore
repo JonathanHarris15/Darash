@@ -4,7 +4,7 @@ venv/
 env/
 ENV/
 laptop-venv/
-BibleTranslations/
+# BibleTranslations/
 book_archive/
 
 # Python bytecode/cache
