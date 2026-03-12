@@ -29,6 +29,7 @@ class SceneSettingsManager:
         scene.sentence_break_enabled = settings.get("sentence_break_enabled", False)
         scene.primary_translation = settings.get("primary_translation", "ESV")
         scene.enabled_interlinear = settings.get("enabled_interlinear", [])
+        scene.scroll_sens = settings.get("scroll_sensitivity", SCROLL_SENSITIVITY)
         
         scene.target_font_size = scene.font_size
         scene.target_line_spacing = scene.line_spacing

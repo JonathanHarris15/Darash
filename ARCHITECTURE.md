@@ -68,12 +68,14 @@
 
 | File | Key Class / Contents | Responsibility |
 |---|---|---|
-| `reader_scene.py` | `ReaderScene` | **Facade coordinator only.** Owns all scene managers, routes events, exposes top-level API to `ReaderWidget` |
-| `layout_engine.py` | `LayoutEngine` | **Heart of the reader.** Computes `QTextDocument` word-wrap, virtual↔physical mapping, and multi-translation verse stacking. |
+| `reader_scene.py` | `ReaderScene` | **Facade coordinator only.** Owns all scene managers, routes events, exposes top-level API to `ReaderWidget`. Delegates scroll/chunk logic to `SceneStateManager` and search to `SceneSearchManager`. |
+| `scene_state_manager.py` | `SceneStateManager` | Manages virtual scroll position, physical scroll synchronization, and visible chunk boundaries. |
+| `layout_engine.py` | `LayoutEngine` | **Heart of the reader.** Computes `QTextDocument` word-wrap, virtual↔physical mapping, and multi-translation verse stacking. Provides geometric helpers for hit-testing and reference finding. |
 | `renderer.py` | `OverlayRenderer` | **Rendering facade.** Orchestrates specialized renderers for verse numbers, interlinear dividers, and visible chunk highlights. |
 | `outline_renderer.py` | `OutlineRenderer` | Paints hierarchical outline bands, draggable boundaries, and section summaries on the scene. |
 | `study_renderer.py` | `StudyRenderer` | Paints Strong's overlays, search highlights, symbols, and verse flash animations. |
-| `scene_input_handler.py` | `SceneInputHandler` | Centralised mouse & keyboard event dispatch. Delegates to interaction/indentation/outline managers |
+| `scene_input_handler.py` | `SceneInputHandler` | Centralised mouse & keyboard event dispatch. Delegates to specialized handlers. |
+| `scene_study_input_handler.py` | `SceneStudyInputHandler` | Handles specialized study interactions: arrows, strongs, and study-item deletions. |
 | `scene_interaction_manager.py` | `SceneInteractionManager` | Click logic: word selection, right-click context menu, mark application, symbol placement, arrow initiation |
 | `scene_indentation_manager.py` | `SceneIndentationManager` | Live drag logic for adjusting verse/sentence indentation handles |
 | `scene_overlay_manager.py` | `SceneOverlayManager` | Draws dynamic `QGraphicsItem` overlays: marks, symbols, arrows (including ghost arrows), hover highlights |
@@ -96,7 +98,8 @@
 |---|---|---|
 | `main_window.py` | `MainWindow` | Top-level `QMainWindow`. Assembles all docks/panels, handles menu bar, layout presets, dock visibility |
 | `main_window_layout.py` | `MainWindowLayoutMixin` | Mixin for `MainWindow` handling layout state saving, restoring, and presets |
-| `main_window_panels.py` | `MainWindowPanelsMixin` | Mixin for `MainWindow` handling panel creation, tracking, and teardown |
+| `main_window_panels.py` | `MainWindowPanelsMixin` | Mixin for `MainWindow` handling high-level panel creation and orchestration. Delegates dock operations and panel tracking to `MainWindowDockManager`. |
+| `main_window_dock_manager.py` | `MainWindowDockManager` | Handles low-level dock widget addition, tab management, dock cleanups, and dock event routing. |
 | `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar) |
 | `export_manager.py` | `ExportManager` | Orchestrates content extraction (Notes/Outlines) and export dialog flow |
 | `components/activity_bar.py` | `ActivityBar` | Left-edge icon bar that toggles panel visibility (similar to VS Code sidebar icons) |
@@ -122,7 +125,8 @@
 | `components/split_overlay.py` | `SplitOverlay` | Transparent drag target overlay shown when dragging a panel to split the view |
 | `components/strongs_ui.py` | `StrongsPanel` | Dock widget displaying Strong's dictionary entries and cross-references |
 | `components/study_panel.py` | `StudyPanel` | **Primary sidebar.** Layout container for the study overview tree |
-| `components/study_tree.py` | `StudyTreeWidget` | Hierarchical tree of study data: outlines, marks, notes, bookmarks |
+| `components/study_tree.py` | `StudyTreeWidget` | Hierarchical tree of study data. Delegates population to `StudyTreePopulator`. |
+| `components/study_tree_populator.py` | `StudyTreePopulator` | Logic for building and refreshing the study tree hierarchy from `StudyManager` data. |
 | `components/suggested_symbols_dialog.py` | `SuggestedSymbolsDialog` | Dialog that shows AI/rule-based suggested symbols for a selection |
 | `components/symbol_dialog.py` | `SymbolDialog` | Full symbol library browser and picker dialog |
 | `components/translation_selector.py` | `TranslationSelector` | Dropdown for toggling and reordering translations via drag-and-drop |
@@ -130,6 +134,7 @@
 | `components/styling_playground.py` | `StylingPlaygroundPanel` | Developer-only styling tool; showcases all theme tokens and component styles for rapid iteration via Lab runner |
 | `components/spellcheck_highlighter.py` | `SpellcheckHighlighter` | `QSyntaxHighlighter` that underlines misspelled words for `RichTextEdit` |
 | `components/spellcheck_title_edit.py` | `SpellcheckTitleEdit` | Single-line text input with spellcheck support for titles |
+| `components/export_dialog.py` | `ExportDialog` | Modal dialog for export options (font, spacing, orientation, format) with a live PDF/DOCX preview panel |
 
 ---
 
@@ -160,31 +165,42 @@ Mirrors `src/` structure. Add new test files here as features are built.
 
 | Test File | Covers |
 |---|---|
-| `tests/core/test_verse_loader.py` | `VerseLoader` parsing, flat index, lookups |
-| `tests/core/test_search_engine.py` | `SearchEngine` query parsing, logical ops, scoped search |
-| `tests/core/test_multi_translation_loader.py` | `VerseLoader` multi-format and interlinear loading |
-| `tests/managers/test_study_manager.py` | Mark/note save-load, undo/redo |
-| `tests/managers/test_strongs_manager.py` | Strong's number indexing and top-word extraction |
-| `tests/managers/test_outline_manager_scrubbing.py` | Outline split, merge, scrub operations |
-| `tests/scene/test_layout_engine.py` | `LayoutEngine` geometry calculation, hit-testing, ref-finding |
-| `tests/scene/test_scene_interactions.py` | `SceneInteractionManager` click/select logic |
-| `tests/scene/test_scene_overlay.py` | `SceneOverlayManager` arrow/mark item creation |
-| `tests/scene/test_mac_delete_key.py` | Cross-platform Delete/Backspace key handling |
-| `tests/ui/test_layout_and_movement.py` | Dock layout, panel movement |
-| `tests/ui/test_main_window_layout.py` | Layout preset percentages |
-| `tests/ui/test_main_window_placeholder.py` | Placeholder dock positioning |
-| `tests/ui/test_restore_layout_fallback.py` | Layout restore / fallback logic |
-| `tests/ui/test_widget_resize.py` | Widget resize behaviour |
-| `tests/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
-| `tests/utils/test_reader_utils.py` | Bounding rect calculations, coordinate mapping |
-| `tests/utils/test_snake_path_finder.py` | `SnakePathFinder` path algorithm validation |
-| `tests/utils/test_exporter.py` | PDF and DOCX generation with various options |
-| `tests/utils/test_export_manager.py` | `ExportManager` dialog triggering and content extraction logic |
-| `tests/utils/test_update_manager.py` | `UpdateManager` version comparison and parsing logic |
-| `tests/managers/test_release_note_manager.py` | `ReleaseNoteManager` | View tracking, version detection, file discovery |
-| `tests/managers/test_spellcheck_manager.py` | `SpellcheckManager` | Basic spellcheck, suggestions, and custom dictionary persistence |
-| `tests/scene/test_scene_outline_manager.py` | `SceneOutlineManager` | Creation delegation and UI refresh signals |
-| `tests/scene/test_scene_regression.py` | `ReaderScene` | **Foolproof event delegation protection** (wheel/key events) |
+| `tests/unit/core/test_verse_loader.py` | `VerseLoader` parsing, flat index, lookups |
+| `tests/unit/core/test_search_engine.py` | `SearchEngine` query parsing, logical ops, scoped search |
+| `tests/unit/core/test_multi_translation_loader.py` | `VerseLoader` multi-format and interlinear loading |
+| `tests/unit/managers/test_study_manager.py` | Mark/note save-load, undo/redo |
+| `tests/unit/managers/test_strongs_manager.py` | Strong's number indexing and top-word extraction |
+| `tests/unit/managers/test_outline_manager_scrubbing.py` | Outline split, merge, scrub operations |
+| `tests/unit/scene/test_layout_engine.py` | `LayoutEngine` geometry calculation, hit-testing, ref-finding |
+| `tests/integration/scene/test_scene_interactions.py` | `SceneInteractionManager` click/select logic |
+| `tests/integration/scene/test_scene_overlay.py` | `SceneOverlayManager` arrow/mark item creation |
+| `tests/unit/scene/test_mac_delete_key.py` | Cross-platform Delete/Backspace key handling |
+| `tests/e2e/ui/test_layout_and_movement.py` | Dock layout, panel movement |
+| `tests/e2e/ui/test_main_window_layout.py` | Layout preset percentages |
+| `tests/e2e/ui/test_main_window_placeholder.py` | Placeholder dock positioning |
+| `tests/e2e/ui/test_restore_layout_fallback.py` | Layout restore / fallback logic |
+| `tests/component/ui/test_widget_resize.py` | Widget resize behaviour |
+| `tests/component/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
+| `tests/unit/utils/test_reader_utils.py` | Bounding rect calculations, coordinate mapping |
+| `tests/unit/utils/test_snake_path_finder.py` | `SnakePathFinder` path algorithm validation |
+| `tests/unit/utils/test_exporter.py` | PDF and DOCX generation with various options |
+| `tests/component/ui/test_export_manager.py` | `ExportManager` dialog triggering and content extraction logic |
+| `tests/unit/utils/test_update_manager.py` | `UpdateManager` version comparison and parsing logic |
+| `tests/unit/managers/test_release_note_manager.py` | `ReleaseNoteManager` | View tracking, version detection, file discovery |
+| `tests/unit/managers/test_spellcheck_manager.py` | `SpellcheckManager` | Basic spellcheck, suggestions, and custom dictionary persistence |
+| `tests/integration/scene/test_scene_outline_manager.py` | `SceneOutlineManager` | Creation delegation and UI refresh signals |
+| `tests/component/scene/test_scene_regression.py` | `ReaderScene` | **Foolproof event delegation protection** (wheel/key events) |
+| `tests/integration/test_reader_pipeline.py` | `VerseLoader` -> `LayoutEngine` | **End-to-End Pipeline Verification** (Fixes packing regressions) |
+| `tests/component/test_scene_input_handler.py` | `SceneInputHandler` | Key/wheel delegation and accumulator logic |
+| `tests/component/test_study_tree_populator.py` | `StudyTreePopulator` | Tree hierarchy population and section validation |
+| `tests/e2e/test_app_startup.py` | `MainWindow` | Full app import and window initialization smoke test |
+| `tests/integration/scene/test_ghost_arrows.py` | `SceneOverlayManager`, `SceneInputHandler` | Ghost arrow rendering, hover coordination, and deletion logic |
+| `tests/unit/scene/test_layout_engine_boundary_fixes.py` | `LayoutEngine` | y-top/y-bottom boundary calculations with headings and interlinear blocks |
+| `tests/unit/utils/test_qt_images.py` | — | Manual exploratory script for Qt image rendering (not collected by pytest) |
+
+**Final Verification Results (v0.1.5):**
+- **Code Coverage:** 52%+ (Enforced by `check_tests.ps1`)
+- **Layers:** Unit, Component, Integration, End-to-End (E2E) confirmed stable.
 
 ---
 
@@ -240,7 +256,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `ui/theme.py`, `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
-| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.3) |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.4) |
 | **Release Notes** | `managers/release_note_manager.py`, `ui/components/release_note_dialog.py` |
 | **Spellcheck** | `managers/spellcheck_manager.py`, `ui/components/spellcheck_highlighter.py` |
 | **Styling / Theme Iteration** | `ui/components/styling_playground.py`, `ui/theme.py` |

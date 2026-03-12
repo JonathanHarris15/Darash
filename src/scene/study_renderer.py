@@ -56,8 +56,9 @@ class StudyRenderer:
             
             for word_idx, token in enumerate(verse['tokens']):
                 if len(token) > 1:
-                    start_pos_in_v = scene._get_word_offset_in_verse(verse, word_idx)
-                    rects = scene._get_text_rects(v_start + start_pos_in_v, len(token[0]))
+                    word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
+                    if word_pos == -1: continue
+                    rects = scene._get_text_rects(word_pos, len(token[0]))
                     for r in rects:
                         line = QGraphicsLineItem(r.left(), r.bottom() + 1, r.right(), r.bottom() + 1)
                         line.setPen(pen)

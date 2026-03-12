@@ -295,12 +295,202 @@ class LayoutEngine:
             
         scene.sectionsUpdated.emit(section_data, total_verses)
 
-    def get_ref_from_pos(self, pos):
+    def _get_ref_from_pos(self, pos):
         scene = self.scene
         if not scene.pos_verse_map: return None
         import bisect
         idx = bisect.bisect_right(scene.pos_verse_map, (pos, "zzzzzz")) - 1
         return scene.pos_verse_map[idx][1] if idx >= 0 else None
+
+    def _get_text_rects(self, start_pos, length):
+        scene = self.scene
+        doc = scene.main_text_item.document()
+        rects = []
+        
+        cur_pos = start_pos
+        end_pos = start_pos + length
+        
+        while cur_pos < end_pos:
+            block = doc.findBlock(cur_pos)
+            if not block.isValid():
+                break
+                
+            block_layout = block.layout()
+            block_pos = block.position()
+            rel_pos = cur_pos - block_pos
+            
+            line = block_layout.lineForTextPosition(rel_pos)
+            if not line.isValid():
+                cur_pos += 1
+                continue
+                
+            # Find how much of the desired text is on this line
+            line_end_rel = line.textStart() + line.textLength()
+            chunk_end_rel = min(end_pos - block_pos, line_end_rel)
+            
+            # Get X coordinates bounds for the chunk on this line
+            x_start, _ = line.cursorToX(rel_pos)
+            x_end, _ = line.cursorToX(chunk_end_rel)
+            
+            # Construct the rect in document coordinates
+            block_rect = doc.documentLayout().blockBoundingRect(block)
+            doc_x = block_rect.left()
+            doc_y = block_rect.top() + line.y()
+            
+            # x_start and x_end already include the block's leftMargin.
+            # block_rect.left() is the document-level margin.
+            # So (doc_x + x_start) is the absolute X within the document.
+            doc_rect = QRectF(doc_x + x_start, doc_y, x_end - x_start, line.height())
+            scene_rect = self.scene.main_text_item.mapToScene(doc_rect).boundingRect()
+            
+            if not rects or abs(scene_rect.top() - rects[-1].top()) > 5:
+                rects.append(scene_rect)
+            else:
+                rects[-1] = rects[-1].united(scene_rect)
+                
+            cur_pos = block_pos + chunk_end_rel
+            
+        return rects
+
+    def _get_word_idx_from_pos(self, verse_data, rel_pos):
+        # rel_pos here is the character offset relative to the START OF THE VERSE
+        # (including any block separators if it spans multiple blocks).
+        # However, QTextDocument.hitTest returns document-absolute positions.
+        # This function is used by _get_word_key_at_pos where rel_pos = pos - v_start.
+        accum = 0
+        for i, token in enumerate(verse_data['tokens']):
+            word = token[0]
+            if rel_pos >= accum and rel_pos < accum + len(word):
+                return i
+            accum += len(word) + 1
+        return -1
+
+    def _get_word_document_pos(self, ref, word_idx):
+        """Returns the document-absolute position of a word, accounting for sentence-break blocks."""
+        scene = self.scene
+        verse_data = scene.loader.get_verse_by_ref(ref)
+        if not verse_data: return -1
+        
+        v_start = scene.verse_pos_map.get(ref)
+        if v_start is None: return -1
+        
+        if not scene.sentence_break_enabled:
+            # Simple case: word_idx * (len + 1)
+            accum = 0
+            for i in range(word_idx):
+                accum += len(verse_data['tokens'][i][0]) + 1
+            return v_start + accum
+            
+        # Sentence-aware case: We must find which block this word falls into.
+        doc = scene.main_text_item.document()
+        curr_word_idx = 0
+        
+        s_idx = 0
+        while True:
+            s_ref = f"{ref}|{s_idx}"
+            if s_ref not in scene.verse_pos_map: break
+            
+            s_start = scene.verse_pos_map[s_ref]
+            block = doc.findBlock(s_start)
+            # Text in this block (excluding trailing newline)
+            s_text = block.text()
+            
+            # Count words in this sentence
+            # Note: The splitting logic in recalculate_layout uses re.split(r'(?<=...)[\s\u00A0]+')
+            # Here we just iterate tokens and see if they fit in s_text
+            block_accum = 0
+            while curr_word_idx < len(verse_data['tokens']):
+                token_text = verse_data['tokens'][curr_word_idx][0]
+                if curr_word_idx == word_idx:
+                    return s_start + block_accum
+                
+                # Check if next word + space fits
+                next_jump = len(token_text) + 1
+                if block_accum + len(token_text) <= len(s_text):
+                    block_accum += next_jump
+                    curr_word_idx += 1
+                else:
+                    # Word belongs to next block
+                    break
+            s_idx += 1
+            
+        return -1
+
+    def _get_word_key_at_pos(self, scene_pos):
+        scene = self.scene
+        doc_pos = scene.main_text_item.mapFromScene(scene_pos)
+        pos = scene.main_text_item.document().documentLayout().hitTest(doc_pos, Qt.FuzzyHit)
+        if pos == -1: return None
+        ref = self._get_ref_from_pos(pos)
+        if not ref: return None
+        verse_data = scene.loader.get_verse_by_ref(ref)
+        if not verse_data: return None
+        v_start = scene.verse_pos_map.get(ref)
+        if v_start is None: return None
+        
+        # When sentence breaks are on, 'pos' might be in a different block than v_start.
+        # v_start is always the start of sentence 0.
+        # We need the relative position within the verse's logical character stream.
+        doc = scene.main_text_item.document()
+        if scene.sentence_break_enabled:
+            # Reconstruct logical position by summing lengths of previous blocks in this verse
+            logical_pos = 0
+            found = False
+            s_idx = 0
+            while True:
+                s_ref = f"{ref}|{s_idx}"
+                if s_ref not in scene.verse_pos_map: break
+                s_start = scene.verse_pos_map[s_ref]
+                s_block = doc.findBlock(s_start)
+                if s_start <= pos < s_start + s_block.length():
+                    logical_pos += (pos - s_start)
+                    found = True
+                    break
+                logical_pos += s_block.length() # includes newline character
+                s_idx += 1
+            if not found: return None
+            rel_pos = logical_pos
+        else:
+            rel_pos = pos - v_start
+            
+        word_idx = self._get_word_idx_from_pos(verse_data, rel_pos)
+        if word_idx == -1: return None
+        return f"{verse_data['book']}|{verse_data['chapter']}|{verse_data['verse_num']}|{word_idx}"
+
+    def _get_strongs_at_pos(self, scene_pos):
+        scene = self.scene
+        key = self._get_word_key_at_pos(scene_pos)
+        if not key: return None, None
+        return scene.strongs_manager.get_strongs_for_key(key), key
+
+    def _get_word_rect(self, key):
+        scene = self.scene
+        if not key: return None
+        ref_parts = key.split('|')
+        if len(ref_parts) < 4: return None
+        ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
+        
+        word_idx = int(ref_parts[3])
+        
+        word_pos = self._get_word_document_pos(ref, word_idx)
+        if word_pos == -1: return None
+        
+        verse_data = scene.loader.get_verse_by_ref(ref)
+        if not verse_data or word_idx >= len(verse_data['tokens']): return None
+        token = verse_data['tokens'][word_idx][0]
+        
+        rects = self._get_text_rects(word_pos, len(token))
+        return rects[0] if rects else None
+
+    def _get_word_center(self, key):
+        rect = self._get_word_rect(key)
+        return rect.center() if rect else None
+
+    def _get_word_offset_in_verse(self, verse_data, word_idx):
+        offset = 0
+        for i in range(word_idx):
+            offset += len(verse_data['tokens'][i][0]) + 1
+        return offset
 
     def get_sentence_ref_at_pos(self, scene_pos):
         scene = self.scene
@@ -308,7 +498,7 @@ class LayoutEngine:
         pos = scene.main_text_item.document().documentLayout().hitTest(doc_pos, Qt.FuzzyHit)
         if pos == -1: return None
         
-        ref = self.get_ref_from_pos(pos)
+        ref = self._get_ref_from_pos(pos)
         if not ref: return None
         if not scene.sentence_break_enabled: return ref
         

@@ -16,24 +16,24 @@ class TestMacDeleteKey(unittest.TestCase):
 
     def test_backspace_triggers_delete(self):
         """Verify that Backspace (Mac Delete) triggers the delete handler."""
-        # Mock _handle_delete_key to see if it's called
-        with patch.object(SceneInputHandler, '_handle_delete_key') as mock_delete:
-            # Simulate Backspace key press
-            event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Backspace, Qt.NoModifier)
-            handled = self.handler.handle_key_press(event)
-            
-            self.assertTrue(handled, "Backspace should be handled")
-            mock_delete.assert_called_once()
+        # Handle the delegation
+        self.handler.study_handler = MagicMock()
+        
+        event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Backspace, Qt.NoModifier)
+        handled = self.handler.handle_key_press(event)
+        
+        self.assertTrue(handled, "Backspace should be handled")
+        self.handler.study_handler.handle_delete_key.assert_called_once()
 
     def test_delete_still_works(self):
         """Verify that standard Delete still triggers the delete handler."""
-        with patch.object(SceneInputHandler, '_handle_delete_key') as mock_delete:
-            # Simulate Delete key press
-            event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Delete, Qt.NoModifier)
-            handled = self.handler.handle_key_press(event)
-            
-            self.assertTrue(handled, "Delete should be handled")
-            mock_delete.assert_called_once()
+        self.handler.study_handler = MagicMock()
+        
+        event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Delete, Qt.NoModifier)
+        handled = self.handler.handle_key_press(event)
+        
+        self.assertTrue(handled, "Delete should be handled")
+        self.handler.study_handler.handle_delete_key.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

@@ -29,7 +29,7 @@ BIBLE_SECTIONS = [
 ]
 
 # Application Info
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.1.4"
 GITHUB_REPO = "JonathanHarris15/Darash"
 GITHUB_API_LATEST_RELEASE = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 

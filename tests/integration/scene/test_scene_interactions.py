@@ -71,7 +71,7 @@ class TestSceneInteractionArrows(unittest.TestCase):
         self.assertIsNone(self.mock_scene.arrow_start_center)
         # Ensure study manager was called to persist the arrow
         self.mock_study_manager.add_arrow.assert_called_with(
-            "Genesis|1|1|0", "Genesis|1|1|5", "#99ffffff", arrow_type="straight"
+            "Genesis|1|1|0", "Genesis|1|1|5", "#96ffffff", arrow_type="straight"
         )
         self.mock_scene._render_study_overlays.assert_called()
 

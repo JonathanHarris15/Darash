@@ -20,11 +20,11 @@ def test_get_ref_from_pos(scene):
     scene.pos_verse_map = [(10, "Gen 1:1"), (20, "Gen 1:2"), (30, "Gen 1:3")]
     
     engine = scene.layout_engine
-    assert engine.get_ref_from_pos(5) is None
-    assert engine.get_ref_from_pos(10) == "Gen 1:1"
-    assert engine.get_ref_from_pos(15) == "Gen 1:1"
-    assert engine.get_ref_from_pos(25) == "Gen 1:2"
-    assert engine.get_ref_from_pos(35) == "Gen 1:3"
+    assert engine._get_ref_from_pos(5) is None
+    assert engine._get_ref_from_pos(10) == "Gen 1:1"
+    assert engine._get_ref_from_pos(15) == "Gen 1:1"
+    assert engine._get_ref_from_pos(25) == "Gen 1:2"
+    assert engine._get_ref_from_pos(35) == "Gen 1:3"
 
 def test_get_verse_y_midpoint(scene):
     scene.verse_y_map = {"Gen 1:1": (0, 100), "Gen 1:2": (100, 200)}

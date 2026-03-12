@@ -1,0 +1,12 @@
+=== Jehu-Reader Architecture Health Check ===
+
+[WARNING]  src\scene\layout_engine.py: 338 lines (Exceeds soft limit of 300)
+[WARNING]  src\scene\reader_scene.py: 374 lines (Exceeds soft limit of 300)
+[WARNING]  src\scene\scene_input_handler.py: 422 lines (Exceeds soft limit of 300)
+[WARNING]  src\scene\scene_outline_manager.py: 303 lines (Exceeds soft limit of 300)
+[WARNING]  src\ui\main_window.py: 369 lines (Exceeds soft limit of 300)
+[WARNING]  src\ui\main_window_panels.py: 322 lines (Exceeds soft limit of 300)
+[WARNING]  src\ui\components\outline_cell.py: 304 lines (Exceeds soft limit of 300)
+[WARNING]  src\ui\components\study_tree.py: 374 lines (Exceeds soft limit of 300)
+
+[OK] Architecture is healthy! All domain boundaries and file limits respected.

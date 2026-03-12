@@ -62,9 +62,9 @@ class SceneOverlayManager:
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
                     word_idx = int(ref_parts[3])
-                    if word_idx < len(verse_data['tokens']):
-                        start_pos = v_start + scene._get_word_offset_in_verse(verse_data, word_idx)
-                        rects = scene._get_text_rects(start_pos, len(verse_data['tokens'][word_idx][0]))
+                    word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
+                    if word_pos != -1:
+                        rects = scene._get_text_rects(word_pos, len(verse_data['tokens'][word_idx][0]))
                         if rects:
                             r = rects[0]
                             symbol_text = Theme.LOGICAL_MARKS[mark_type]
@@ -83,11 +83,12 @@ class SceneOverlayManager:
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
             if ref in scene.verse_pos_map:
-                v_start = scene.verse_pos_map[ref]
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
-                    start_pos = v_start + scene._get_word_offset_in_verse(verse_data, int(ref_parts[3]))
-                    rects = scene._get_text_rects(start_pos, len(verse_data['tokens'][int(ref_parts[3])][0]))
+                    word_idx = int(ref_parts[3])
+                    word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
+                    if word_pos != -1:
+                        rects = scene._get_text_rects(word_pos, len(verse_data['tokens'][word_idx][0]))
                     if rects:
                         r = rects[0]
                         pix_item = scene._create_symbol_item(symbol_name, r, symbol_opacity)
@@ -103,11 +104,12 @@ class SceneOverlayManager:
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
             if ref in scene.verse_pos_map:
-                v_start = scene.verse_pos_map[ref]
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
-                    start_pos = v_start + scene._get_word_offset_in_verse(verse_data, int(ref_parts[3]))
-                    rects = scene._get_text_rects(start_pos, len(verse_data['tokens'][int(ref_parts[3])][0]))
+                    word_idx = int(ref_parts[3])
+                    word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
+                    if word_pos != -1:
+                        rects = scene._get_text_rects(word_pos, len(verse_data['tokens'][word_idx][0]))
                     if rects:
                         r = rects[0]
                         note_icon = NoteIcon(key, ref, scene)
@@ -171,20 +173,7 @@ class SceneOverlayManager:
 
     def _get_word_rect(self, key):
         """Return the first rect for a word key, or None."""
-        scene = self.scene
-        if not key: return None
-        ref_parts = key.split('|')
-        if len(ref_parts) < 4: return None
-        ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
-        if ref not in scene.verse_pos_map: return None
-        v_start = scene.verse_pos_map[ref]
-        verse_data = scene.loader.get_verse_by_ref(ref)
-        if not verse_data: return None
-        word_idx = int(ref_parts[3])
-        if word_idx >= len(verse_data['tokens']): return None
-        offset = scene._get_word_offset_in_verse(verse_data, word_idx)
-        rects = scene._get_text_rects(v_start + offset, len(verse_data['tokens'][word_idx][0]))
-        return rects[0] if rects else None
+        return self.scene.layout_engine._get_word_rect(key)
 
     # ------------------------------------------------------------------
     # Ghost arrow hover coordination

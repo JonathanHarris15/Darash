@@ -45,10 +45,13 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         
         self.center_panels = []
         
+        from src.ui.main_window_dock_manager import MainWindowDockManager
+        self.dock_manager = MainWindowDockManager(self)
+        
         from src.ui.components.reading_view_link_manager import ReadingViewLinkManager
         self.link_manager = ReadingViewLinkManager(self)
         self.split_link_buttons = []
-
+        
         self.setup_docks()
         self._load_and_restore_layout()
         self.setup_connections()
@@ -189,6 +192,7 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         
         self.main_scene.studyDataChanged.connect(self.study_panel.refresh)
         self.main_scene.outlineCreated.connect(self.study_panel.set_active_outline)
+        self.main_scene.outlineCreated.connect(self.add_outline_panel)
         self.main_scene.noteOpenRequested.connect(self.add_note_panel)
 
     def _broadcast_appearance_settings(self):

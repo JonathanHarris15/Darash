@@ -83,9 +83,9 @@ def check_health():
                                 issues_found = True
 
     if not issues_found:
-        print("\n✅ Architecture is healthy! All domain boundaries and file limits respected.")
+        print("\n[OK] Architecture is healthy! All domain boundaries and file limits respected.")
     else:
-        print("\n❌ Architectural issues detected. Please refactor according to GEMINI.md.")
+        print("\n[FAIL] Architectural issues detected. Please refactor according to GEMINI.md.")
         # sys.exit(1) # Don't exit 1 yet so we can see the full output in terminal if needed
 
 if __name__ == "__main__":

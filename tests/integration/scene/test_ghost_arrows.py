@@ -136,6 +136,7 @@ class TestGhostArrowDeletion(unittest.TestCase):
     def _make_handler(self, arrows):
         """Create a SceneInputHandler with a mock scene containing the given arrows."""
         from src.scene.scene_input_handler import SceneInputHandler
+        from src.scene.scene_study_input_handler import SceneStudyInputHandler
         mock_scene = MagicMock()
         mock_scene.study_manager.data = {
             "symbols": {},
@@ -143,8 +144,9 @@ class TestGhostArrowDeletion(unittest.TestCase):
             "logical_marks": {}
         }
         mock_scene.views.return_value = [MagicMock()]
-        handler = SceneInputHandler.__new__(SceneInputHandler)
-        handler.scene = mock_scene
+        handler = SceneInputHandler(mock_scene)
+        # Prevent Strongs timer from trying to start
+        handler.strongs_hover_timer = MagicMock()
         return handler, mock_scene
 
     def _call_delete_for_key(self, handler, mock_scene, key_str):
@@ -154,7 +156,7 @@ class TestGhostArrowDeletion(unittest.TestCase):
         # itemAt returns None (no OutlineDividerItem)
         mock_scene.itemAt.return_value = None
         mock_scene._get_word_key_at_pos.return_value = key_str
-        handler._handle_delete_key()
+        handler.study_handler.handle_delete_key()
 
     def test_delete_by_start_key_removes_arrow(self):
         arrows = {

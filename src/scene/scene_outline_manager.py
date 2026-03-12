@@ -16,6 +16,7 @@ class SceneOutlineManager:
         if result:
             self.scene.renderer._render_outline_overlays()
             self.scene.studyDataChanged.emit()
+            self.scene.outlineCreated.emit(result["id"])
             return result
         return None
 
