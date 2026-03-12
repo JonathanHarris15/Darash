@@ -38,49 +38,52 @@ class SceneIndentationManager:
             else:
                 target_refs = [target_ref]
 
-            for ref in target_refs:
-                if not hasattr(scene, "_drag_start_indents"):
-                    scene._drag_start_indents = {}
-                
-                if ref not in scene._drag_start_indents:
-                    scene._drag_start_indents[ref] = verse_indents.get(ref, 0)
-                
-                start_indent = scene._drag_start_indents[ref]
-                new_indent = max(0, start_indent + tabs_diff)
-                
-                scene.study_manager.data["verse_indent"][ref] = new_indent
-                
-                # Update visual block format
-                if ref in scene.verse_pos_map:
-                    # We need to update the indentation for ALL blocks belonging to this verse/sentence.
-                    # This includes secondary translation blocks that follow the primary.
-                    pos = scene.verse_pos_map[ref]
-                    block = doc.findBlock(pos)
+            # Pre-build a set of all mapped positions for O(1) lookups inside the loop
+            mapped_positions = set(scene.verse_pos_map.values())
+            
+            # Batch all block updates in a single edit block to prevent multiple re-layouts
+            from PySide6.QtGui import QTextCursor
+            cursor = QTextCursor(doc)
+            cursor.beginEditBlock()
+            
+            try:
+                for ref in target_refs:
+                    if not hasattr(scene, "_drag_start_indents"):
+                        scene._drag_start_indents = {}
                     
-                    while block.isValid():
-                        fmt = block.blockFormat()
-                        fmt.setLeftMargin(new_indent * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
+                    if ref not in scene._drag_start_indents:
+                        scene._drag_start_indents[ref] = verse_indents.get(ref, 0)
+                    
+                    start_indent = scene._drag_start_indents[ref]
+                    new_indent = max(0, start_indent + tabs_diff)
+                    
+                    scene.study_manager.data["verse_indent"][ref] = new_indent
+                    
+                    # Update visual block format
+                    if ref in scene.verse_pos_map:
+                        pos = scene.verse_pos_map[ref]
+                        block = doc.findBlock(pos)
                         
-                        cursor = QTextCursor(block)
-                        cursor.setBlockFormat(fmt)
-                        
-                        # Move to next block. 
-                        # Stop if we hit a block that belongs to the NEXT verse or sentence.
-                        block = block.next()
-                        if not block.isValid(): break
-                        
-                        # If the next block has its OWN mapping in verse_pos_map, 
-                        # it's a separate entity (next sentence or next verse), so stop.
-                        next_pos = block.position()
-                        is_mapped = any(p == next_pos for p in scene.verse_pos_map.values())
-                        if is_mapped: break
+                        while block.isValid():
+                            fmt = block.blockFormat()
+                            fmt.setLeftMargin(new_indent * scene.tab_size + VERSE_NUMBER_RESERVED_WIDTH)
+                            
+                            cursor.setPosition(block.position())
+                            cursor.setBlockFormat(fmt)
+                            
+                            block = block.next()
+                            if not block.isValid(): break
+                            if block.position() in mapped_positions: break
+            finally:
+                cursor.endEditBlock()
 
-            # Targeted update: only update positions of items actually moved
-            # Instead of updating EVERYTHING, we update the target items
+            # Targeted update for verse item positions
             self.update_all_verse_number_positions()
-            scene._render_study_overlays()
-            if scene.strongs_enabled:
-                scene.renderer._render_strongs_overlays()
+            
+            # SUPPRESS expensive overlays like Strong's during active drag.
+            # Only render essential study overlays (like marks) if specifically requested.
+            # scene._render_study_overlays() 
+
 
     def update_all_verse_number_positions(self):
         scene = self.scene
@@ -112,5 +115,10 @@ class SceneIndentationManager:
         if hasattr(scene, "_was_dragged") and scene._was_dragged:
             scene._clear_verse_selection()
             scene._was_dragged = False
+            # Trigger full rerender on release
+            scene.renderer.render_verses()
+            if scene.strongs_enabled:
+                scene.renderer._render_strongs_overlays()
             
-        scene.studyDataChanged.emit()
+        # Remove studyDataChanged.emit() as the Study Panel does not show indentation
+        # and rebuilding the entire tree is extremely slow for these rapid changes.

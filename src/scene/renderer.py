@@ -42,6 +42,9 @@ class OverlayRenderer:
             
         if scene.outlines_enabled or scene.active_outline_id:
             self.outline_renderer.render()
+            
+        # Ensure marks, symbols, and arrows are updated with the new layout
+        scene._render_study_overlays()
 
     def _render_interlinear_dividers(self):
         scene = self.scene
@@ -79,7 +82,7 @@ class OverlayRenderer:
         doc = scene.main_text_item.document()
         layout = doc.documentLayout()
         
-        buffer = 200
+        buffer = 500 # Increased buffer for smoother scrolling
         start_pos = layout.hitTest(QPointF(scene.side_margin + 10, max(0, scene.scroll_y - buffer)), Qt.FuzzyHit)
         end_pos = layout.hitTest(QPointF(scene.side_margin + 10, scene.scroll_y + scene.view_height + buffer), Qt.FuzzyHit)
         
@@ -111,24 +114,20 @@ class OverlayRenderer:
             mark_type = verse_marks.get(ref)
             is_selected = hasattr(scene, "selected_refs") and ref in scene.selected_refs
 
+            verse_data = scene.loader.get_verse_by_ref(ref)
+            if not verse_data: continue
+            
+            block = doc.findBlock(char_pos)
+            if not block.isValid(): continue
+            rect = layout.blockBoundingRect(block)
+            
+            # Use |0 suffix for indentation level if sentences are enabled
+            s_ref = f"{ref}|0" if scene.sentence_break_enabled else ref
+            indent_level = verse_indents.get(s_ref, verse_indents.get(ref, 0))
+            
             if ref not in scene.verse_number_items:
-                verse_data = scene.loader.get_verse_by_ref(ref)
-                if not verse_data: continue
-                
-                block = doc.findBlock(char_pos)
-                rect = layout.blockBoundingRect(block)
-                
-                # Use |0 suffix for indentation level if sentences are enabled
-                s_ref = f"{ref}|0" if scene.sentence_break_enabled else ref
-                indent_level = verse_indents.get(s_ref, verse_indents.get(ref, 0))
-                
                 v_item = VerseNumberItem(verse_data['verse_num'], ref, scene.verse_num_font, scene.ref_color, mark_font=scene.verse_mark_font)
-                v_item.setPos(scene.side_margin + (indent_level * scene.tab_size), rect.top())
                 v_item.setZValue(10)
-                v_item.mark_type = mark_type
-                v_item.is_selected = is_selected
-                v_item.is_search_result = ref in getattr(scene, 'search_verse_refs', set())
-                
                 v_item.clicked.connect(lambda shift, v=v_item: scene._on_verse_num_clicked(v, shift))
                 v_item.doubleClicked.connect(scene._clear_verse_selection)
                 v_item.contextMenuRequested.connect(lambda pos, v=v_item: scene._on_verse_num_context_menu(v, pos))
@@ -137,25 +136,21 @@ class OverlayRenderer:
                 
                 scene.addItem(v_item)
                 scene.verse_number_items[ref] = v_item
-            else:
-                it = scene.verse_number_items[ref]
-                is_search = ref in getattr(scene, 'search_verse_refs', set())
-                if it.mark_type != mark_type or it.is_selected != is_selected or getattr(it, 'is_search_result', False) != is_search:
-                    it.mark_type = mark_type
-                    it.is_selected = is_selected
-                    it.is_search_result = is_search
-                    it.update()
+            
+            # ALWAYS update position and state to handle scrolling/layout changes
+            v_item = scene.verse_number_items[ref]
+            v_item.setPos(scene.side_margin + (indent_level * scene.tab_size), rect.top())
+            v_item.mark_type = mark_type
+            v_item.is_selected = is_selected
+            v_item.is_search_result = ref in getattr(scene, 'search_verse_refs', set())
+            v_item.update()
             
             # --- Render Translation Labels if multiple translations active ---
             if len(active_translations) > 1:
                 # Primary translation label
-                block = doc.findBlock(scene.verse_pos_map[ref])
-                rect = layout.blockBoundingRect(block)
-                indent = verse_indents.get(ref + "|0" if scene.sentence_break_enabled else ref, verse_indents.get(ref, 0))
-                
-                # Calculate the exact baseline of the first line of the block
-                block_layout = block.layout()
+                # ... (rest of translation label logic)
                 baseline_y = rect.top()
+                block_layout = block.layout()
                 if block_layout.lineCount() > 0:
                     first_line = block_layout.lineAt(0)
                     baseline_y += first_line.y() + first_line.ascent()
@@ -163,7 +158,7 @@ class OverlayRenderer:
                     baseline_y += scene.font_size
                     
                 p_label = TranslationIndicatorItem(scene.primary_translation, scene, scene.ref_color)
-                p_label.setPos(scene.side_margin + (indent * scene.tab_size) + 28, baseline_y)
+                p_label.setPos(scene.side_margin + (indent_level * scene.tab_size) + 28, baseline_y)
                 scene.addItem(p_label)
                 self.translation_indicator_items.append(p_label)
                 
@@ -176,7 +171,7 @@ class OverlayRenderer:
                         s_idx += 1
                 
                 for tid in scene.enabled_interlinear:
-                    if curr_block.isValid():
+                    if curr_block and curr_block.isValid():
                         t_rect = layout.blockBoundingRect(curr_block)
                         t_block_layout = curr_block.layout()
                         t_baseline_y = t_rect.top()
@@ -187,7 +182,7 @@ class OverlayRenderer:
                             t_baseline_y += scene.font_size
                             
                         t_label = TranslationIndicatorItem(tid, scene, QColor(120, 120, 120))
-                        t_label.setPos(scene.side_margin + (indent * scene.tab_size) + 28, t_baseline_y)
+                        t_label.setPos(scene.side_margin + (indent_level * scene.tab_size) + 28, t_baseline_y)
                         scene.addItem(t_label)
                         self.translation_indicator_items.append(t_label)
                         curr_block = curr_block.next()
@@ -200,18 +195,13 @@ class OverlayRenderer:
                     if s_ref not in scene.verse_pos_map: break
                     
                     visible_sentence_refs.add(s_ref)
+                    s_pos = scene.verse_pos_map[s_ref]
+                    s_block = doc.findBlock(s_pos)
+                    s_rect = layout.blockBoundingRect(s_block)
+                    s_indent = verse_indents.get(s_ref, 0)
+                    
                     if s_ref not in scene.sentence_handle_items:
-                        s_pos = scene.verse_pos_map[s_ref]
-                        s_block = doc.findBlock(s_pos)
-                        s_rect = layout.blockBoundingRect(s_block)
-                        s_indent = verse_indents.get(s_ref, 0)
-                        
-                        # Only show handles if they are on screen
-                        if s_rect.top() > scene.scroll_y + scene.view_height + 500 or s_rect.bottom() < scene.scroll_y - 500:
-                             s_idx += 1; continue
-                             
                         s_item = SentenceHandleItem(ref, s_ref, scene.verse_num_font, scene.ref_color)
-                        s_item.setPos(scene.side_margin + (s_indent * scene.tab_size), s_rect.top())
                         s_item.setZValue(9)
                         s_item.clicked.connect(lambda shift, v=s_item: scene._on_verse_num_clicked(v, shift))
                         s_item.dragged.connect(lambda dx, v=s_item: scene.indentation_manager.on_verse_num_dragged(v, dx))
@@ -219,12 +209,10 @@ class OverlayRenderer:
                         
                         scene.addItem(s_item)
                         scene.sentence_handle_items[s_ref] = s_item
-                    else:
-                        # Update position if layout changed
-                        s_pos = scene.verse_pos_map[s_ref]
-                        s_rect = layout.blockBoundingRect(doc.findBlock(s_pos))
-                        s_indent = verse_indents.get(s_ref, 0)
-                        scene.sentence_handle_items[s_ref].setPos(scene.side_margin + (s_indent * scene.tab_size), s_rect.top())
+                    
+                    # ALWAYS update position
+                    scene.sentence_handle_items[s_ref].setPos(scene.side_margin + (s_indent * scene.tab_size), s_rect.top())
+                    scene.sentence_handle_items[s_ref].setVisible(self._is_rect_visible(s_rect))
                     
                     s_idx += 1
 

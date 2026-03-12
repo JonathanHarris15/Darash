@@ -184,7 +184,7 @@ class OutlinePanel(QWidget):
             if p: return p
         return None
 
-    def _on_title_changed(self, text):
+    def _on_title_changed(self, text=None):
         if self._is_internal_change: return
         self.title_save_timer.start(1000)
 

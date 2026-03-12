@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStyle, QPushButton, QFrame
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from src.ui.components.outline_dialog import OutlineDialog
 from src.ui.components.study_tree import StudyTreeWidget
 from src.core.theme import Theme
@@ -19,6 +19,11 @@ class StudyPanel(QWidget):
         self.study_manager = study_manager
         self.symbol_manager = symbol_manager
         self.active_outline_id = None
+        
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.setInterval(500) # 500ms debounce
+        self.refresh_timer.timeout.connect(self._do_refresh)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -71,7 +76,7 @@ class StudyPanel(QWidget):
         self.add_note_btn.setStyleSheet(btn_style); self.add_outline_btn.setStyleSheet(btn_style)
         actions_layout.addWidget(self.add_note_btn); actions_layout.addWidget(self.add_outline_btn)
         layout.addLayout(actions_layout)
-        self.dataChanged.connect(self.refresh)
+        self.dataChanged.connect(self.request_refresh)
         self.refresh()
 
     def _add_outline(self):
@@ -85,7 +90,17 @@ class StudyPanel(QWidget):
     def _on_outline_open_requested(self, node_id):
         self.set_active_outline(node_id); self.outlineOpenRequested.emit(node_id)
 
-    def refresh(self): self.tree.refresh()
+    def refresh(self): 
+        # Public method starts the debounce timer
+        self.refresh_timer.start()
+
+    def request_refresh(self):
+        # Alias for refresh to be used in signal connections
+        self.refresh_timer.start()
+
+    def _do_refresh(self):
+        # Actual expensive refresh logic
+        self.tree.refresh()
 
     def set_active_outline(self, outline_id, emit_signal=True):
         self.active_outline_id = outline_id

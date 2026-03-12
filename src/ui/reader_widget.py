@@ -84,6 +84,12 @@ class ReaderWidget(QWidget):
         self.resize_timer.setInterval(RESIZE_DEBOUNCE_INTERVAL)
         self.resize_timer.timeout.connect(self.apply_delayed_resize)
         
+        # Fallback timer to ensure loading screen hides even if layout signals are missed
+        self.fallback_hide_timer = QTimer(self)
+        self.fallback_hide_timer.setSingleShot(True)
+        self.fallback_hide_timer.setInterval(2000)
+        self.fallback_hide_timer.timeout.connect(self.hide_loading)
+        
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -130,11 +136,9 @@ class ReaderWidget(QWidget):
             if data["title"]:
                 self.scene.outline_manager.create_outline(data["start_ref"], data["end_ref"], data["title"])
 
-    def _on_show_strongs_tooltip(self, pos, text):
-        if text:
-            self.strongs_tooltip.set_text(text)
-            self.strongs_tooltip.move(pos.toPoint() if isinstance(pos, QPointF) else pos)
-            self.strongs_tooltip.show()
+    def _on_show_strongs_tooltip(self, pos, sn, entry):
+        if entry:
+            self.strongs_tooltip.show_entry(sn, entry, pos.toPoint() if isinstance(pos, QPointF) else pos)
         else:
             self.strongs_tooltip.hide()
 
@@ -186,9 +190,11 @@ class ReaderWidget(QWidget):
     def show_loading(self):
         self.overlay.resize(self.view.size())
         self.overlay.show()
+        self.fallback_hide_timer.start()
 
     def hide_loading(self) -> None:
         self.overlay.hide()
+        self.fallback_hide_timer.stop()
 
     def _recalc_scrollbar(self) -> None:
         self.scrollbar.setMaximum(self.total_count)

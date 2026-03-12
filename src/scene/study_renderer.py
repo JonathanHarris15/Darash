@@ -29,15 +29,15 @@ class StudyRenderer:
         start_idx = max(0, start_idx - 1)
         end_idx = min(len(scene.pos_verse_map), end_idx + 1)
         
-        pen = QPen(Theme.color("ACCENT_GOLD"), 1.5) 
-        pen.setColor(QColor(255, 204, 0, 180)) # Semi-transparent gold for better blending
+        # More visible grey pen for Strong's underlines
+        pen = QPen(QColor(120, 120, 120, 255), 1.8)
         
         for i in range(start_idx, end_idx):
             char_pos, ref = scene.pos_verse_map[i]
             
             # Use the actual displayed primary translation, not raw ESV base data
             verse = None
-            if scene.primary_translation in scene.loader.translation_cache:
+            if hasattr(scene.loader, 'translation_cache') and scene.primary_translation in scene.loader.translation_cache:
                 v_parts = ref.split()
                 if len(v_parts) >= 2:
                     book_name = " ".join(v_parts[:-1])
@@ -52,15 +52,19 @@ class StudyRenderer:
                 
             if not verse: continue
             
+            if ref not in scene.verse_pos_map: continue
             v_start = scene.verse_pos_map[ref]
             
             for word_idx, token in enumerate(verse['tokens']):
                 if len(token) > 1:
                     word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
                     if word_pos == -1: continue
-                    rects = scene._get_text_rects(word_pos, len(token[0]))
-                    for r in rects:
-                        line = QGraphicsLineItem(r.left(), r.bottom() + 1, r.right(), r.bottom() + 1)
+                    # Request baselines for precise positioning
+                    geometries = scene.layout_engine._get_text_rects(word_pos, len(token[0]), return_baselines=True)
+                    for r, baseline_y in geometries:
+                        # Draw a subtle line exactly at the baseline + 2px offset
+                        y_line = baseline_y + 2
+                        line = QGraphicsLineItem(r.left(), y_line, r.right(), y_line)
                         line.setPen(pen)
                         line.setZValue(-1)
                         line.setAcceptedMouseButtons(Qt.NoButton)
@@ -113,8 +117,13 @@ class StudyRenderer:
 
     def flash_verse(self, ref):
         scene = self.scene
-        if ref not in scene.verse_pos_map: return
-        pos = scene.verse_pos_map[ref]; doc = scene.main_text_item.document(); rects = scene._get_text_rects(pos, doc.findBlock(pos).length())
+        if not ref or ref not in scene.verse_pos_map: return
+        pos = scene.verse_pos_map[ref]
+        doc = scene.main_text_item.document()
+        block = doc.findBlock(pos)
+        if not block.isValid(): return
+        
+        rects = scene._get_text_rects(pos, block.length())
         for r in rects:
             item = QGraphicsRectItem(r); item.setBrush(QBrush(QColor(100, 200, 255, 100))); item.setPen(Qt.NoPen); item.setZValue(-2) 
             scene.addItem(item); scene.flash_items.append([item, 1.0])

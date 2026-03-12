@@ -31,7 +31,7 @@ class ReaderScene(QGraphicsScene):
     bookmarksUpdated = Signal(); studyDataChanged = Signal(); outlineCreated = Signal(str)
     noteOpenRequested = Signal(str, str); showMarkPopup = Signal(QPointF, str)
     showSuggestedSymbols = Signal(list, str); showOutlineDialog = Signal(str, str)
-    showStrongsTooltip = Signal(QPointF, str); showStrongsVerboseDialog = Signal(str, dict, list)
+    showStrongsTooltip = Signal(QPointF, str, object); showStrongsVerboseDialog = Signal(str, dict, list)
 
     def __init__(self, parent=None, shared_resources=None):
         super().__init__(parent)
@@ -54,6 +54,8 @@ class ReaderScene(QGraphicsScene):
         self.selected_verse_items, self.selected_refs, self.last_clicked_verse_idx = [], set(), -1
         self.main_text_item = NoFocusTextItem(); self.main_text_item.setAcceptHoverEvents(True)
         self.main_text_item.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # QGraphicsItems use flags for focusability; disable it so it doesn't steal keys
+        self.main_text_item.setFlag(NoFocusTextItem.ItemIsFocusable, False)
         self.addItem(self.main_text_item)
         
         self.strongs_enabled, self.strongs_overlay_items = False, []
@@ -103,8 +105,12 @@ class ReaderScene(QGraphicsScene):
     def CHUNK_SIZE(self): return self.state_manager.CHUNK_SIZE
 
     def _update_item_visibility(self):
+        # Update visibility for study overlays, search results, and outlines
         for item in self.study_overlay_items + self.search_overlay_items + self.outline_overlay_items:
             item.setVisible(self.renderer._is_rect_visible(item.sceneBoundingRect()))
+            
+        # Also ensure verse numbers and sentence handles are rendered for the new scroll position
+        self.render_verses()
 
     def recalculate_layout(self, w, center_verse_idx=None): self.layout_engine.recalculate_layout(w, center_verse_idx)
     def render_verses(self): self.renderer.render_verses()
@@ -153,6 +159,8 @@ class ReaderScene(QGraphicsScene):
     def apply_layout_changes(self): self.settings_manager.apply_layout_changes()
 
     def set_scroll_y(self, v): self.state_manager.set_scroll_y(v)
+    def check_chunk_boundaries(self): self.state_manager.check_chunk_boundaries()
+    def _sync_physical_scroll(self): self.state_manager._sync_physical_scroll()
     def jump_to(self, b, c, v="1"):
         idx = self.loader.get_verse_index(f"{b} {c}:{v if v else '1'}"); self.set_scroll_y(idx) if idx != -1 else None; self.flash_verse(f"{b} {c}:{v if v else '1'}")
     def flash_verse(self, r): self.renderer.flash_verse(r)
@@ -167,6 +175,10 @@ class ReaderScene(QGraphicsScene):
     def keyPressEvent(self, e):
         if not self.input_handler.handle_key_press(e):
             super().keyPressEvent(e)
+
+    def keyReleaseEvent(self, e):
+        if not self.input_handler.handle_key_release(e):
+            super().keyReleaseEvent(e)
 
     def mousePressEvent(self, e):
         self.input_handler.handle_mouse_press(e)

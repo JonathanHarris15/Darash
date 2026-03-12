@@ -96,21 +96,36 @@ class StudyManager:
             self.save_data()
 
     def save_data(self):
-        with open(self.study_file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, indent=4)
+        # Snapshot the data as a string on the main thread to ensure thread safety
+        # then write to disk in a background thread.
+        import threading
+        try:
+            json_str = json.dumps(self.data)
+        except Exception as e:
+            print(f"Error serializing study data: {e}")
+            return
 
-    def add_symbol(self, book: str, chap: str, verse: str, word_idx: int, symbol_id: str):
-        self.save_state()
+        def _threaded_write(path, content):
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            except Exception as e:
+                print(f"Error writing study data to disk: {e}")
+
+        threading.Thread(target=_threaded_write, args=(self.study_file_path, json_str), daemon=True).start()
+
+    def add_symbol(self, book: str, chap: str, verse: str, word_idx: int, symbol_id: str, backup=True, save=True):
+        if backup: self.save_state()
         key = f"{book}|{chap}|{verse}|{word_idx}"
         self.data["symbols"][key] = symbol_id
-        self.save_data()
+        if save: self.save_data()
 
-    def add_note(self, book: str, chap: str, verse: str, word_idx: int, note_text: str, title: str = ""):
+    def add_note(self, book: str, chap: str, verse: str, word_idx: int, note_text: str, title: str = "", save=True):
         key = f"{book}|{chap}|{verse}|{word_idx}"
         # Preserve existing folder if updating
         existing_folder = self.data["notes"].get(key, {}).get("folder", "")
         self.data["notes"][key] = {"title": title, "text": note_text, "folder": existing_folder}
-        self.save_data()
+        if save: self.save_data()
 
     def add_standalone_note(self, title: str = "", text: str = "", folder: str = ""):
         import time
@@ -201,21 +216,22 @@ class StudyManager:
                 
         self.save_data()
 
-    def add_mark(self, mark_data: Dict[str, Any]):
-        self.save_state()
+    def add_mark(self, mark_data: Dict[str, Any], backup=True, save=True):
+        if backup: self.save_state()
         self.data["marks"].append(mark_data)
-        self.save_data()
+        if save: self.save_data()
 
-    def set_verse_indent(self, ref: str, indent_level: int):
+    def set_verse_indent(self, ref: str, indent_level: int, save=True):
         self.data["verse_indent"][ref] = indent_level
-        self.save_data()
+        if save: self.save_data()
 
-    def set_verse_mark(self, ref: str, mark_type: str):
+    def set_verse_mark(self, ref: str, mark_type: str, backup=True, save=True):
+        if backup: self.save_state()
         if mark_type:
             self.data["verse_marks"][ref] = mark_type
         elif ref in self.data["verse_marks"]:
             del self.data["verse_marks"][ref]
-        self.save_data()
+        if save: self.save_data()
 
     def add_bookmark(self, book: str, chap: str, verse: str, color: str = "#0078D7"):
         ref = f"{book} {chap}:{verse}"
@@ -249,10 +265,10 @@ class StudyManager:
                 break
         self.save_data()
 
-    def add_arrow(self, start_key: str, end_key: str, color: str = "#00FFFF", arrow_type: str = "straight"):
+    def add_arrow(self, start_key: str, end_key: str, color: str = "#0078D7", arrow_type: str = "straight", backup=True, save=True):
         if not start_key or start_key == "null":
             return
-        self.save_state()
+        if backup: self.save_state()
         if start_key not in self.data["arrows"]:
             self.data["arrows"][start_key] = []
         self.data["arrows"][start_key].append({
@@ -260,9 +276,9 @@ class StudyManager:
             "color": color,
             "type": arrow_type
         })
-        self.save_data()
+        if save: self.save_data()
 
-    def add_logical_mark(self, key: str, mark_type: str):
-        self.save_state()
+    def add_logical_mark(self, key: str, mark_type: str, backup=True, save=True):
+        if backup: self.save_state()
         self.data["logical_marks"][key] = mark_type
-        self.save_data()
+        if save: self.save_data()

@@ -25,24 +25,55 @@ class NoteEditor(QDialog):
         self._ref = ref; self.setObjectName("NoteEditorDialog")
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0); outer.setSpacing(0)
 
-        header = QWidget(); header.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #444;")
-        h_lay = QVBoxLayout(header); h_lay.setContentsMargins(10, 8, 10, 8); h_lay.setSpacing(4)
-        if ref:
-            rl = QLabel(f"📖  {ref}"); rl.setStyleSheet("color: #888; font-size: 11px;"); h_lay.addWidget(rl)
-        t_row = QHBoxLayout(); self.title_input = SpellcheckTitleEdit(); self.title_input.setPlaceholderText("Note title…"); self.title_input.setText(initial_title)
-        self.title_input.setStyleSheet("QTextEdit { background: transparent; border: none; border-bottom: 1px solid #555; color: #f0f0f0; font-size: 18px; font-weight: bold; padding: 2px 0; } QTextEdit:focus { border-bottom-color: #007acc; }")
+        header = QWidget(); header.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #333;")
+        h_lay = QVBoxLayout(header); h_lay.setContentsMargins(16, 12, 16, 4); h_lay.setSpacing(0)
+        
+        t_row = QHBoxLayout()
+        self.title_input = SpellcheckTitleEdit()
+        self.title_input.setPlaceholderText("Note title…")
+        self.title_input.setText(initial_title)
+        self.title_input.setStyleSheet("""
+            QTextEdit { 
+                background: transparent; 
+                border: none; 
+                color: #f0f0f0; 
+                font-size: 22px; 
+                font-weight: bold; 
+                padding: 0;
+            }
+        """)
+        self.title_input.setFixedHeight(40)
         t_row.addWidget(self.title_input, 1)
-        self.menu_btn = QToolButton(); self.menu_btn.setText("⋮"); self.menu_btn.setStyleSheet("QToolButton { background: transparent; color: #888; font-size: 18px; border: none; } QToolButton:hover { color: white; }")
-        self.menu_btn.setPopupMode(QToolButton.InstantPopup); self.menu_btn.setMenu(self._build_export_menu())
-        t_row.addWidget(self.menu_btn); h_lay.addLayout(t_row); outer.addWidget(header)
+        
+        self.menu_btn = QToolButton()
+        self.menu_btn.setText("⋮")
+        self.menu_btn.setStyleSheet("""
+            QToolButton { 
+                background: transparent; 
+                color: #888; 
+                font-size: 18px; 
+                border: none; 
+            } 
+            QToolButton:hover { color: white; }
+            QToolButton::menu-indicator { image: none; }
+        """)
+        self.menu_btn.setPopupMode(QToolButton.InstantPopup)
+        self.menu_btn.setMenu(self._build_export_menu())
+        t_row.addWidget(self.menu_btn)
+        
+        h_lay.addLayout(t_row)
+        outer.addWidget(header)
 
         from src.managers.spellcheck_manager import SpellcheckManager
         self.editor = RichTextEdit(); self.editor.setAcceptRichText(True); self.editor.anchorClicked.connect(self._on_link_activated)
         self.editor.enableSpellcheck(SpellcheckManager.get_instance())
         self.editor.setStyleSheet("QTextEdit { background-color: #1e1e1e; color: #e8e8e8; border: none; font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 12pt; padding: 12px 16px; selection-background-color: #264f78; }")
         self.toolbar = FormattingToolBar(self.editor, self); outer.addWidget(self.toolbar)
-        line = QFrame(); line.setFrameShape(QFrame.HLine); line.setStyleSheet("color: #3a3a3a;"); outer.addWidget(line); outer.addWidget(self.editor)
-
+        line = QFrame(); line.setFrameShape(QFrame.HLine); line.setStyleSheet("color: #3a3a3a;"); outer.addWidget(line)
+        
+        # Add the editor and then a stretch to ensure layout doesn't "spread" in large docks
+        outer.addWidget(self.editor, 1) # Give editor a stretch factor of 1
+        
         btn_bar = QWidget(); btn_bar.setStyleSheet("background-color: #252525; border-top: 1px solid #444;")
         b_lay = QHBoxLayout(btn_bar); b_lay.setContentsMargins(10, 6, 10, 6); b_lay.setSpacing(8)
         self.btn_delete = QPushButton("🗑 Delete"); self.btn_delete.setStyleSheet("QPushButton { background: transparent; color: #e57373; border: 1px solid #555; border-radius: 4px; padding: 5px 12px; } QPushButton:hover { background: #3a1a1a; border-color: #e57373; }"); self.btn_delete.clicked.connect(lambda: self.done(self.DELETE_CODE))

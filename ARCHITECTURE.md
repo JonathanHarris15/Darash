@@ -51,7 +51,7 @@
 
 | File | Key Class / Contents | Responsibility |
 |---|---|---|
-| `study_manager.py` | `StudyManager` | **Primary data orchestrator.** Saves/loads study JSON, undo/redo stack, manages marks, notes, symbols, indentation state |
+| `study_manager.py` | `StudyManager` | **Primary data orchestrator.** Saves/loads study JSON (via background thread), undo/redo stack, manages marks, notes, symbols, indentation state |
 | `outline_manager.py` | `OutlineManager` | Tree-based book outline CRUD, splitting verses into outline sections, merging, scrubbing metadata |
 | `outline_tree_ops.py` | `OutlineTreeOps` | Static helpers for tree hierarchy manipulation, searching, and structural modifications |
 | `outline_ref_utils.py` | `OutlineRefUtils` | Utilities for verse reference calculations, delta shifting, and bounds checking |
@@ -70,7 +70,7 @@
 |---|---|---|
 | `reader_scene.py` | `ReaderScene` | **Facade coordinator only.** Owns all scene managers, routes events, exposes top-level API to `ReaderWidget`. Delegates scroll/chunk logic to `SceneStateManager` and search to `SceneSearchManager`. |
 | `scene_state_manager.py` | `SceneStateManager` | Manages virtual scroll position, physical scroll synchronization, and visible chunk boundaries. |
-| `layout_engine.py` | `LayoutEngine` | **Heart of the reader.** Computes `QTextDocument` word-wrap, virtual↔physical mapping, and multi-translation verse stacking. Provides geometric helpers for hit-testing and reference finding. |
+| `layout_engine.py` | `LayoutEngine` | **Heart of the reader.** Computes `QTextDocument` word-wrap, virtual↔physical mapping, and multi-translation verse stacking. Provides signal-safe layout orchestration and geometric helpers for hit-testing and reference finding. |
 | `renderer.py` | `OverlayRenderer` | **Rendering facade.** Orchestrates specialized renderers for verse numbers, interlinear dividers, and visible chunk highlights. |
 | `outline_renderer.py` | `OutlineRenderer` | Paints hierarchical outline bands, draggable boundaries, and section summaries on the scene. |
 | `study_renderer.py` | `StudyRenderer` | Paints Strong's overlays, search highlights, symbols, and verse flash animations. |
@@ -100,7 +100,7 @@
 | `main_window_layout.py` | `MainWindowLayoutMixin` | Mixin for `MainWindow` handling layout state saving, restoring, and presets |
 | `main_window_panels.py` | `MainWindowPanelsMixin` | Mixin for `MainWindow` handling high-level panel creation and orchestration. Delegates dock operations and panel tracking to `MainWindowDockManager`. |
 | `main_window_dock_manager.py` | `MainWindowDockManager` | Handles low-level dock widget addition, tab management, dock cleanups, and dock event routing. |
-| `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar) |
+| `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar). Manages loading overlay state with fallback protection. |
 | `export_manager.py` | `ExportManager` | Orchestrates content extraction (Notes/Outlines) and export dialog flow |
 | `components/activity_bar.py` | `ActivityBar` | Left-edge icon bar that toggles panel visibility (similar to VS Code sidebar icons) |
 | `components/appearance_panel.py` | `AppearancePanel` | Dock widget for font, spacing, color, and display settings |
@@ -124,7 +124,7 @@
 | `components/split_link_button.py` | `SplitLinkButton` | Toggle button shown between split views to enable/disable scroll linking |
 | `components/split_overlay.py` | `SplitOverlay` | Transparent drag target overlay shown when dragging a panel to split the view |
 | `components/strongs_ui.py` | `StrongsPanel` | Dock widget displaying Strong's dictionary entries and cross-references |
-| `components/study_panel.py` | `StudyPanel` | **Primary sidebar.** Layout container for the study overview tree |
+| `components/study_panel.py` | `StudyPanel` | **Primary sidebar.** Layout container for the study overview tree. Implements debounced refreshes (500ms) to ensure UI responsiveness during rapid data changes. |
 | `components/study_tree.py` | `StudyTreeWidget` | Hierarchical tree of study data. Delegates population to `StudyTreePopulator`. |
 | `components/study_tree_populator.py` | `StudyTreePopulator` | Logic for building and refreshing the study tree hierarchy from `StudyManager` data. |
 | `components/suggested_symbols_dialog.py` | `SuggestedSymbolsDialog` | Dialog that shows AI/rule-based suggested symbols for a selection |

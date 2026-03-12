@@ -53,7 +53,10 @@ class SceneInputHandler(QObject):
 
     def handle_mouse_move(self, event):
         s = self.scene; s.last_mouse_scene_pos = event.scenePos()
-        if s.outline_manager.handle_mouse_move(event): return True
+        # print(f"[InputHandler] mouse_move. Pos: {s.last_mouse_scene_pos}")
+        if s.outline_manager.handle_mouse_move(event):
+            # print("[InputHandler] outline_manager handled mouse_move")
+            return True
         if s.is_drawing_arrow: self.study_handler.draw_temp_arrow(event.scenePos())
         key = s._get_word_key_at_pos(event.scenePos())
         if key != self._last_hovered_word_key:
@@ -62,13 +65,16 @@ class SceneInputHandler(QObject):
             sn_str, _ = s._get_strongs_at_pos(event.scenePos())
             if sn_str:
                 if (event.scenePos() - self.last_strongs_pos).manhattanLength() > 10:
-                    self.strongs_hover_timer.stop(); s.showStrongsTooltip.emit(event.scenePos(), None)
+                    self.strongs_hover_timer.stop(); s.showStrongsTooltip.emit(event.scenePos(), None, None)
                     self.last_strongs_pos = event.scenePos(); self.strongs_hover_timer.start()
-            else: self.strongs_hover_timer.stop(); s.showStrongsTooltip.emit(event.scenePos(), None)
+            else: self.strongs_hover_timer.stop(); s.showStrongsTooltip.emit(event.scenePos(), None, None)
         return False
 
     def handle_mouse_press(self, event):
         from src.scene.components.reader_items import VerseNumberItem, SentenceHandleItem
+        if self.scene.views():
+            self.scene.views()[0].setFocus()
+            
         if not isinstance(self.scene.itemAt(event.scenePos(), self.scene.views()[0].transform()), (VerseNumberItem, SentenceHandleItem)):
             self.scene._clear_verse_selection()
         return False
@@ -109,7 +115,7 @@ class SceneInputHandler(QObject):
             sn = sn_str.split()[0]; entry = s.strongs_manager.get_entry(sn)
             if entry:
                 v = s.views()[0]; p = v.viewport().mapToGlobal(v.mapFromScene(self.last_strongs_pos))
-                s.showStrongsTooltip.emit(p, f"{sn}: {entry.get('gloss', '')}")
+                s.showStrongsTooltip.emit(p, sn, entry)
 
     def _handle_copy(self):
         s = self.scene; c = s.main_text_item.textCursor()

@@ -10,12 +10,14 @@ class OutlineRenderer:
     def render(self):
         scene = self.scene
         scene._clear_outline_overlays()
+        # print(f"[OutlineRenderer] render. Enabled: {scene.outlines_enabled}, Active: {scene.active_outline_id}")
         if not scene.outlines_enabled and not scene.active_outline_id: return
         
         outlines = scene.study_manager.outline_manager.get_outlines()
         if not scene.outlines_enabled and scene.active_outline_id:
             outlines = [o for o in outlines if o["id"] == scene.active_outline_id]
-            
+        
+        # print(f"[OutlineRenderer] Found {len(outlines)} outlines to render")
         doc = scene.main_text_item.document()
         layout = doc.documentLayout()
         
@@ -129,7 +131,7 @@ class OutlineRenderer:
                     item.setToolTip(tip)
                 
                 if node_is_active and split_idx != -1:
-                    item.dragStarted.connect(scene._start_divider_drag)
+                    item.dragStarted.connect(scene.outline_manager.start_divider_drag)
                 else:
                     item.setCursor(Qt.ArrowCursor)
                 

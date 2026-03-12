@@ -191,6 +191,7 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         self.study_panel.dataChanged.connect(self._render_all_study_data)
         
         self.main_scene.studyDataChanged.connect(self.study_panel.refresh)
+        self.main_scene.studyDataChanged.connect(self._render_all_study_data)
         self.main_scene.outlineCreated.connect(self.study_panel.set_active_outline)
         self.main_scene.outlineCreated.connect(self.add_outline_panel)
         self.main_scene.noteOpenRequested.connect(self.add_note_panel)
@@ -232,8 +233,7 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
                 widget = p.widget()
                 if isinstance(widget, ReadingViewPanel):
                     scene = widget.reader_widget.scene
-                    if scene != self.main_scene:
-                        scene._render_study_overlays(); scene._render_outline_overlays(); scene.render_verses()
+                    scene._render_study_overlays(); scene._render_outline_overlays(); scene.render_verses()
                 elif isinstance(widget, OutlinePanel):
                     widget.refresh()
             except RuntimeError: pass

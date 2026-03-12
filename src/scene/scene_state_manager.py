@@ -49,6 +49,5 @@ class SceneStateManager:
         if abs(width - self.scene.last_width) > 2:
             self.scene.last_width = width
             self.scene.recalculate_layout(width, center_verse_idx=int(self.virtual_scroll_y))
-            self.scene._render_study_overlays(); self.scene._render_search_overlays()
         self.scene.view_height = height
         self.scene.update_scene_rect_only()

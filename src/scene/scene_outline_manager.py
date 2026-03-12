@@ -40,17 +40,20 @@ class SceneOutlineManager:
         if not start_ref or not end_ref: return
         scene.showOutlineDialog.emit(start_ref, end_ref)
 
-    def start_divider_drag(self, pos):
+    def start_divider_drag(self, item, pos):
         from src.scene.components.reader_items import OutlineDividerItem
         scene = self.scene
-        item = scene.sender()
-        if not isinstance(item, OutlineDividerItem): return
+        # print(f"[OutlineManager] start_divider_drag. Item: {item}, Pos: {pos}")
+        if not isinstance(item, OutlineDividerItem):
+            # print(f"[OutlineManager] item is NOT OutlineDividerItem: {type(item)}")
+            return
         
         scene.is_dragging_divider = True
         scene.drag_divider_item = item
         
         parent = item.parent_node
         idx = item.split_idx
+        # print(f"[OutlineManager] dragging node {parent.get('id')} idx {idx}")
         loader = scene.loader
         
         # Determine draggable bounds

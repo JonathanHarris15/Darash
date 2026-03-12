@@ -17,32 +17,44 @@ class SceneOverlayManager:
         self.path_finder = SnakePathFinder(scene)
         self._active_ghost_highlights = []  # Temp QGraphicsRectItems for hover highlights
         self._ghost_icon_map = {}           # key -> GhostArrowIconItem (for hover coordination)
+        self._is_rendering = False
 
     def render_study_overlays(self):
-        scene = self.scene
-        for it in scene.study_overlay_items:
-            if it.scene() == scene:
-                scene.removeItem(it)
-        scene.study_overlay_items.clear()
-        self._ghost_icon_map.clear()
-        self._clear_ghost_highlights()
+        if self._is_rendering:
+            return
+        self._is_rendering = True
         
-        self._render_marks_layer()
-        self._render_logical_marks_layer()
-        self._render_symbols_layer()
-        self._render_notes_layer()
-        self._render_arrows_layer()
-        
-        # Force a full repaint of the visible scene area. Qt only invalidates
-        # per-item bounding rects when removeItem() is called, which can leave
-        # ghost pixels from semi-transparent (alpha) fills and anti-aliased edges.
-        scene.update(scene.sceneRect())
+        try:
+            scene = self.scene
+            for it in scene.study_overlay_items:
+                if it.scene() == scene:
+                    scene.removeItem(it)
+            scene.study_overlay_items.clear()
+            self._ghost_icon_map.clear()
+            self._clear_ghost_highlights()
+            
+            self._render_marks_layer()
+            self._render_logical_marks_layer()
+            self._render_symbols_layer()
+            self._render_notes_layer()
+            self._render_arrows_layer()
+            
+            # Use update() on the visible viewport area instead of full sceneRect()
+            # to prevent expensive full-scene repaints.
+            scene.update(0, scene.scroll_y, scene.last_width, scene.view_height)
+        finally:
+            self._is_rendering = False
 
     def _render_marks_layer(self):
         scene = self.scene
         for mark in scene.study_manager.data["marks"]:
             ref = f"{mark['book']} {mark['chapter']}:{mark['verse_num']}"
             if ref in scene.verse_pos_map:
+                # OPTIMIZATION: Check if the verse is even remotely visible before computing rects
+                y_top, y_bottom = scene.verse_y_map[ref]
+                if not scene._is_rect_visible(QRectF(0, y_top, 1, y_bottom - y_top)):
+                    continue
+                    
                 start_pos = scene.verse_pos_map[ref] + mark['start']
                 rects = scene._get_text_rects(start_pos, mark['length'])
                 for r in rects:
@@ -50,14 +62,17 @@ class SceneOverlayManager:
 
     def _render_logical_marks_layer(self):
         scene = self.scene
-        # Logical marks are stored in logical_marks dict
-        # key: mark_type (e.g. "arrow_right")
         for key, mark_type in scene.study_manager.data.get("logical_marks", {}).items():
             if mark_type not in Theme.LOGICAL_MARKS: continue
             
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
             if ref in scene.verse_pos_map:
+                # OPTIMIZATION: Check visibility
+                y_top, y_bottom = scene.verse_y_map[ref]
+                if not scene._is_rect_visible(QRectF(0, y_top, 1, y_bottom - y_top)):
+                    continue
+                    
                 v_start = scene.verse_pos_map[ref]
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
@@ -83,19 +98,24 @@ class SceneOverlayManager:
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
             if ref in scene.verse_pos_map:
+                # OPTIMIZATION: Check visibility
+                y_top, y_bottom = scene.verse_y_map[ref]
+                if not scene._is_rect_visible(QRectF(0, y_top, 1, y_bottom - y_top)):
+                    continue
+                    
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
                     word_idx = int(ref_parts[3])
                     word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
                     if word_pos != -1:
                         rects = scene._get_text_rects(word_pos, len(verse_data['tokens'][word_idx][0]))
-                    if rects:
-                        r = rects[0]
-                        pix_item = scene._create_symbol_item(symbol_name, r, symbol_opacity)
-                        if pix_item:
-                            pix_item.setVisible(scene._is_rect_visible(r))
-                            scene.addItem(pix_item)
-                            scene.study_overlay_items.append(pix_item)
+                        if rects:
+                            r = rects[0]
+                            pix_item = scene._create_symbol_item(symbol_name, r, symbol_opacity)
+                            if pix_item:
+                                pix_item.setVisible(scene._is_rect_visible(r))
+                                scene.addItem(pix_item)
+                                scene.study_overlay_items.append(pix_item)
 
     def _render_notes_layer(self):
         scene = self.scene
@@ -104,19 +124,24 @@ class SceneOverlayManager:
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
             if ref in scene.verse_pos_map:
+                # OPTIMIZATION: Check visibility
+                y_top, y_bottom = scene.verse_y_map[ref]
+                if not scene._is_rect_visible(QRectF(0, y_top, 1, y_bottom - y_top)):
+                    continue
+                    
                 verse_data = scene.loader.get_verse_by_ref(ref)
                 if verse_data:
                     word_idx = int(ref_parts[3])
                     word_pos = scene.layout_engine._get_word_document_pos(ref, word_idx)
                     if word_pos != -1:
                         rects = scene._get_text_rects(word_pos, len(verse_data['tokens'][word_idx][0]))
-                    if rects:
-                        r = rects[0]
-                        note_icon = NoteIcon(key, ref, scene)
-                        note_icon.setPos(r.right() - 5, r.top() - 5)
-                        note_icon.setVisible(scene._is_rect_visible(r))
-                        scene.addItem(note_icon)
-                        scene.study_overlay_items.append(note_icon)
+                        if rects:
+                            r = rects[0]
+                            note_icon = NoteIcon(key, ref, scene)
+                            note_icon.setPos(r.right() - 5, r.top() - 5)
+                            note_icon.setVisible(scene._is_rect_visible(r))
+                            scene.addItem(note_icon)
+                            scene.study_overlay_items.append(note_icon)
 
     def _render_arrows_layer(self):
         scene = self.scene

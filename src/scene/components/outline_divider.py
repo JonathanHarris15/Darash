@@ -7,7 +7,7 @@ class OutlineDividerItem(QGraphicsObject):
     """
     A draggable horizontal line representing a split in the outline.
     """
-    dragStarted = Signal(QPointF)
+    dragStarted = Signal(object, QPointF)
     
     def __init__(self, parent_node, split_idx, y, x_start, x_end, pen, is_double=False, text_level=None, parent=None):
         super().__init__(parent)
@@ -85,7 +85,7 @@ class OutlineDividerItem(QGraphicsObject):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.dragStarted.emit(event.scenePos())
+            self.dragStarted.emit(self, event.scenePos())
             event.accept()
         else:
             super().mousePressEvent(event)

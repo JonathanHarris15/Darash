@@ -37,6 +37,7 @@ class SceneInteractionManager(QObject):
         block = doc.findBlock(start)
         group_id = str(time.time())
         
+        scene.study_manager.save_state()
         while block.isValid() and block.position() < start + length:
             ref = scene._get_ref_from_pos(block.position())
             if ref:
@@ -44,14 +45,15 @@ class SceneInteractionManager(QObject):
                 rel_start = max(0, start - v_start)
                 rel_end = min(block.length(), start + length - v_start)
                 if rel_start < rel_end: 
-                    self.apply_mark_to_verse(ref, rel_start, rel_end - rel_start, mark_type, color, group_id)
+                    self.apply_mark_to_verse(ref, rel_start, rel_end - rel_start, mark_type, color, group_id, backup=False, save=False)
             block = block.next()
+        scene.study_manager.save_data()
             
         scene._clear_selection()
         scene._render_study_overlays()
         scene.studyDataChanged.emit()
 
-    def apply_mark_to_verse(self, ref, rel_start, rel_length, mark_type, color, group_id=None):
+    def apply_mark_to_verse(self, ref, rel_start, rel_length, mark_type, color, group_id=None, backup=True, save=True):
         scene = self.scene
         verse_data = scene.loader.get_verse_by_ref(ref)
         if not verse_data: return
@@ -81,8 +83,8 @@ class SceneInteractionManager(QObject):
                 "length": rel_length, 
                 "color": color,
                 "group_id": group_id
-            })
-        elif modified:
+            }, backup=backup, save=save)
+        elif modified and save:
             scene.study_manager.save_data()
 
     def on_add_bookmark_requested(self):
@@ -178,8 +180,10 @@ class SceneInteractionManager(QObject):
 
     def set_selected_verse_mark(self, mark_type):
         scene = self.scene
+        scene.study_manager.save_state()
         for ref in scene.selected_refs:
-            scene.study_manager.set_verse_mark(ref, mark_type)
+            scene.study_manager.set_verse_mark(ref, mark_type, backup=False, save=False)
+        scene.study_manager.save_data()
         scene.render_verses()
         scene.studyDataChanged.emit()
 

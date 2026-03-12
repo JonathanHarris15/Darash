@@ -93,10 +93,9 @@ class SceneSettingsManager:
         
         self.update_fonts()
         self.save_settings()
+        # recalculate_layout already calls render_verses, _render_search_overlays,
+        # and emits layoutFinished — no need to call them again here.
         scene.recalculate_layout(scene.last_width, center_verse_idx=int(scene.virtual_scroll_y))
-        scene.setSceneRect(QRectF(0, scene.scroll_y, scene.last_width, scene.view_height))
-        scene._render_study_overlays()
-        scene._render_search_overlays()
-        scene.render_verses()
+        scene.update_scene_rect_only()
         scene.scrollChanged.emit(int(scene.virtual_scroll_y))
-        scene.layoutFinished.emit()
+
