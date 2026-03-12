@@ -240,7 +240,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `ui/theme.py`, `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
-| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.2) |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.3) |
 | **Release Notes** | `managers/release_note_manager.py`, `ui/components/release_note_dialog.py` |
 | **Spellcheck** | `managers/spellcheck_manager.py`, `ui/components/spellcheck_highlighter.py` |
 | **Styling / Theme Iteration** | `ui/components/styling_playground.py`, `ui/theme.py` |
