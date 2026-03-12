@@ -13,3 +13,6 @@ Example: "release v0.1.5" and it would run through all of the necessary scripts 
 `/new-release-note` - Starts the process of creating a new release note
 
 `/release` - Releases a new version of the application
+
+## Labs
+you can run the labs in the `scripts/labs` directory. 

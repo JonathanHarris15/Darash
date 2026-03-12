@@ -5,7 +5,7 @@ from src.core.constants import (
     SCROLL_SENSITIVITY, RESIZE_DEBOUNCE_INTERVAL,
     LAYOUT_DEBOUNCE_INTERVAL, VERSE_NUMBER_RESERVED_WIDTH
 )
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class SceneSettingsManager:
     """

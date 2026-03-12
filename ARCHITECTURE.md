@@ -41,6 +41,7 @@
 | File | Key Class / Contents | Responsibility |
 |---|---|---|
 | `constants.py` | — | Bible book list, section metadata, application version, and core layout parameters (non-styling) |
+| `theme.py` | `Theme` | **Single source of truth for design tokens.** Centralizes colors, typography, and spacing; generates global application stylesheet |
 | `verse_loader.py` | `VerseLoader` | Parses Bible JSON/XML. Supports multi-translation chapter loading with caching. |
 | `search_engine.py` | `SearchEngine`, `SearchParser` | Logical-operator search parsing (`AND`, `OR`, `NOT`), scoped searches (verse/chapter/book), returns ranked result lists |
 
@@ -96,7 +97,6 @@
 | `main_window.py` | `MainWindow` | Top-level `QMainWindow`. Assembles all docks/panels, handles menu bar, layout presets, dock visibility |
 | `main_window_layout.py` | `MainWindowLayoutMixin` | Mixin for `MainWindow` handling layout state saving, restoring, and presets |
 | `main_window_panels.py` | `MainWindowPanelsMixin` | Mixin for `MainWindow` handling panel creation, tracking, and teardown |
-| `theme.py` | `Theme` | **Single source of truth for design tokens.** Centralizes colors, typography, and spacing; generates global application stylesheet |
 | `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar) |
 | `export_manager.py` | `ExportManager` | Orchestrates content extraction (Notes/Outlines) and export dialog flow |
 | `components/activity_bar.py` | `ActivityBar` | Left-edge icon bar that toggles panel visibility (similar to VS Code sidebar icons) |
@@ -127,6 +127,7 @@
 | `components/symbol_dialog.py` | `SymbolDialog` | Full symbol library browser and picker dialog |
 | `components/translation_selector.py` | `TranslationSelector` | Dropdown for toggling and reordering translations via drag-and-drop |
 | `components/release_note_dialog.py` | `ReleaseNoteDialog` | Styled markdown viewer for version updates |
+| `components/styling_playground.py` | `StylingPlaygroundPanel` | Developer-only styling tool; showcases all theme tokens and component styles for rapid iteration via Lab runner |
 | `components/spellcheck_highlighter.py` | `SpellcheckHighlighter` | `QSyntaxHighlighter` that underlines misspelled words for `RichTextEdit` |
 | `components/spellcheck_title_edit.py` | `SpellcheckTitleEdit` | Single-line text input with spellcheck support for titles |
 
@@ -183,6 +184,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/managers/test_release_note_manager.py` | `ReleaseNoteManager` | View tracking, version detection, file discovery |
 | `tests/managers/test_spellcheck_manager.py` | `SpellcheckManager` | Basic spellcheck, suggestions, and custom dictionary persistence |
 | `tests/scene/test_scene_outline_manager.py` | `SceneOutlineManager` | Creation delegation and UI refresh signals |
+| `tests/scene/test_scene_regression.py` | `ReaderScene` | **Foolproof event delegation protection** (wheel/key events) |
 
 ---
 
@@ -241,6 +243,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.2) |
 | **Release Notes** | `managers/release_note_manager.py`, `ui/components/release_note_dialog.py` |
 | **Spellcheck** | `managers/spellcheck_manager.py`, `ui/components/spellcheck_highlighter.py` |
+| **Styling / Theme Iteration** | `ui/components/styling_playground.py`, `ui/theme.py` |
 | Release Tagging / Build | `gh-release-tag/SKILL.md` (Gemini Skill) |
 | Top-level window / docks / menu | `ui/main_window.py` |
 | GraphicsView container / HUD | `ui/reader_widget.py` |

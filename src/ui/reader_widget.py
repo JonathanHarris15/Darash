@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QGraphicsView, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtGui import QPainter
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QPointF
 import re
 from src.scene.reader_scene import ReaderScene
 from src.ui.components.jump_scrollbar import JumpScrollBar
@@ -9,7 +9,7 @@ from src.ui.components.mark_popup import MarkPopup
 from src.ui.components.suggested_symbols_dialog import SuggestedSymbolsDialog
 from src.ui.components.outline_dialog import OutlineDialog
 from src.ui.components.strongs_ui import StrongsTooltip, StrongsVerboseDialog
-from src.ui.theme import Theme
+from src.core.theme import Theme
 from src.core.constants import RESIZE_DEBOUNCE_INTERVAL
 
 class ReaderWidget(QWidget):

@@ -116,17 +116,50 @@ class SceneInputHandler(QObject):
             QGuiApplication.clipboard().setText(final_text)
 
     def handle_wheel(self, event):
+        scene = self.scene
         if self.d_key_pressed:
             # Cycle division levels
             scene_pos = event.scenePos()
             delta = event.delta()
-            if self.scene.outline_manager.cycle_divider_at_pos(scene_pos, delta):
+            if scene.outline_manager.cycle_divider_at_pos(scene_pos, delta):
                 return True
             return True # Still block scrolling even if no divider found
-        return False
+        
+        modifiers = event.modifiers()
+        delta = event.delta()
+        if delta == 0:
+            return False
+
+        if modifiers & (Qt.ControlModifier | Qt.AltModifier):
+            scene._zoom_accumulator += delta
+            while abs(scene._zoom_accumulator) >= 120:
+                step = 120 if scene._zoom_accumulator > 0 else -120
+                if modifiers & Qt.ControlModifier:
+                    scene.target_font_size = max(8, min(72, scene.target_font_size + (2 if step > 0 else -2)))
+                elif modifiers & Qt.AltModifier:
+                    scene.target_line_spacing = max(1.0, min(3.0, scene.target_line_spacing + (0.1 if step > 0 else -0.1)))
+                scene._zoom_accumulator -= step
+            scene.settingsPreview.emit(scene.target_font_size, scene.target_line_spacing)
+            scene.layout_timer.start()
+            return True
+
+        scene._wheel_accumulator += delta
+        while abs(scene._wheel_accumulator) >= 30:
+            step = 30 if scene._wheel_accumulator > 0 else -30
+            move = -(step / 120.0) * (scene.scroll_sens / 100.0)
+            scene.target_virtual_scroll_y = max(0, min(len(scene.loader.flat_verses) - 1, scene.target_virtual_scroll_y + move))
+            scene._wheel_accumulator -= step
+        
+        if not scene.scroll_timer.isActive():
+            scene.scroll_timer.start()
+        return True
 
     def handle_mouse_move(self, event):
         scene = self.scene
+        scene.last_mouse_scene_pos = event.scenePos()
+        if scene.outline_manager.handle_mouse_move(event):
+            return True
+            
         if scene.is_drawing_arrow:
             self._draw_temp_arrow(event.scenePos())
             
@@ -153,6 +186,74 @@ class SceneInputHandler(QObject):
                 if self.strongs_hover_timer.isActive():
                     self.strongs_hover_timer.stop()
                 scene.showStrongsTooltip.emit(event.scenePos(), None) # Hide current
+        return False
+
+    def handle_mouse_press(self, event):
+        scene = self.scene
+        item = scene.itemAt(event.scenePos(), scene.views()[0].transform())
+        from src.scene.components.reader_items import VerseNumberItem, SentenceHandleItem
+        if not isinstance(item, VerseNumberItem) and not isinstance(item, SentenceHandleItem):
+            scene._clear_verse_selection()
+        return False
+
+    def handle_mouse_release(self, event):
+        scene = self.scene
+        if scene.outline_manager.handle_mouse_release(event):
+            return True
+        if event.button() != Qt.LeftButton:
+            return False
+            
+        cursor = scene.main_text_item.textCursor()
+        if cursor.hasSelection():
+            scene.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
+            view = scene.views()[0]
+            screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
+            scene.showMarkPopup.emit(screen_pos, scene._get_ref_from_pos(cursor.selectionStart()))
+        else:
+            scene.current_selection = None
+        scene.render_verses()
+        return False
+
+    def handle_mouse_double_click(self, event):
+        return self.scene.outline_manager.handle_double_click(event)
+
+    def handle_context_menu(self, event):
+        scene = self.scene
+        view = scene.views()[0]
+        global_pos = event.screenPos()
+        h_data = scene.interaction_manager.get_heading_at_pos(event.scenePos())
+        from PySide6.QtGui import QAction
+        from src.utils.menu_utils import create_menu
+        if h_data:
+            menu = create_menu(view)
+            suggest_act = QAction("Get suggested symbols", menu)
+            suggest_act.triggered.connect(lambda: scene.interaction_manager.show_suggested_symbols_dialog(h_data))
+            menu.addAction(suggest_act)
+            menu.exec(global_pos)
+            return True
+            
+        from src.scene.components.reader_items import VerseNumberItem
+        item = scene.itemAt(event.scenePos(), view.transform())
+        if isinstance(item, VerseNumberItem):
+            item.contextMenuRequested.emit(QPointF(global_pos))
+            return True
+            
+        cursor = scene.main_text_item.textCursor()
+        if not cursor.hasSelection():
+            pos = scene.main_text_item.document().documentLayout().hitTest(
+                scene.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit
+            )
+            if pos != -1:
+                cursor.setPosition(pos)
+                cursor.select(QTextCursor.WordUnderCursor)
+                scene.main_text_item.setTextCursor(cursor)
+                
+        if cursor.hasSelection():
+            scene.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
+            scene.showMarkPopup.emit(global_pos, scene._get_ref_from_pos(cursor.selectionStart()))
+            scene.render_verses()
+            return True
+        return False
 
     def _handle_strongs_lookup(self):
         scene = self.scene

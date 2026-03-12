@@ -11,12 +11,12 @@ def spell_manager(tmp_path, monkeypatch):
 
 def test_is_misspelled_basic(spell_manager):
     assert spell_manager.is_misspelled("hello") == False
-    assert spell_manager.is_misspelled("hallo") == True  # Assuming hallo is not in default dict
+    assert spell_manager.is_misspelled("xzxzxz") == True
     assert spell_manager.is_misspelled("123") == False   # Non-alpha should be ignored
     assert spell_manager.is_misspelled("") == False
 
 def test_ignore_word(spell_manager):
-    word = "hallo"
+    word = "xzxzxz"
     assert spell_manager.is_misspelled(word) == True
     spell_manager.ignore_word(word)
     assert spell_manager.is_misspelled(word) == False
@@ -35,6 +35,6 @@ def test_persistence(tmp_path, monkeypatch):
     assert mgr2.is_misspelled("customword") == False
 
 def test_get_suggestions(spell_manager):
-    suggestions = spell_manager.get_suggestions("hallo")
+    suggestions = spell_manager.get_suggestions("helllo") # 3 'l's
     assert len(suggestions) > 0
-    assert "hello" in suggestions or "halo" in suggestions
+    assert "hello" in suggestions

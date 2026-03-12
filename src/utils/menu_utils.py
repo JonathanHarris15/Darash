@@ -3,7 +3,7 @@ Shared utilities for creating consistently styled context menus across the appli
 """
 from PySide6.QtWidgets import QMenu
 
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 # Unified dark-theme stylesheet applied to every context menu in the app.
 _MENU_STYLE = f"""

@@ -47,7 +47,7 @@ class TestSceneOverlayManager(unittest.TestCase):
         self.assertEqual(len(self.mock_scene.study_overlay_items), 1)
 
     def test_render_logical_marks_layer(self):
-        self.mock_study_manager.data["logical_marks"]["Genesis|1|1|0"] = "arrow_right"
+        self.mock_study_manager.data["logical_marks"]["Genesis|1|1|0"] = "relation"
         self.overlay_manager._render_logical_marks_layer()
         self.assertEqual(len(self.mock_scene.study_overlay_items), 1)
         self.assertIsInstance(self.mock_scene.study_overlay_items[0], LogicalMarkItem)

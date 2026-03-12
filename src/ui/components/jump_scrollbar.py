@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QScrollBar, QStyle, QStyleOptionSlider, QLabel
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtCore import Qt
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class JumpScrollBar(QScrollBar):
     """

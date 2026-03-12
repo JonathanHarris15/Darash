@@ -3,7 +3,7 @@ from PySide6.QtCore import Signal, Qt
 import re
 import difflib
 from src.core.constants import OT_BOOKS, NT_BOOKS
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 ALL_BOOKS = OT_BOOKS + NT_BOOKS
 

@@ -30,7 +30,7 @@ from src.core.constants import (
     SCROLL_SENSITIVITY, RESIZE_DEBOUNCE_INTERVAL,
     LAYOUT_DEBOUNCE_INTERVAL, VERSE_NUMBER_RESERVED_WIDTH
 )
-from src.ui.theme import Theme
+from src.core.theme import Theme
 import bisect
 import os
 import time
@@ -265,83 +265,37 @@ class ReaderScene(QGraphicsScene):
     def prev_match(self): self.search_manager.prev_match()
     def clear_search(self): self.search_manager.clear_search()
 
+    def _clear_verse_selection(self): self.interaction_manager.clear_verse_selection()
+    def _on_verse_num_clicked(self, item, shift): self.interaction_manager.on_verse_num_clicked(item, shift)
+    def _on_verse_num_context_menu(self, item, screen_pos): self.interaction_manager.on_verse_num_context_menu(item, screen_pos)
+
     def contextMenuEvent(self, event):
-        view = self.views()[0]; global_pos = event.screenPos()
-        h_data = self.interaction_manager.get_heading_at_pos(event.scenePos())
-        if h_data:
-            menu = create_menu(view); suggest_act = QAction("Get suggested symbols", menu)
-            suggest_act.triggered.connect(lambda: self.interaction_manager.show_suggested_symbols_dialog(h_data))
-            menu.addAction(suggest_act); menu.exec(global_pos); event.accept(); return
-        item = self.itemAt(event.scenePos(), view.transform())
-        if isinstance(item, VerseNumberItem):
-            item.contextMenuRequested.emit(QPointF(global_pos)); event.accept(); return
-        cursor = self.main_text_item.textCursor()
-        if not cursor.hasSelection():
-            pos = self.main_text_item.document().documentLayout().hitTest(self.main_text_item.mapFromScene(event.scenePos()), Qt.FuzzyHit)
-            if pos != -1:
-                cursor.setPosition(pos); cursor.select(QTextCursor.WordUnderCursor); self.main_text_item.setTextCursor(cursor)
-        if cursor.hasSelection():
-            self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            self.showMarkPopup.emit(global_pos, self._get_ref_from_pos(cursor.selectionStart()))
-            self.render_verses(); event.accept(); return
-        super().contextMenuEvent(event)
+        if not self.input_handler.handle_context_menu(event):
+            super().contextMenuEvent(event)
+
+    def wheelEvent(self, event):
+        if not self.input_handler.handle_wheel(event):
+            super().wheelEvent(event)
+
+    def keyPressEvent(self, event):
+        if not self.input_handler.handle_key_press(event):
+            super().keyPressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.outline_manager.handle_mouse_release(event): event.accept(); return
-        if event.button() != Qt.LeftButton: super().mouseReleaseEvent(event); return
-        cursor = self.main_text_item.textCursor()
-        if cursor.hasSelection():
-            self.current_selection = (cursor.selectionStart(), cursor.selectionEnd() - cursor.selectionStart())
-            view = self.views()[0]; screen_pos = view.viewport().mapToGlobal(view.mapFromScene(event.scenePos()))
-            self.showMarkPopup.emit(screen_pos, self._get_ref_from_pos(cursor.selectionStart()))
-        else: self.current_selection = None
-        self.render_verses(); super().mouseReleaseEvent(event)
-
-    def _clear_verse_selection(self): self.interaction_manager.clear_verse_selection()
-    def _on_verse_num_context_menu(self, item, screen_pos): self.interaction_manager.on_verse_num_context_menu(item, screen_pos)
-    def _set_selected_verse_mark(self, mark_type): self.interaction_manager.set_selected_verse_mark(mark_type)
-
-    def wheelEvent(self, event) -> None:
-        if self.input_handler.handle_wheel(event): event.accept(); return
-        modifiers = event.modifiers(); delta = event.delta() 
-        if delta == 0: super().wheelEvent(event); return
-        if modifiers & (Qt.ControlModifier | Qt.AltModifier):
-            self._zoom_accumulator += delta
-            while abs(self._zoom_accumulator) >= 120:
-                step = 120 if self._zoom_accumulator > 0 else -120
-                if modifiers & Qt.ControlModifier: self.target_font_size = max(8, min(72, self.target_font_size + (2 if step > 0 else -2)))
-                elif modifiers & Qt.AltModifier: self.target_line_spacing = max(1.0, min(3.0, self.target_line_spacing + (0.1 if step > 0 else -0.1)))
-                self._zoom_accumulator -= step
-            self.settingsPreview.emit(self.target_font_size, self.target_line_spacing); self.layout_timer.start(); event.accept(); return
-        self._wheel_accumulator += delta
-        while abs(self._wheel_accumulator) >= 30:
-            step = 30 if self._wheel_accumulator > 0 else -30
-            move = -(step / 120.0) * (self.scroll_sens / 100.0) 
-            self.target_virtual_scroll_y = max(0, min(len(self.loader.flat_verses) - 1, self.target_virtual_scroll_y + move))
-            self._wheel_accumulator -= step
-        if not self.scroll_timer.isActive(): self.scroll_timer.start()
-        event.accept(); super().wheelEvent(event) 
+        if not self.input_handler.handle_mouse_release(event):
+            super().mouseReleaseEvent(event)
 
     def mousePressEvent(self, event):
-        item = self.itemAt(event.scenePos(), self.views()[0].transform())
-        if not isinstance(item, VerseNumberItem) and not isinstance(item, SentenceHandleItem): self._clear_verse_selection()
-        super().mousePressEvent(event)
+        if not self.input_handler.handle_mouse_press(event):
+            super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
-        if not self.outline_manager.handle_double_click(event): super().mouseDoubleClickEvent(event)
-
-    def _clear_selection(self):
-        cursor = self.main_text_item.textCursor(); cursor.clearSelection(); self.main_text_item.setTextCursor(cursor); self.current_selection = None
-
-    def _on_add_bookmark_requested(self): self.interaction_manager.on_add_bookmark_requested()
-    def _on_add_note_requested(self): self.interaction_manager.on_add_note_requested()
-    def keyPressEvent(self, event):
-        if not self.input_handler.handle_key_press(event): super().keyPressEvent(event)
+        if not self.input_handler.handle_mouse_double_click(event):
+            super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event):
-        self.last_mouse_scene_pos = event.scenePos()
-        if self.outline_manager.handle_mouse_move(event): super().mouseMoveEvent(event); return
-        self.input_handler.handle_mouse_move(event); super().mouseMoveEvent(event)
+        if not self.input_handler.handle_mouse_move(event):
+            super().mouseMoveEvent(event)
 
     def keyReleaseEvent(self, event):
         if not self.input_handler.handle_key_release(event): super().keyReleaseEvent(event)

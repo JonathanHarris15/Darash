@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QApplication
 from PySide6.QtCore import QFileSystemWatcher, Qt, QTimer
 from PySide6.QtGui import QScreen
 
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class HotReloadHarness(QMainWindow):
     """

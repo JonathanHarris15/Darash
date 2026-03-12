@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QPoint
 from PySide6.QtGui import QAction, QColor
 from src.utils.menu_utils import create_menu
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class StudyTreeWidget(QTreeWidget):
     jumpRequested = Signal(str, str, str)

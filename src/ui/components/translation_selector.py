@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class TranslationSelector(QFrame):
     """

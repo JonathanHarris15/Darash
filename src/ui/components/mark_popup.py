@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QFrame, QGridLayout, QLabel
 from PySide6.QtCore import Qt, Signal, QPoint, QEvent
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class ColorButton(QPushButton):
     def __init__(self, color_name, hex_code, parent=None):

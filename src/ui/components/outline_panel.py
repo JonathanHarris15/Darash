@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer
 from src.ui.components.outline_cell import OutlineCell
 from src.ui.components.spellcheck_title_edit import SpellcheckTitleEdit
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class OutlinePanel(QWidget):
     """

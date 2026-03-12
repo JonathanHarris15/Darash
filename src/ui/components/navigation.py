@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from typing import List
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class NavigationDock(QWidget):
     """

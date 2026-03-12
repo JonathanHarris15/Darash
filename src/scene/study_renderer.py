@@ -3,7 +3,7 @@ import os
 from PySide6.QtGui import QColor, QPen, QBrush, QPixmap
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem, QGraphicsPixmapItem
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class StudyRenderer:
     def __init__(self, scene):

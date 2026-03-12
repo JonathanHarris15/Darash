@@ -6,7 +6,7 @@ from src.scene.components.reader_items import (
     NoteIcon, ArrowItem, SnakeArrowItem, LogicalMarkItem, GhostArrowIconItem
 )
 from src.utils.snake_path_finder import SnakePathFinder
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class SceneOverlayManager:
     """

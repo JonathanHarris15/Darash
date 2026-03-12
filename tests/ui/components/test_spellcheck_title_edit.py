@@ -11,8 +11,8 @@ def test_spellcheck_title_edit_single_line(qtbot):
     qtbot.keyClick(edit, Qt.Key_Return)
     qtbot.keyClick(edit, Qt.Key_B)
     
-    # Newline should be blocked, resulting in "AB"
-    assert edit.text() == "AB"
+    # Newline should be blocked, resulting in "ab" (keyClick lowercase by default)
+    assert edit.text() == "ab"
     
 def test_spellcheck_title_edit_interface(qtbot):
     edit = SpellcheckTitleEdit("Initial Title")

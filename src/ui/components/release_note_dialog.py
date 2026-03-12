@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QPushButton, QHBoxLayout
 from PySide6.QtCore import Qt
-from src.ui.theme import Theme
+from src.core.theme import Theme
 
 class ReleaseNoteDialog(QDialog):
     """
