@@ -11,6 +11,8 @@ class RichTextEdit(QTextEdit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cursorPositionChanged.connect(self._break_link_format)
+        self.spell_manager = None
+        self.highlighter = None
 
     def _break_link_format(self):
         cursor = self.textCursor()
@@ -20,6 +22,49 @@ class RichTextEdit(QTextEdit):
             plain = QTextCharFormat(fmt)
             plain.setAnchor(False); plain.setAnchorHref(""); plain.setAnchorNames([]); plain.setFontUnderline(False); plain.clearForeground()
             self.setCurrentCharFormat(plain)
+
+    def enableSpellcheck(self, manager=None):
+        """Enable spellcheck with an optional manager instance."""
+        from src.managers.spellcheck_manager import SpellcheckManager
+        from src.ui.components.spellcheck_highlighter import SpellcheckHighlighter
+        
+        self.spell_manager = manager or SpellcheckManager()
+        self.highlighter = SpellcheckHighlighter(self.document(), self.spell_manager)
+
+    def contextMenuEvent(self, event):
+        menu = self.createStandardContextMenu()
+        
+        if self.spell_manager:
+            cursor = self.cursorForPosition(event.pos())
+            cursor.select(QTextCursor.WordUnderCursor)
+            word = cursor.selectedText().strip()
+            
+            if word and self.spell_manager.is_misspelled(word):
+                menu.addSeparator()
+                suggestions = self.spell_manager.get_suggestions(word)
+                if suggestions:
+                    for sugg in suggestions[:5]:  # Limit to 5 suggestions
+                        action = menu.addAction(sugg)
+                        action.triggered.connect(lambda checked=False, s=sugg, c=cursor: self._replace_word(c, s))
+                else:
+                    menu.addAction("No suggestions").setEnabled(False)
+                
+                menu.addSeparator()
+                ignore_action = menu.addAction("Add to Dictionary")
+                ignore_action.triggered.connect(lambda: self._ignore_word(word))
+        
+        menu.exec(event.globalPos())
+
+    def _replace_word(self, cursor, new_word):
+        cursor.beginEditBlock()
+        cursor.insertText(new_word)
+        cursor.endEditBlock()
+
+    def _ignore_word(self, word):
+        if self.spell_manager:
+            self.spell_manager.ignore_word(word)
+            if self.highlighter:
+                self.highlighter.rehighlight()
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:

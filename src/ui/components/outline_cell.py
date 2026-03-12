@@ -3,6 +3,8 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QHBoxLayout, QFrame, QSizePolicy, QTextEdit
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QEvent
+from src.ui.components.rich_text_edit import RichTextEdit
+from src.managers.spellcheck_manager import SpellcheckManager
 
 class DraggableLabel(QLabel):
     dragged = Signal(int, bool)
@@ -201,7 +203,8 @@ class OutlineCell(QFrame):
         layout.addWidget(self.ref_widget, alignment=Qt.AlignTop)
         
         # 4. Summary Edit (Multi-line)
-        self.summary_edit = QTextEdit()
+        self.summary_edit = RichTextEdit()
+        self.summary_edit.enableSpellcheck(SpellcheckManager.get_instance())
         self.summary_edit.setPlainText(node.get("summary", ""))
         self.summary_edit.setPlaceholderText("Section summary...")
         self.summary_edit.setAcceptRichText(False)

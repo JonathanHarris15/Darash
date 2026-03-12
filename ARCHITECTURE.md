@@ -56,6 +56,8 @@
 | `outline_ref_utils.py` | `OutlineRefUtils` | Utilities for verse reference calculations, delta shifting, and bounds checking |
 | `strongs_manager.py` | `StrongsManager` | Strong's number dictionary lookups, cross-reference indexing |
 | `symbol_manager.py` | `SymbolManager` | Custom icon library registration, symbol-to-verse bindings |
+| `release_note_manager.py` | `ReleaseNoteManager` | Tracks view counts for current version, manages seen state, loads markdown notes |
+| `spellcheck_manager.py` | `SpellcheckManager` | Manages spellcheck engine, suggestions, and custom ignored-words dictionary |
 
 **`StudyManager` key signals:** `marks_changed`, `notes_changed`, `symbols_changed`, `state_changed`
 
@@ -74,7 +76,7 @@
 | `scene_interaction_manager.py` | `SceneInteractionManager` | Click logic: word selection, right-click context menu, mark application, symbol placement, arrow initiation |
 | `scene_indentation_manager.py` | `SceneIndentationManager` | Live drag logic for adjusting verse/sentence indentation handles |
 | `scene_overlay_manager.py` | `SceneOverlayManager` | Draws dynamic `QGraphicsItem` overlays: marks, symbols, arrows (including ghost arrows), hover highlights |
-| `scene_outline_manager.py` | `SceneOutlineManager` | Interactive outline creation, splitting, and visual feedback within the scene |
+| `scene_outline_manager.py` | `SceneOutlineManager` | Interactive outline creation (`create_outline`), splitting, and visual feedback within the scene |
 | `scene_search_manager.py` | `SceneSearchManager` | Applies/clears search highlight items, manages navigation state within the visible chunk |
 | `scene_settings_manager.py` | `SceneSettingsManager` | Reads/writes appearance settings (fonts, spacing, colors), syncs font changes across the scene |
 | `components/reader_items.py` | — | Re-exports all graphics items for the reader scene |
@@ -124,6 +126,9 @@
 | `components/suggested_symbols_dialog.py` | `SuggestedSymbolsDialog` | Dialog that shows AI/rule-based suggested symbols for a selection |
 | `components/symbol_dialog.py` | `SymbolDialog` | Full symbol library browser and picker dialog |
 | `components/translation_selector.py` | `TranslationSelector` | Dropdown for toggling and reordering translations via drag-and-drop |
+| `components/release_note_dialog.py` | `ReleaseNoteDialog` | Styled markdown viewer for version updates |
+| `components/spellcheck_highlighter.py` | `SpellcheckHighlighter` | `QSyntaxHighlighter` that underlines misspelled words for `RichTextEdit` |
+| `components/spellcheck_title_edit.py` | `SpellcheckTitleEdit` | Single-line text input with spellcheck support for titles |
 
 ---
 
@@ -175,6 +180,9 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/utils/test_exporter.py` | PDF and DOCX generation with various options |
 | `tests/utils/test_export_manager.py` | `ExportManager` dialog triggering and content extraction logic |
 | `tests/utils/test_update_manager.py` | `UpdateManager` version comparison and parsing logic |
+| `tests/managers/test_release_note_manager.py` | `ReleaseNoteManager` | View tracking, version detection, file discovery |
+| `tests/managers/test_spellcheck_manager.py` | `SpellcheckManager` | Basic spellcheck, suggestions, and custom dictionary persistence |
+| `tests/scene/test_scene_outline_manager.py` | `SceneOutlineManager` | Creation delegation and UI refresh signals |
 
 ---
 
@@ -231,6 +239,8 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Font / color / spacing settings | `ui/theme.py`, `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
 | Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.2) |
+| **Release Notes** | `managers/release_note_manager.py`, `ui/components/release_note_dialog.py` |
+| **Spellcheck** | `managers/spellcheck_manager.py`, `ui/components/spellcheck_highlighter.py` |
 | Release Tagging / Build | `gh-release-tag/SKILL.md` (Gemini Skill) |
 | Top-level window / docks / menu | `ui/main_window.py` |
 | GraphicsView container / HUD | `ui/reader_widget.py` |

@@ -10,6 +10,15 @@ class SceneOutlineManager:
     def __init__(self, scene):
         self.scene = scene
 
+    def create_outline(self, start_ref, end_ref, title, summary=""):
+        """Creates a new outline and refreshes the scene."""
+        result = self.scene.study_manager.outline_manager.create_outline(start_ref, end_ref, title, summary)
+        if result:
+            self.scene.renderer._render_outline_overlays()
+            self.scene.studyDataChanged.emit()
+            return result
+        return None
+
     def create_outline_from_verse_selection(self):
         scene = self.scene
         if not scene.selected_refs: return

@@ -61,6 +61,12 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         
         self.setup_menu()
         
+        # Release Note Manager
+        from src.managers.release_note_manager import ReleaseNoteManager
+        self.release_note_manager = ReleaseNoteManager()
+        if self.release_note_manager.should_show_release_note():
+            QTimer.singleShot(1000, self._show_release_notes)
+        
         self.left_dock.installEventFilter(self)
         self.right_dock.installEventFilter(self)
         self._is_applying_preset = False
@@ -313,6 +319,20 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         manage_symbols_act = QAction("Manage Symbols...", self)
         manage_symbols_act.triggered.connect(lambda: SymbolDialog(self.main_scene.symbol_manager, self).exec())
         symbols_menu.addAction(manage_symbols_act)
+
+        help_menu = menubar.addMenu("&Help")
+        release_notes_act = QAction("Release Notes...", self)
+        release_notes_act.triggered.connect(self._show_release_notes)
+        help_menu.addAction(release_notes_act)
+
+    def _show_release_notes(self):
+        from src.ui.components.release_note_dialog import ReleaseNoteDialog
+        content = self.release_note_manager.get_current_release_note()
+        version = self.release_note_manager.version
+        dialog = ReleaseNoteDialog(self, content=content, version=version)
+        if dialog.exec():
+            # If they closed it, count it as a "seen" event
+            self.release_note_manager.increment_view_count()
 
     def closeEvent(self, event):
         import json

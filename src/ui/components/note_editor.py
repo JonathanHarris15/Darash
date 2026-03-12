@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction, QDesktopServices
 
 from src.ui.components.rich_text_edit import RichTextEdit
 from src.ui.components.formatting_toolbar import FormattingToolBar
+from src.ui.components.spellcheck_title_edit import SpellcheckTitleEdit
 
 def _is_html(text: str) -> bool:
     stripped = text.strip().lower()
@@ -28,14 +29,16 @@ class NoteEditor(QDialog):
         h_lay = QVBoxLayout(header); h_lay.setContentsMargins(10, 8, 10, 8); h_lay.setSpacing(4)
         if ref:
             rl = QLabel(f"📖  {ref}"); rl.setStyleSheet("color: #888; font-size: 11px;"); h_lay.addWidget(rl)
-        t_row = QHBoxLayout(); self.title_input = QLineEdit(); self.title_input.setPlaceholderText("Note title…"); self.title_input.setText(initial_title)
-        self.title_input.setStyleSheet("QLineEdit { background: transparent; border: none; border-bottom: 1px solid #555; color: #f0f0f0; font-size: 18px; font-weight: bold; padding: 2px 0; } QLineEdit:focus { border-bottom-color: #007acc; }")
+        t_row = QHBoxLayout(); self.title_input = SpellcheckTitleEdit(); self.title_input.setPlaceholderText("Note title…"); self.title_input.setText(initial_title)
+        self.title_input.setStyleSheet("QTextEdit { background: transparent; border: none; border-bottom: 1px solid #555; color: #f0f0f0; font-size: 18px; font-weight: bold; padding: 2px 0; } QTextEdit:focus { border-bottom-color: #007acc; }")
         t_row.addWidget(self.title_input, 1)
         self.menu_btn = QToolButton(); self.menu_btn.setText("⋮"); self.menu_btn.setStyleSheet("QToolButton { background: transparent; color: #888; font-size: 18px; border: none; } QToolButton:hover { color: white; }")
         self.menu_btn.setPopupMode(QToolButton.InstantPopup); self.menu_btn.setMenu(self._build_export_menu())
         t_row.addWidget(self.menu_btn); h_lay.addLayout(t_row); outer.addWidget(header)
 
+        from src.managers.spellcheck_manager import SpellcheckManager
         self.editor = RichTextEdit(); self.editor.setAcceptRichText(True); self.editor.anchorClicked.connect(self._on_link_activated)
+        self.editor.enableSpellcheck(SpellcheckManager.get_instance())
         self.editor.setStyleSheet("QTextEdit { background-color: #1e1e1e; color: #e8e8e8; border: none; font-family: 'Segoe UI', 'Arial', sans-serif; font-size: 12pt; padding: 12px 16px; selection-background-color: #264f78; }")
         self.toolbar = FormattingToolBar(self.editor, self); outer.addWidget(self.toolbar)
         line = QFrame(); line.setFrameShape(QFrame.HLine); line.setStyleSheet("color: #3a3a3a;"); outer.addWidget(line); outer.addWidget(self.editor)

@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QPushButton, QDialogButtonBox, QComboBox, QFormLayout, QTextEdit
 )
 from PySide6.QtCore import Qt
+from src.ui.components.spellcheck_title_edit import SpellcheckTitleEdit
 
 class OutlineDialog(QDialog):
     """
@@ -18,8 +19,9 @@ class OutlineDialog(QDialog):
         
         form_layout = QFormLayout()
         
-        self.title_edit = QLineEdit(title)
+        self.title_edit = SpellcheckTitleEdit(title)
         self.title_edit.setPlaceholderText("Enter outline title...")
+        self.title_edit.setFixedHeight(24) # Match QLineEdit height better in forms
         form_layout.addRow("Title:", self.title_edit)
         
         self.start_ref_edit = QLineEdit(start_ref)

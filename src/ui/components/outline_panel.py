@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from src.ui.components.outline_cell import OutlineCell
+from src.ui.components.spellcheck_title_edit import SpellcheckTitleEdit
 from src.ui.theme import Theme
 
 class OutlinePanel(QWidget):
@@ -46,10 +47,10 @@ class OutlinePanel(QWidget):
         layout.addLayout(header_layout)
 
         # 2. Title Edit Bar
-        self.title_edit = QLineEdit()
+        self.title_edit = SpellcheckTitleEdit()
         self.title_edit.setPlaceholderText("Outline Title")
         self.title_edit.setStyleSheet(f"""
-            QLineEdit {{
+            QTextEdit {{
                 background-color: {Theme.BG_SECONDARY};
                 color: {Theme.TEXT_PRIMARY};
                 border: 1px solid {Theme.BORDER_DEFAULT};
