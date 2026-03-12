@@ -22,12 +22,14 @@ This document outlines high-impact technical workflows to professionalize the Je
 ## 3. Visual Regression Testing (Snapshot Lab)
 **Concept:** Ensure styling changes in one component don't accidentally break another.
 
+- **Status:** [ACTIVE] - Run `python scripts/visual_regression.py`
 - **Workflow:** A script that launches all established Labs, captures a screenshot of the window, and saves it to `docs/snapshots/`.
 - **Benefit:** Provides a "visual history" of the app and makes it easy to spot accidental layout shifts after a big CSS refactor.
 
 ## 4. UI REPL & Inspector
 **Concept:** Interact with live UI components via a terminal.
 
+- **Status:** [ACTIVE]
 - **Workflow:** Add an interactive Python prompt (using `code.InteractiveConsole`) to the Lab harness.
 - **Benefit:** Allows you to test logic and states in real-time (e.g., `component.show_loading()`) without modifying code or restarting.
 

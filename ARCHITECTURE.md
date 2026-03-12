@@ -186,7 +186,8 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `installer/windows_setup.iss` | Inno Setup | Windows professional installer (Setup.exe) generation |
 | `.github/workflows/release.yml` | GitHub Action | Multi-OS build matrix (Windows/Mac), installer creation, and GitHub Release automation |
 | `gh-release-tag/` | Gemini Skill | Custom command to automate version bumping, tagging, and pushing to GitHub |
-| `scripts/lab/` | `HotReloadHarness` | Standalone runners for UI components to enable rapid styling in isolation; includes hot-reload capability |
+| `scripts/lab/` | `HotReloadHarness` | Standalone runners with integrated UI REPL and Hot-Reload support |
+| `scripts/visual_regression.py` | — | Automated UI snapshot capture for all Lab runners |
 
 ---
 

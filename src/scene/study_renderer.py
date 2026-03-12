@@ -29,7 +29,8 @@ class StudyRenderer:
         start_idx = max(0, start_idx - 1)
         end_idx = min(len(scene.pos_verse_map), end_idx + 1)
         
-        pen = QPen(QColor(120, 120, 120, 120), 1.5) 
+        pen = QPen(Theme.color("ACCENT_GOLD"), 1.5) 
+        pen.setColor(QColor(255, 204, 0, 180)) # Semi-transparent gold for better blending
         
         for i in range(start_idx, end_idx):
             char_pos, ref = scene.pos_verse_map[i]

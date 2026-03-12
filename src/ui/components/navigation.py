@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from typing import List
+from src.ui.theme import Theme
 
 class NavigationDock(QWidget):
     """
@@ -33,24 +34,25 @@ class NavigationDock(QWidget):
         self.btn_strongs.setCheckable(True)
         self.btn_strongs.setToolTip("Toggle Strong's Underlines")
         self.btn_strongs.setFixedSize(28, 28)
-        self.btn_strongs.setStyleSheet("""
-            QPushButton {
-                background-color: #333;
-                color: #888;
-                border: 1px solid #444;
+        self.btn_strongs.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.BG_TERTIARY};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 border-radius: 4px;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #444;
-                color: #bbb;
-            }
-            QPushButton:checked {
-                background-color: #2a2a25;
-                color: #ffcc00;
-                border-color: #665500;
-            }
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.BORDER_LIGHT};
+                color: white;
+            }}
+            QPushButton:checked {{
+                background-color: {Theme.BG_PRIMARY};
+                color: {Theme.ACCENT_GOLD};
+                border-color: {Theme.ACCENT_GOLD};
+            }}
         """)
         self.btn_strongs.toggled.connect(self.strongsToggled.emit)
         header_layout.addWidget(self.btn_strongs)
@@ -59,24 +61,25 @@ class NavigationDock(QWidget):
         self.btn_outlines.setCheckable(True)
         self.btn_outlines.setToolTip("Toggle Outlines")
         self.btn_outlines.setFixedSize(28, 28)
-        self.btn_outlines.setStyleSheet("""
-            QPushButton {
-                background-color: #333;
-                color: #888;
-                border: 1px solid #444;
+        self.btn_outlines.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.BG_TERTIARY};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 border-radius: 4px;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #444;
-                color: #bbb;
-            }
-            QPushButton:checked {
-                background-color: #2a2a25;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.BORDER_LIGHT};
+                color: white;
+            }}
+            QPushButton:checked {{
+                background-color: {Theme.BG_PRIMARY};
                 color: #00ff00;
-                border-color: #006600;
-            }
+                border-color: #00ff00;
+            }}
         """)
         self.btn_outlines.toggled.connect(self.outlinesToggled.emit)
         header_layout.addWidget(self.btn_outlines)
@@ -86,18 +89,18 @@ class NavigationDock(QWidget):
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(15)
-        self.tree.setStyleSheet("""
-            QTreeWidget {
-                background-color: #222;
-                border: 1px solid #444;
-                color: #ccc;
-            }
-            QTreeWidget::item {
+        self.tree.setStyleSheet(f"""
+            QTreeWidget {{
+                background-color: {Theme.BG_SECONDARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
+                color: {Theme.TEXT_PRIMARY};
+            }}
+            QTreeWidget::item {{
                 padding: 4px;
-            }
-            QTreeWidget::item:hover {
-                background-color: #333;
-            }
+            }}
+            QTreeWidget::item:hover {{
+                background-color: {Theme.BG_TERTIARY};
+            }}
         """)
         layout.addWidget(self.tree)
         
