@@ -26,13 +26,11 @@ from src.utils.reader_utils import (
 )
 
 from src.core.constants import (
-    APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR,
-    DEFAULT_FONT_FAMILY, VERSE_FONT_FAMILY, DEFAULT_FONT_SIZE, 
-    HEADER_FONT_SIZE, CHAPTER_FONT_SIZE,
-    LINE_SPACING_DEFAULT, SCROLL_SENSITIVITY, SIDE_MARGIN,
-    TAB_SIZE_DEFAULT, ARROW_OPACITY_DEFAULT, VERSE_MARK_SIZE_DEFAULT,
-    LOGICAL_MARK_OPACITY_DEFAULT, LAYOUT_DEBOUNCE_INTERVAL, LOGICAL_MARK_COLOR
+    OT_BOOKS, NT_BOOKS, BIBLE_SECTIONS,
+    SCROLL_SENSITIVITY, RESIZE_DEBOUNCE_INTERVAL,
+    LAYOUT_DEBOUNCE_INTERVAL, VERSE_NUMBER_RESERVED_WIDTH
 )
+from src.ui.theme import Theme
 import bisect
 import os
 import time
@@ -70,15 +68,15 @@ class ReaderScene(QGraphicsScene):
         self.scroll_y = 0.0
         self.target_scroll_y = 0.0
         self.last_mouse_scene_pos = QPointF()
-        self.font_size = DEFAULT_FONT_SIZE
-        self.line_spacing = LINE_SPACING_DEFAULT
-        self.font_family = VERSE_FONT_FAMILY
-        self.verse_num_font_size = DEFAULT_FONT_SIZE - 4
-        self.side_margin = SIDE_MARGIN
-        self.tab_size = TAB_SIZE_DEFAULT
-        self.arrow_opacity = ARROW_OPACITY_DEFAULT
-        self.verse_mark_size = VERSE_MARK_SIZE_DEFAULT
-        self.logical_mark_opacity = LOGICAL_MARK_OPACITY_DEFAULT
+        self.font_size = Theme.SIZE_READER_DEFAULT
+        self.line_spacing = 1.5 # Standard line spacing default
+        self.font_family = Theme.FONT_READER
+        self.verse_num_font_size = Theme.SIZE_READER_DEFAULT - 4
+        self.side_margin = 40 # Standard margin
+        self.tab_size = 40   # Standard tab
+        self.arrow_opacity = 0.6
+        self.verse_mark_size = 18
+        self.logical_mark_opacity = 0.5
         self.scroll_sens = SCROLL_SENSITIVITY
         self.last_emitted_ref = ""
         self.sentence_break_enabled = False
@@ -174,10 +172,10 @@ class ReaderScene(QGraphicsScene):
         self.settings_manager.load_settings()
         self.settings_manager.update_fonts()
         
-        self.text_color = QColor(self.study_manager.data["settings"].get("text_color", TEXT_COLOR.name()))
-        self.ref_color = QColor(self.study_manager.data["settings"].get("ref_color", REFERENCE_COLOR.name()))
-        self.logical_mark_color = QColor(self.study_manager.data["settings"].get("logical_mark_color", LOGICAL_MARK_COLOR.name()))
-        bg_color = QColor(self.study_manager.data["settings"].get("bg_color", APP_BACKGROUND_COLOR.name()))
+        self.text_color = QColor(self.study_manager.data["settings"].get("text_color", Theme.TEXT_PRIMARY))
+        self.ref_color = QColor(self.study_manager.data["settings"].get("ref_color", Theme.ACCENT_PRIMARY))
+        self.logical_mark_color = QColor(self.study_manager.data["settings"].get("logical_mark_color", "#ffffff"))
+        bg_color = QColor(self.study_manager.data["settings"].get("bg_color", Theme.BG_PRIMARY))
         self.setBackgroundBrush(bg_color)
 
     def _init_timers(self):

@@ -3,6 +3,7 @@ from PySide6.QtCore import Signal, Qt
 import re
 import difflib
 from src.core.constants import OT_BOOKS, NT_BOOKS
+from src.ui.theme import Theme
 
 ALL_BOOKS = OT_BOOKS + NT_BOOKS
 
@@ -34,7 +35,7 @@ class SearchBar(QWidget):
         self.res_layout.setContentsMargins(0, 0, 0, 0)
         
         self.results_label = QLabel("0 matches")
-        self.results_label.setStyleSheet("color: #aaa;")
+        self.results_label.setStyleSheet(f"color: {Theme.TEXT_MUTED};")
         
         # Navigation Buttons
         self.btn_prev = QPushButton("▲")
@@ -43,17 +44,17 @@ class SearchBar(QWidget):
         
         for btn in [self.btn_prev, self.btn_next, self.btn_clear]:
             btn.setFixedSize(24, 24)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #444;
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {Theme.BG_TERTIARY};
                     color: white;
                     border: none;
                     border-radius: 4px;
                     font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #555;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {Theme.BORDER_LIGHT};
+                }}
             """)
 
         self.btn_prev.clicked.connect(self.prevMatch.emit)
@@ -71,18 +72,18 @@ class SearchBar(QWidget):
         
         self.results_container.hide() # Hide until results exist
         
-        self.setStyleSheet("""
-            SearchBar {
-                background-color: #252525;
-                border-bottom: 1px solid #333;
-            }
-            QLineEdit {
-                background-color: #333;
-                color: white;
-                border: 1px solid #444;
+        self.setStyleSheet(f"""
+            SearchBar {{
+                background-color: {Theme.BG_SECONDARY};
+                border-bottom: 1px solid {Theme.BORDER_DEFAULT};
+            }}
+            QLineEdit {{
+                background-color: {Theme.BG_TERTIARY};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER_LIGHT};
                 border-radius: 4px;
                 padding: 4px 8px;
-            }
+            }}
         """)
 
     def _resolve_book(self, book_input: str) -> str:

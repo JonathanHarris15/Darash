@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QPoint
 from PySide6.QtGui import QAction, QColor
 from src.utils.menu_utils import create_menu
+from src.ui.theme import Theme
 
 class StudyTreeWidget(QTreeWidget):
     jumpRequested = Signal(str, str, str)
@@ -26,11 +27,11 @@ class StudyTreeWidget(QTreeWidget):
         self.setDragDropMode(QTreeWidget.InternalMove)
         self.setDropIndicatorShown(True)
         
-        self.setStyleSheet("""
-            QTreeWidget { background-color: #222; border: 1px solid #444; color: #ccc; }
-            QTreeWidget::item { padding: 4px; }
-            QTreeWidget::item:hover { background-color: #333; }
-            QTreeWidget::item:selected { background-color: #444; color: white; }
+        self.setStyleSheet(f"""
+            QTreeWidget {{ background-color: {Theme.BG_PRIMARY}; border: 1px solid {Theme.BORDER_DEFAULT}; color: {Theme.TEXT_SECONDARY}; }}
+            QTreeWidget::item {{ padding: 4px; }}
+            QTreeWidget::item:hover {{ background-color: {Theme.BG_SECONDARY}; }}
+            QTreeWidget::item:selected {{ background-color: {Theme.BG_TERTIARY}; color: {Theme.TEXT_PRIMARY}; }}
         """)
         
         self.itemDoubleClicked.connect(self._on_item_clicked)

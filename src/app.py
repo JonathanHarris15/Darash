@@ -9,6 +9,9 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Jehu Reader")
     
+    from src.ui.theme import Theme
+    app.setStyleSheet(Theme.get_global_stylesheet())
+    
     # Check for updates
     release_info = UpdateManager.check_for_updates()
     if release_info:

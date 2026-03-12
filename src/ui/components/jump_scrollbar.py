@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QScrollBar, QStyle, QStyleOptionSlider, QLabel
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtCore import Qt
-from src.core.constants import SEARCH_HIGHLIGHT_COLOR
+from src.ui.theme import Theme
 
 class JumpScrollBar(QScrollBar):
     """
@@ -17,10 +17,10 @@ class JumpScrollBar(QScrollBar):
         
         # Custom Tooltip that follows mouse smoothly
         self.floating_label = QLabel(None, Qt.ToolTip | Qt.WindowTransparentForInput)
-        self.floating_label.setStyleSheet("""
-            background-color: #333;
-            color: white;
-            border: 1px solid #555;
+        self.floating_label.setStyleSheet(f"""
+            background-color: {Theme.BG_SECONDARY};
+            color: {Theme.TEXT_PRIMARY};
+            border: 1px solid {Theme.BORDER_DEFAULT};
             padding: 4px 10px;
             border-radius: 4px;
             font-size: 13px;
@@ -101,7 +101,7 @@ class JumpScrollBar(QScrollBar):
 
         # 2. Paint Search Matches (Always visible)
         if self.match_y_positions:
-            painter.setPen(SEARCH_HIGHLIGHT_COLOR)
+            painter.setPen(Theme.color("SEARCH_HIGHLIGHT"))
             for rel_y in self.match_y_positions:
                 y = groove_rect.y() + (rel_y * groove_rect.height())
                 painter.drawLine(groove_rect.left(), int(y), groove_rect.right(), int(y))

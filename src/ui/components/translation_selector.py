@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon
+from src.ui.theme import Theme
 
 class TranslationSelector(QFrame):
     """
@@ -18,28 +19,28 @@ class TranslationSelector(QFrame):
         self.setFrameShape(QFrame.StyledPanel)
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setFixedWidth(250)
-        self.setStyleSheet("""
-            TranslationSelector {
-                background-color: #2d2d2d;
-                border: 1px solid #444;
+        self.setStyleSheet(f"""
+            TranslationSelector {{
+                background-color: {Theme.BG_SECONDARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 border-radius: 4px;
-            }
-            QListWidget {
+            }}
+            QListWidget {{
                 background-color: transparent;
                 border: none;
                 outline: none;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 padding: 5px;
-                border-bottom: 1px solid #3d3d3d;
-            }
-            QListWidget::item:selected {
-                background-color: #3d3d3d;
-            }
-            QLabel {
-                color: #ddd;
+                border-bottom: 1px solid {Theme.BG_TERTIARY};
+            }}
+            QListWidget::item:selected {{
+                background-color: {Theme.BG_TERTIARY};
+            }}
+            QLabel {{
+                color: {Theme.TEXT_PRIMARY};
                 font-weight: bold;
-            }
+            }}
         """)
 
         layout = QVBoxLayout(self)
@@ -54,7 +55,7 @@ class TranslationSelector(QFrame):
 
         # Bottom info
         info = QLabel("Drag to reorder. Top is Primary.")
-        info.setStyleSheet("font-size: 10px; font-weight: normal; color: #888;")
+        info.setStyleSheet(f"font-size: 10px; font-weight: normal; color: {Theme.TEXT_MUTED};")
         layout.addWidget(info)
 
         self._refresh_list()
@@ -89,7 +90,7 @@ class TranslationSelector(QFrame):
             # Primary is always "enabled" visually and can't be unchecked
             if trans_id == primary:
                 check.setEnabled(False)
-                check.setStyleSheet("color: #64c8ff;") # Highlight primary
+                check.setStyleSheet(f"color: {Theme.ACCENT_PRIMARY};") # Highlight primary
             
             check.blockSignals(True)
             check.stateChanged.connect(lambda state, t=trans_id: self._on_toggle(t, state))
@@ -99,7 +100,7 @@ class TranslationSelector(QFrame):
             item_layout.addStretch()
             
             handle = QLabel("☰")
-            handle.setStyleSheet("color: #555;")
+            handle.setStyleSheet(f"color: {Theme.BORDER_LIGHT};")
             item_layout.addWidget(handle)
             
             widget.setLayout(item_layout)

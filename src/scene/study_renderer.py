@@ -3,7 +3,7 @@ import os
 from PySide6.QtGui import QColor, QPen, QBrush, QPixmap
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsLineItem, QGraphicsPixmapItem
-from src.core.constants import SEARCH_HIGHLIGHT_COLOR
+from src.ui.theme import Theme
 
 class StudyRenderer:
     def __init__(self, scene):
@@ -78,7 +78,7 @@ class StudyRenderer:
         for h_rect, h_type, h_text in scene.heading_rects:
             if (h_type, h_text) in search_matches:
                 hl = QGraphicsRectItem(h_rect)
-                hl.setBrush(QBrush(SEARCH_HIGHLIGHT_COLOR))
+                hl.setBrush(QBrush(Theme.color("SEARCH_HIGHLIGHT")))
                 hl.setPen(Qt.NoPen)
                 hl.setZValue(-1)
                 hl.setAcceptedMouseButtons(Qt.NoButton)

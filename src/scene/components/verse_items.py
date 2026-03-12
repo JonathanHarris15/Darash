@@ -42,9 +42,9 @@ class VerseNumberItem(QGraphicsObject):
 
     def paint(self, painter, option, widget=None):
         if getattr(self, 'is_search_result', False):
-            from src.core.constants import SEARCH_HIGHLIGHT_COLOR
+            from src.ui.theme import Theme
             painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(SEARCH_HIGHLIGHT_COLOR))
+            painter.setBrush(QBrush(Theme.color("SEARCH_HIGHLIGHT")))
             # Just behind the verse number
             painter.drawRect(QRectF(-2, 2, VERSE_NUMBER_RESERVED_WIDTH + 4, self._height + 2))
             

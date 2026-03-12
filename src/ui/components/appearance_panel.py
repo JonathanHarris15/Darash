@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFontDatabase
+from src.ui.theme import Theme
 import src.core.constants as constants
 
 class AppearancePanel(QDialog):
@@ -19,13 +20,13 @@ class AppearancePanel(QDialog):
         self.scene = scene
         self.setWindowTitle("Appearance Settings")
         self.resize(320, 500)
-        self.setStyleSheet("""
-            QDialog { background-color: #222; color: #ddd; }
-            QLabel { color: #aaa; font-size: 11px; }
-            QGroupBox { border: 1px solid #444; margin-top: 10px; padding-top: 10px; font-weight: bold; color: #eee; }
-            QComboBox, QSpinBox, QDoubleSpinBox { background-color: #333; border: 1px solid #555; padding: 4px; color: white; }
-            QPushButton { background-color: #444; border: 1px solid #555; padding: 6px; color: white; }
-            QPushButton:hover { background-color: #555; }
+        self.setStyleSheet(f"""
+            QDialog {{ background-color: {Theme.BG_SECONDARY}; color: {Theme.TEXT_PRIMARY}; }}
+            QLabel {{ color: {Theme.TEXT_SECONDARY}; font-size: 11px; }}
+            QGroupBox {{ border: 1px solid {Theme.BORDER_DEFAULT}; margin-top: 10px; padding-top: 10px; font-weight: bold; color: {Theme.TEXT_PRIMARY}; }}
+            QComboBox, QSpinBox, QDoubleSpinBox {{ background-color: {Theme.BG_TERTIARY}; border: 1px solid {Theme.BORDER_LIGHT}; padding: 4px; color: white; }}
+            QPushButton {{ background-color: {Theme.BG_TERTIARY}; border: 1px solid {Theme.BORDER_LIGHT}; padding: 6px; color: white; }}
+            QPushButton:hover {{ background-color: {Theme.BORDER_LIGHT}; }}
         """)
         
         layout = QVBoxLayout(self)
@@ -146,7 +147,7 @@ class AppearancePanel(QDialog):
         return btn
 
     def _update_color_btn_style(self, btn, color):
-        btn.setStyleSheet(f"background-color: {color.name()}; border: 1px solid #666;")
+        btn.setStyleSheet(f"background-color: {color.name()}; border: 1px solid {Theme.BORDER_DEFAULT};")
 
     def _pick_color(self, btn, callback):
         color = QColorDialog.getColor(QColor(btn.styleSheet().split(":")[1].split(";")[0].strip()), self)

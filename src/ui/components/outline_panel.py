@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from src.ui.components.outline_cell import OutlineCell
+from src.ui.theme import Theme
 
 class OutlinePanel(QWidget):
     """
@@ -47,16 +48,16 @@ class OutlinePanel(QWidget):
         # 2. Title Edit Bar
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("Outline Title")
-        self.title_edit.setStyleSheet("""
-            QLineEdit {
-                background-color: #252526;
-                color: #eee;
-                border: 1px solid #333;
+        self.title_edit.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {Theme.BG_SECONDARY};
+                color: {Theme.TEXT_PRIMARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 border-radius: 4px;
                 padding: 6px;
                 font-size: 14px;
                 font-weight: bold;
-            }
+            }}
         """)
         self.title_edit.textChanged.connect(self._on_title_changed)
         layout.addWidget(self.title_edit)
@@ -91,15 +92,15 @@ class OutlinePanel(QWidget):
         self.edit_btn.blockSignals(True); self.edit_btn.setChecked(is_active); self.edit_btn.blockSignals(False)
         if is_active:
             self.edit_btn.setText("Currently Editing in Reader")
-            self.edit_btn.setStyleSheet("""
-                QPushButton { background-color: #005a9e; color: white; border: 1px solid #0078d4; border-radius: 4px; padding: 0px 8px; font-weight: bold; }
-                QPushButton:hover { background-color: #0078d4; }
+            self.edit_btn.setStyleSheet(f"""
+                QPushButton {{ background-color: {Theme.ACCENT_PRIMARY}; color: {Theme.BG_PRIMARY}; border: 1px solid {Theme.ACCENT_PRIMARY}; border-radius: 4px; padding: 0px 8px; font-weight: bold; }}
+                QPushButton:hover {{ background-color: {Theme.ACCENT_PRIMARY}; filter: brightness(1.1); }}
             """)
         else:
             self.edit_btn.setText("Edit Outline in Reader")
-            self.edit_btn.setStyleSheet("""
-                QPushButton { background-color: #333; color: #ccc; border: 1px solid #555; border-radius: 4px; padding: 0px 8px; }
-                QPushButton:hover { background-color: #444; color: white; border-color: #0078d4; }
+            self.edit_btn.setStyleSheet(f"""
+                QPushButton {{ background-color: {Theme.BG_TERTIARY}; color: {Theme.TEXT_SECONDARY}; border: 1px solid {Theme.BORDER_DEFAULT}; border-radius: 4px; padding: 0px 8px; }}
+                QPushButton:hover {{ background-color: {Theme.BORDER_LIGHT}; color: {Theme.TEXT_PRIMARY}; border-color: {Theme.ACCENT_PRIMARY}; }}
             """)
 
     def refresh(self):

@@ -40,7 +40,7 @@
 
 | File | Key Class / Contents | Responsibility |
 |---|---|---|
-| `constants.py` | — | Global styling tokens, color palette, font sizes, Bible book list, section metadata |
+| `constants.py` | — | Bible book list, section metadata, application version, and core layout parameters (non-styling) |
 | `verse_loader.py` | `VerseLoader` | Parses Bible JSON/XML. Supports multi-translation chapter loading with caching. |
 | `search_engine.py` | `SearchEngine`, `SearchParser` | Logical-operator search parsing (`AND`, `OR`, `NOT`), scoped searches (verse/chapter/book), returns ranked result lists |
 
@@ -94,6 +94,7 @@
 | `main_window.py` | `MainWindow` | Top-level `QMainWindow`. Assembles all docks/panels, handles menu bar, layout presets, dock visibility |
 | `main_window_layout.py` | `MainWindowLayoutMixin` | Mixin for `MainWindow` handling layout state saving, restoring, and presets |
 | `main_window_panels.py` | `MainWindowPanelsMixin` | Mixin for `MainWindow` handling panel creation, tracking, and teardown |
+| `theme.py` | `Theme` | **Single source of truth for design tokens.** Centralizes colors, typography, and spacing; generates global application stylesheet |
 | `reader_widget.py` | `ReaderWidget` | Container for `QGraphicsView` + `ReaderScene`. Houses HUD overlays (search bar, navigation label, jump scrollbar) |
 | `export_manager.py` | `ExportManager` | Orchestrates content extraction (Notes/Outlines) and export dialog flow |
 | `components/activity_bar.py` | `ActivityBar` | Left-edge icon bar that toggles panel visibility (similar to VS Code sidebar icons) |
@@ -226,7 +227,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Arrows / marks / symbols on scene | `scene/scene_overlay_manager.py` |
 | Interactive outline creation | `scene/scene_outline_manager.py` |
 | Search highlight items | `scene/scene_search_manager.py` |
-| Font / color / spacing settings | `scene/scene_settings_manager.py` |
+| Font / color / spacing settings | `ui/theme.py`, `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
 | Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.2) |
 | Release Tagging / Build | `gh-release-tag/SKILL.md` (Gemini Skill) |

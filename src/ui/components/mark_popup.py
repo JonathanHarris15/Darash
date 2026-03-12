@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QFrame, QGridLayout, QLabel
 from PySide6.QtCore import Qt, Signal, QPoint, QEvent
-from src.core.constants import HIGHLIGHT_COLORS, LOGICAL_MARKS
+from src.ui.theme import Theme
 
 class ColorButton(QPushButton):
     def __init__(self, color_name, hex_code, parent=None):
@@ -8,7 +8,7 @@ class ColorButton(QPushButton):
         self.color_name = color_name
         self.setFixedSize(24, 24)
         self.setCursor(Qt.PointingHandCursor)
-        self.setStyleSheet(f"background-color: {hex_code}; border-radius: 12px; border: 1px solid #555;")
+        self.setStyleSheet(f"background-color: {hex_code}; border-radius: 12px; border: 1px solid {Theme.BORDER_DEFAULT};")
 
 class LogicalMarkButton(QPushButton):
     def __init__(self, mark_key, symbol_text, parent=None):
@@ -16,18 +16,18 @@ class LogicalMarkButton(QPushButton):
         self.mark_key = mark_key
         self.setFixedSize(36, 36)
         self.setCursor(Qt.PointingHandCursor)
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #444; 
-                color: white; 
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.BG_TERTIARY}; 
+                color: {Theme.TEXT_PRIMARY}; 
                 border-radius: 4px; 
-                border: 1px solid #666;
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 font-size: 18px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #666;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.BG_SECONDARY};
+            }}
         """)
 
 class MarkPopup(QWidget):
@@ -54,9 +54,9 @@ class MarkPopup(QWidget):
         
         # 1. Selection Container (Left)
         self.selection_container = QFrame()
-        self.selection_container.setStyleSheet("""
-            background-color: #333;
-            border: 1px solid #555;
+        self.selection_container.setStyleSheet(f"""
+            background-color: {Theme.BG_PRIMARY};
+            border: 1px solid {Theme.BORDER_DEFAULT};
             border-radius: 6px;
         """)
         self.selection_layout = QVBoxLayout(self.selection_container)
@@ -74,9 +74,9 @@ class MarkPopup(QWidget):
         self.color_wrapper_layout.addWidget(self.top_spacer)
         
         self.color_container = QFrame()
-        self.color_container.setStyleSheet("""
-            background-color: #333;
-            border: 1px solid #555;
+        self.color_container.setStyleSheet(f"""
+            background-color: {Theme.BG_PRIMARY};
+            border: 1px solid {Theme.BORDER_DEFAULT};
             border-radius: 6px;
         """)
         self.color_layout = QHBoxLayout(self.color_container)
@@ -84,7 +84,7 @@ class MarkPopup(QWidget):
         self.color_layout.setSpacing(8)
         self.color_container.hide()
         
-        for name, hex_code in HIGHLIGHT_COLORS.items():
+        for name, hex_code in Theme.HIGHLIGHT_COLORS.items():
             btn = ColorButton(name, hex_code)
             # Use a slightly different approach for the lambda to ensure it captures correctly
             btn.clicked.connect(lambda checked=False, c=hex_code: self._on_color_clicked(c))
@@ -94,9 +94,9 @@ class MarkPopup(QWidget):
         
         # 3. Logical Marks Container (Right - alternative to color)
         self.logical_marks_container = QFrame()
-        self.logical_marks_container.setStyleSheet("""
-            background-color: #333;
-            border: 1px solid #555;
+        self.logical_marks_container.setStyleSheet(f"""
+            background-color: {Theme.BG_PRIMARY};
+            border: 1px solid {Theme.BORDER_DEFAULT};
             border-radius: 6px;
         """)
         self.logical_layout = QGridLayout(self.logical_marks_container)
@@ -105,7 +105,7 @@ class MarkPopup(QWidget):
         self.logical_marks_container.hide()
         
         row, col = 0, 0
-        for key, symbol in LOGICAL_MARKS.items():
+        for key, symbol in Theme.LOGICAL_MARKS.items():
             l_btn = LogicalMarkButton(key, symbol)
             l_btn.clicked.connect(lambda checked=False, k=key: self._on_select("logical_mark", k))
             l_btn.setToolTip(key.replace("_", " ").title())
@@ -175,38 +175,38 @@ class MarkPopup(QWidget):
     def _create_btn(self, text, mark_type):
         btn = QPushButton(text)
         btn.setObjectName("action_btn")
-        btn.setStyleSheet("""
-            QPushButton {
+        btn.setStyleSheet(f"""
+            QPushButton {{
                 background-color: transparent;
-                color: white;
+                color: {Theme.TEXT_PRIMARY};
                 border: none;
                 padding: 6px 12px;
                 text-align: left;
                 font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #444;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.BG_TERTIARY};
+            }}
         """)
         btn.installEventFilter(self)
-        btn.clicked.connect(lambda: self._on_select(mark_type, HIGHLIGHT_COLORS["yellow"]))
+        btn.clicked.connect(lambda: self._on_select(mark_type, Theme.HIGHLIGHT_COLORS["yellow"]))
         return btn
 
     def _create_action_btn(self, text):
         btn = QPushButton(text)
         btn.setObjectName("action_btn")
-        btn.setStyleSheet("""
-            QPushButton {
+        btn.setStyleSheet(f"""
+            QPushButton {{
                 background-color: transparent;
-                color: white;
+                color: {Theme.TEXT_PRIMARY};
                 border: none;
                 padding: 6px 12px;
                 text-align: left;
                 font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #444;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.BG_TERTIARY};
+            }}
         """)
         # Ensure action buttons hide the color panel
         btn.installEventFilter(self)
@@ -216,7 +216,7 @@ class MarkPopup(QWidget):
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setFrameShadow(QFrame.Sunken)
-        sep.setStyleSheet("background-color: #555; min-height: 1px; max-height: 1px; margin: 4px 5px;")
+        sep.setStyleSheet(f"background-color: {Theme.BORDER_DEFAULT}; min-height: 1px; max-height: 1px; margin: 4px 5px;")
         return sep
 
     def eventFilter(self, obj, event):

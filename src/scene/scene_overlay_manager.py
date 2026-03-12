@@ -6,7 +6,7 @@ from src.scene.components.reader_items import (
     NoteIcon, ArrowItem, SnakeArrowItem, LogicalMarkItem, GhostArrowIconItem
 )
 from src.utils.snake_path_finder import SnakePathFinder
-from src.core.constants import LOGICAL_MARKS, LOGICAL_MARK_COLOR
+from src.ui.theme import Theme
 
 class SceneOverlayManager:
     """
@@ -53,7 +53,7 @@ class SceneOverlayManager:
         # Logical marks are stored in logical_marks dict
         # key: mark_type (e.g. "arrow_right")
         for key, mark_type in scene.study_manager.data.get("logical_marks", {}).items():
-            if mark_type not in LOGICAL_MARKS: continue
+            if mark_type not in Theme.LOGICAL_MARKS: continue
             
             ref_parts = key.split('|')
             ref = f"{ref_parts[0]} {ref_parts[1]}:{ref_parts[2]}"
@@ -67,9 +67,9 @@ class SceneOverlayManager:
                         rects = scene._get_text_rects(start_pos, len(verse_data['tokens'][word_idx][0]))
                         if rects:
                             r = rects[0]
-                            symbol_text = LOGICAL_MARKS[mark_type]
+                            symbol_text = Theme.LOGICAL_MARKS[mark_type]
                             
-                            item = LogicalMarkItem(key, symbol_text, r, scene.logical_mark_color)
+                            item = LogicalMarkItem(key, symbol_text, r, Theme.LOGICAL_MARK_COLOR)
                             item.setZValue(-0.5) # Behind text
                             item.setOpacity(scene.logical_mark_opacity)
                             item.setVisible(scene._is_rect_visible(r))

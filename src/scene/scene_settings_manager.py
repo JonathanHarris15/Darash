@@ -1,12 +1,11 @@
 from PySide6.QtGui import QFont, QColor
 from PySide6.QtCore import QRectF
 from src.core.constants import (
-    DEFAULT_FONT_FAMILY, VERSE_FONT_FAMILY, DEFAULT_FONT_SIZE, 
-    HEADER_FONT_SIZE, CHAPTER_FONT_SIZE, LINE_SPACING_DEFAULT, 
-    SIDE_MARGIN, TAB_SIZE_DEFAULT, ARROW_OPACITY_DEFAULT, 
-    VERSE_MARK_SIZE_DEFAULT, LOGICAL_MARK_OPACITY_DEFAULT,
-    TEXT_COLOR, REFERENCE_COLOR, LOGICAL_MARK_COLOR, APP_BACKGROUND_COLOR
+    OT_BOOKS, NT_BOOKS,
+    SCROLL_SENSITIVITY, RESIZE_DEBOUNCE_INTERVAL,
+    LAYOUT_DEBOUNCE_INTERVAL, VERSE_NUMBER_RESERVED_WIDTH
 )
+from src.ui.theme import Theme
 
 class SceneSettingsManager:
     """
@@ -18,15 +17,15 @@ class SceneSettingsManager:
     def load_settings(self):
         scene = self.scene
         settings = scene.study_manager.data.get("settings", {})
-        scene.font_size = settings.get("font_size", DEFAULT_FONT_SIZE)
-        scene.line_spacing = settings.get("line_spacing", LINE_SPACING_DEFAULT)
-        scene.font_family = settings.get("font_family", VERSE_FONT_FAMILY)
+        scene.font_size = settings.get("font_size", Theme.SIZE_READER_DEFAULT)
+        scene.line_spacing = settings.get("line_spacing", 1.5)
+        scene.font_family = settings.get("font_family", Theme.FONT_READER)
         scene.verse_num_font_size = settings.get("verse_num_size", scene.font_size - 4)
-        scene.side_margin = settings.get("side_margin", SIDE_MARGIN)
-        scene.tab_size = settings.get("tab_size", TAB_SIZE_DEFAULT)
-        scene.arrow_opacity = settings.get("arrow_opacity", ARROW_OPACITY_DEFAULT)
-        scene.verse_mark_size = settings.get("verse_mark_size", VERSE_MARK_SIZE_DEFAULT)
-        scene.logical_mark_opacity = settings.get("logical_mark_opacity", LOGICAL_MARK_OPACITY_DEFAULT)
+        scene.side_margin = settings.get("side_margin", 40)
+        scene.tab_size = settings.get("tab_size", 40)
+        scene.arrow_opacity = settings.get("arrow_opacity", 0.6)
+        scene.verse_mark_size = settings.get("verse_mark_size", 18)
+        scene.logical_mark_opacity = settings.get("logical_mark_opacity", 0.5)
         scene.sentence_break_enabled = settings.get("sentence_break_enabled", False)
         scene.primary_translation = settings.get("primary_translation", "ESV")
         scene.enabled_interlinear = settings.get("enabled_interlinear", [])
@@ -71,8 +70,8 @@ class SceneSettingsManager:
     def update_fonts(self):
         scene = self.scene
         scene.font = QFont(scene.font_family, scene.font_size)
-        scene.header_font = QFont(DEFAULT_FONT_FAMILY, HEADER_FONT_SIZE, QFont.Bold)
-        scene.chapter_font = QFont(DEFAULT_FONT_FAMILY, CHAPTER_FONT_SIZE, QFont.Bold)
+        scene.header_font = QFont(Theme.FONT_UI, Theme.SIZE_HEADER, QFont.Bold)
+        scene.chapter_font = QFont(Theme.FONT_UI, Theme.SIZE_CHAPTER, QFont.Bold)
         scene.verse_num_font = QFont(scene.font_family, scene.verse_num_font_size)
         scene.verse_mark_font = QFont(scene.font_family, scene.verse_mark_size)
 

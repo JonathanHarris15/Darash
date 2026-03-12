@@ -9,10 +9,8 @@ from src.ui.components.mark_popup import MarkPopup
 from src.ui.components.suggested_symbols_dialog import SuggestedSymbolsDialog
 from src.ui.components.outline_dialog import OutlineDialog
 from src.ui.components.strongs_ui import StrongsTooltip, StrongsVerboseDialog
-from src.core.constants import (
-    TEXT_COLOR, OVERLAY_BACKGROUND_COLOR,
-    RESIZE_DEBOUNCE_INTERVAL, SELECTION_COLOR
-)
+from src.ui.theme import Theme
+from src.core.constants import RESIZE_DEBOUNCE_INTERVAL
 
 class ReaderWidget(QWidget):
     """
@@ -31,12 +29,12 @@ class ReaderWidget(QWidget):
         self.view.setFrameShape(QGraphicsView.NoFrame)
         self.view.setFocusPolicy(Qt.StrongFocus)
         self.view.setMouseTracking(True)
-        self.view.setStyleSheet("QGraphicsView { outline: none; border: none; background: transparent; }")
+        self.view.setStyleSheet(f"QGraphicsView {{ outline: none; border: none; background: {Theme.BG_PRIMARY}; }}")
         
         # Set selection color on view palette
         palette = self.view.palette()
-        palette.setColor(palette.ColorGroup.Active, palette.ColorRole.Highlight, SELECTION_COLOR)
-        palette.setColor(palette.ColorGroup.Inactive, palette.ColorRole.Highlight, SELECTION_COLOR)
+        palette.setColor(palette.ColorGroup.Active, palette.ColorRole.Highlight, Theme.color("SELECTION_BG"))
+        palette.setColor(palette.ColorGroup.Inactive, palette.ColorRole.Highlight, Theme.color("SELECTION_BG"))
         self.view.setPalette(palette)
         
         self.scrollbar = JumpScrollBar(Qt.Vertical)
@@ -46,7 +44,7 @@ class ReaderWidget(QWidget):
         self.ref_label = ClickableLabel(self.view)
         self.ref_label.setCursor(Qt.PointingHandCursor)
         self.ref_label.setToolTip("Click to Bookmark")
-        self.ref_label.setStyleSheet(f"background-color: rgba(30, 30, 30, 200); color: {TEXT_COLOR.name()}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
+        self.ref_label.setStyleSheet(f"background-color: {Theme.HUD_BG}; color: {Theme.ACCENT_PRIMARY}; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold;")
         self.ref_label.hide()
 
         # UI Components
@@ -55,22 +53,22 @@ class ReaderWidget(QWidget):
         
         # --- Professional Loading Overlay ---
         self.overlay = QWidget(self.view)
-        self.overlay.setStyleSheet(f"background-color: {OVERLAY_BACKGROUND_COLOR};")
+        self.overlay.setStyleSheet(f"background-color: {Theme.OVERLAY_BG};")
         self.overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
         
         overlay_layout = QVBoxLayout(self.overlay)
         overlay_layout.setAlignment(Qt.AlignCenter)
         
         self.loading_title = QLabel("JEHU READER")
-        self.loading_title.setStyleSheet("color: white; font-size: 32px; font-weight: bold; letter-spacing: 4px;")
+        self.loading_title.setStyleSheet(f"color: {Theme.TEXT_PRIMARY}; font-size: 32px; font-weight: bold; letter-spacing: 4px;")
         self.loading_title.setAlignment(Qt.AlignCenter)
         
         self.loading_subtitle = QLabel("Preparing the Holy Scriptures...")
-        self.loading_subtitle.setStyleSheet("color: #aaa; font-size: 16px; font-style: italic;")
+        self.loading_subtitle.setStyleSheet(f"color: {Theme.TEXT_SECONDARY}; font-size: 16px; font-style: italic;")
         self.loading_subtitle.setAlignment(Qt.AlignCenter)
         
         self.info_label = QLabel("")
-        self.info_label.setStyleSheet("color: #888; font-size: 13px; margin-top: 20px;")
+        self.info_label.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px; margin-top: 20px;")
         self.info_label.setAlignment(Qt.AlignCenter)
         
         overlay_layout.addStretch()

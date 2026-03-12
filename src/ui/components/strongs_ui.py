@@ -8,7 +8,7 @@ from PySide6.QtGui import (
     QFont, QColor, QPalette, QTextDocument, QAbstractTextDocumentLayout,
     QPainter
 )
-from src.core.constants import APP_BACKGROUND_COLOR, TEXT_COLOR, REFERENCE_COLOR
+from src.ui.theme import Theme
 
 class HTMLItemDelegate(QStyledItemDelegate):
     """Custom delegate to render HTML in QListWidget items with word wrap."""
@@ -53,12 +53,12 @@ class StrongsTooltip(QFrame):
         
         self.setStyleSheet(f"""
             StrongsTooltip {{
-                background-color: #2a2a25;
-                border: 1px solid #666;
+                background-color: {Theme.BG_SECONDARY};
+                border: 1px solid {Theme.BORDER_DEFAULT};
                 border-radius: 8px;
             }}
             QLabel {{
-                color: #e0e0e0;
+                color: {Theme.TEXT_PRIMARY};
                 background: transparent;
             }}
         """)
@@ -68,22 +68,22 @@ class StrongsTooltip(QFrame):
         layout.setSpacing(8)
         
         self.header_label = QLabel()
-        self.header_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #888;")
+        self.header_label.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {Theme.TEXT_MUTED};")
         layout.addWidget(self.header_label)
         
         self.word_label = QLabel()
-        self.word_label.setStyleSheet("font-size: 28px; color: #ffcc00;")
+        self.word_label.setStyleSheet(f"font-size: 28px; color: {Theme.ACCENT_PRIMARY};")
         self.word_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.word_label)
         
         self.translit_label = QLabel()
-        self.translit_label.setStyleSheet("font-style: italic; color: #aaa; font-size: 15px;")
+        self.translit_label.setStyleSheet(f"font-style: italic; color: {Theme.TEXT_SECONDARY}; font-size: 15px;")
         self.translit_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.translit_label)
         
         self.def_label = QLabel()
         self.def_label.setWordWrap(True)
-        self.def_label.setStyleSheet("font-size: 14px; line-height: 1.4; color: #ddd;")
+        self.def_label.setStyleSheet(f"font-size: 14px; line-height: 1.4; color: {Theme.TEXT_PRIMARY};")
         self.def_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.def_label)
 
@@ -123,33 +123,33 @@ class StrongsVerboseDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f"Strongs {sn} - {entry['word']}")
         self.resize(500, 700)
-        self.setStyleSheet("""
-            QDialog { background-color: #1e1e1e; color: #ddd; }
-            QLabel { color: #ccc; }
-            QTextEdit { background-color: #252525; border: 1px solid #444; color: #bbb; padding: 10px; }
-            QListWidget { 
-                background-color: #252525; 
-                border: 1px solid #444; 
-                color: #aaa; 
+        self.setStyleSheet(f"""
+            QDialog {{ background-color: {Theme.BG_PRIMARY}; color: {Theme.TEXT_PRIMARY}; }}
+            QLabel {{ color: {Theme.TEXT_SECONDARY}; }}
+            QTextEdit {{ background-color: {Theme.BG_SECONDARY}; border: 1px solid {Theme.BORDER_DEFAULT}; color: {Theme.TEXT_PRIMARY}; padding: 10px; }}
+            QListWidget {{ 
+                background-color: {Theme.BG_SECONDARY}; 
+                border: 1px solid {Theme.BORDER_DEFAULT}; 
+                color: {Theme.TEXT_SECONDARY}; 
                 outline: none;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 padding: 8px;
-                border-bottom: 1px solid #333;
-            }
-            QListWidget::item:hover {
-                background-color: #333;
+                border-bottom: 1px solid {Theme.BG_TERTIARY};
+            }}
+            QListWidget::item:hover {{
+                background-color: {Theme.BG_TERTIARY};
                 color: white;
-            }
-            QPushButton { 
-                background-color: #444; 
-                border: 1px solid #555; 
+            }}
+            QPushButton {{ 
+                background-color: {Theme.BG_TERTIARY}; 
+                border: 1px solid {Theme.BORDER_LIGHT}; 
                 color: white; 
                 padding: 8px; 
                 border-radius: 4px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background-color: #555; }
+            }}
+            QPushButton:hover {{ background-color: {Theme.BORDER_LIGHT}; }}
         """)
         
         layout = QVBoxLayout(self)
@@ -158,16 +158,16 @@ class StrongsVerboseDialog(QDialog):
         layout.addWidget(QLabel(f"<b>{sn}</b> - {entry['lang'].upper()}"))
         
         word_box = QFrame()
-        word_box.setStyleSheet("background-color: #252525; border-radius: 8px; margin: 10px 0;")
+        word_box.setStyleSheet(f"background-color: {Theme.BG_SECONDARY}; border-radius: 8px; margin: 10px 0;")
         word_layout = QVBoxLayout(word_box)
         
         word_label = QLabel(entry['word'])
-        word_label.setStyleSheet("font-size: 48px; color: #ffcc00;")
+        word_label.setStyleSheet(f"font-size: 48px; color: {Theme.ACCENT_PRIMARY};")
         word_label.setAlignment(Qt.AlignCenter)
         word_layout.addWidget(word_label)
         
         trans_label = QLabel(f"{{{entry['translit']}}}")
-        trans_label.setStyleSheet("font-size: 18px; color: #888;")
+        trans_label.setStyleSheet(f"font-size: 18px; color: {Theme.TEXT_MUTED};")
         trans_label.setAlignment(Qt.AlignCenter)
         word_layout.addWidget(trans_label)
         
