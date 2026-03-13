@@ -3,6 +3,7 @@
 block_cipher = None
 
 import os
+from PyInstaller.utils.hooks import collect_data_files
 
 # Helper to include files from junctions/subtrees that PyInstaller might skip
 def get_translation_files():
@@ -21,7 +22,7 @@ added_files = [
     ('data', 'data'),
     ('resources', 'resources'),
     ('symbols_library', 'symbols_library'),
-] + get_translation_files()
+] + get_translation_files() + collect_data_files('spellchecker')
 
 a = Analysis(
     ['main.py'],
