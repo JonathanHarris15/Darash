@@ -22,7 +22,7 @@ class FormattingToolBar(QToolBar):
             QComboBox::drop-down, QFontComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 16px; border-left: 1px solid #555; background: transparent; }}
             QComboBox::down-arrow, QFontComboBox::down-arrow {{ image: url({arrow_path}); width: 10px; height: 6px; }}
         """)
-        self._build(); editor.cursorPositionChanged.connect(self._sync_state); editor.currentCharFormatChanged.connect(self._sync_format)
+        self._build()
 
     def _build(self):
         e = self.editor
@@ -47,8 +47,13 @@ class FormattingToolBar(QToolBar):
         self.act_numbered = QAction("1. List", self); self.act_numbered.setCheckable(True); self.act_numbered.triggered.connect(lambda c: e.textCursor().createList(QTextListFormat.ListDecimal) if c else self._remove_list()); self.addAction(self.act_numbered)
         self.addSeparator()
         act_bible = QAction("🔗 Bible", self); act_bible.triggered.connect(self._insert_bible_link); self.addAction(act_bible)
+        
+        # Connect signals only AFTER all widgets/actions are created
+        self.editor.cursorPositionChanged.connect(self._sync_state)
+        self.editor.currentCharFormatChanged.connect(self._sync_format)
 
     def _merge_format(self, fmt):
+        if not hasattr(self, "editor"): return
         cursor = self.editor.textCursor(); 
         if not cursor.hasSelection(): cursor.select(QTextCursor.WordUnderCursor)
         cursor.mergeCharFormat(fmt); self.editor.mergeCurrentCharFormat(fmt)
@@ -92,12 +97,13 @@ class FormattingToolBar(QToolBar):
             c.insertText(ref.strip(), fmt); (r := QTextCharFormat()).setAnchor(False); r.setForeground(self.editor.palette().text().color()); r.setFontUnderline(False); c.insertText(" ", r)
 
     def _sync_format(self, fmt):
+        if not all(hasattr(self, a) for a in ["act_bold", "act_italic", "act_under", "act_strike", "font_combo", "size_combo"]): return
         self.act_bold.setChecked(fmt.fontWeight() == QFont.Bold); self.act_italic.setChecked(fmt.fontItalic()); self.act_under.setChecked(fmt.fontUnderline()); self.act_strike.setChecked(fmt.fontStrikeOut())
         self.font_combo.blockSignals(True); f = fmt.font(); f.setPointSize(max(1, int(self.editor.font().pointSize())) if f.pointSize() <= 0 else f.pointSize()); self.font_combo.setCurrentFont(f); self.font_combo.blockSignals(False)
         self.size_combo.blockSignals(True); pt = fmt.fontPointSize(); self.size_combo.setCurrentText(str(int(pt if pt > 0 else self.editor.font().pointSize()))); self.size_combo.blockSignals(False)
 
     def _sync_state(self):
-        if not hasattr(self, "style_combo"): return
+        if not all(hasattr(self, a) for a in ["style_combo", "align_btn", "act_bullet", "act_numbered"]): return
         cursor = self.editor.textCursor()
         self.style_combo.blockSignals(True)
         # style_combo only has 4 items (0,1,2,3)
