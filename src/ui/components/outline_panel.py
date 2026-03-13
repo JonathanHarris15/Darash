@@ -47,10 +47,10 @@ class OutlinePanel(QWidget):
         layout.addLayout(header_layout)
 
         # 2. Title Edit Bar
-        self.title_edit = SpellcheckTitleEdit()
+        self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("Outline Title")
         self.title_edit.setStyleSheet(f"""
-            QTextEdit {{
+            QLineEdit {{
                 background-color: {Theme.BG_SECONDARY};
                 color: {Theme.TEXT_PRIMARY};
                 border: 1px solid {Theme.BORDER_DEFAULT};

@@ -19,9 +19,8 @@ class OutlineDialog(QDialog):
         
         form_layout = QFormLayout()
         
-        self.title_edit = SpellcheckTitleEdit(title)
+        self.title_edit = QLineEdit(title)
         self.title_edit.setPlaceholderText("Enter outline title...")
-        self.title_edit.setFixedHeight(24) # Match QLineEdit height better in forms
         form_layout.addRow("Title:", self.title_edit)
         
         self.start_ref_edit = QLineEdit(start_ref)

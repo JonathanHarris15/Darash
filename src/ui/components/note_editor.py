@@ -29,11 +29,11 @@ class NoteEditor(QDialog):
         h_lay = QVBoxLayout(header); h_lay.setContentsMargins(16, 12, 16, 4); h_lay.setSpacing(0)
         
         t_row = QHBoxLayout()
-        self.title_input = SpellcheckTitleEdit()
+        self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Note title…")
         self.title_input.setText(initial_title)
         self.title_input.setStyleSheet("""
-            QTextEdit { 
+            QLineEdit { 
                 background: transparent; 
                 border: none; 
                 color: #f0f0f0; 

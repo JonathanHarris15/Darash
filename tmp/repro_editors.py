@@ -40,11 +40,28 @@ def test_outline_panel():
         traceback.print_exc()
         return False
 
+def test_outline_dialog():
+    print("\nTesting OutlineDialog initialization...")
+    from src.ui.components.outline_dialog import OutlineDialog
+    try:
+        dialog = OutlineDialog(None, title="Test", start_ref="Gen 1:1", end_ref="Gen 1:31")
+        print("OutlineDialog initialized successfully.")
+        # Test the getter too
+        data = dialog.get_data()
+        print(f"OutlineDialog get_data: {data}")
+        return True
+    except Exception as e:
+        print(f"FAILED to initialize OutlineDialog: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     n = test_note_editor()
     o = test_outline_panel()
-    if n and o:
-        print("\nBoth editors initialized successfully in headless mode.")
+    d = test_outline_dialog()
+    if n and o and d:
+        print("\nAll editors and dialogs initialized successfully in headless mode.")
     else:
         sys.exit(1)
