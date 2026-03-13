@@ -181,6 +181,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/e2e/ui/test_restore_layout_fallback.py` | Layout restore / fallback logic |
 | `tests/component/ui/test_widget_resize.py` | Widget resize behaviour |
 | `tests/component/ui/components/test_note_editor.py` | `NoteEditor` link handling, indentation, list cycling |
+| `tests/component/ui/components/test_formatting_toolbar.py` | `FormattingToolBar` heading level sync and styling |
 | `tests/unit/utils/test_reader_utils.py` | Bounding rect calculations, coordinate mapping |
 | `tests/unit/utils/test_snake_path_finder.py` | `SnakePathFinder` path algorithm validation |
 | `tests/unit/utils/test_exporter.py` | PDF and DOCX generation with various options |
@@ -256,7 +257,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | Search highlight items | `scene/scene_search_manager.py` |
 | Font / color / spacing settings | `ui/theme.py`, `scene/scene_settings_manager.py` |
 | `QGraphicsItem` definitions | `scene/components/reader_items.py` |
-| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.4) |
+| Auto-Update / Versioning | `utils/update_manager.py`, `core/constants.py` (Current: v0.1.5) |
 | **Release Notes** | `managers/release_note_manager.py`, `ui/components/release_note_dialog.py` |
 | **Spellcheck** | `managers/spellcheck_manager.py`, `ui/components/spellcheck_highlighter.py` |
 | **Styling / Theme Iteration** | `ui/components/styling_playground.py`, `ui/theme.py` |

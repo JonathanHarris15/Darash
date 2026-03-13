@@ -12,8 +12,10 @@ class TestGhostArrowOverlay(unittest.TestCase):
         self.mock_scene = MagicMock()
         self.mock_scene.study_overlay_items = []
         self.mock_scene.verse_pos_map = {"Genesis 1:1": 0}
-        self.mock_scene._get_text_rects.return_value = [QRectF(0, 0, 50, 15)]
+        self.mock_scene._get_text_rects.return_value = [QRectF(0, 0, 10, 10)]
+        self.mock_scene.layout_engine._get_word_rect.return_value = QRectF(0, 0, 10, 10)
         self.mock_scene._is_rect_visible.return_value = True
+
         self.mock_scene._get_word_offset_in_verse.return_value = 0
         self.mock_scene._get_word_center.return_value = QPointF(25, 7)
 

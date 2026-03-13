@@ -65,7 +65,22 @@ class FormattingToolBar(QToolBar):
     def _apply_heading(self, i):
         cursor = self.editor.textCursor(); start, end = (cursor.selectionStart(), cursor.selectionEnd()) if cursor.hasSelection() else (cursor.position(), cursor.position())
         block = self.editor.document().findBlock(start)
-        while block.isValid() and block.position() <= end: (bc := QTextCursor(block)).setBlockFormat((bf := bc.blockFormat(), bf.setHeadingLevel(i))[0]); block = block.next()
+        # Heading sizes and bold status
+        sizes = {0: 12, 1: 22, 2: 18, 3: 14}
+        is_bold = {0: False, 1: True, 2: True, 3: True}
+        
+        while block.isValid() and block.position() <= end:
+            bc = QTextCursor(block)
+            bf = bc.blockFormat()
+            bf.setHeadingLevel(i)
+            bc.setBlockFormat(bf)
+            
+            cf = QTextCharFormat()
+            cf.setFontPointSize(sizes.get(i, 12))
+            cf.setFontWeight(QFont.Bold if is_bold.get(i, False) else QFont.Normal)
+            bc.mergeBlockCharFormat(cf)
+            
+            block = block.next()
     def _remove_list(self): 
         cursor = self.editor.textCursor(); lst = cursor.currentList()
         if lst: (block := cursor.block(), lst.remove(block), (bf := block.blockFormat(), bf.setIndent(0))[0], cursor.setBlockFormat(bf))
@@ -82,6 +97,14 @@ class FormattingToolBar(QToolBar):
         self.size_combo.blockSignals(True); pt = fmt.fontPointSize(); self.size_combo.setCurrentText(str(int(pt if pt > 0 else self.editor.font().pointSize()))); self.size_combo.blockSignals(False)
 
     def _sync_state(self):
+        if not hasattr(self, "style_combo"): return
+        cursor = self.editor.textCursor()
+        self.style_combo.blockSignals(True)
+        # style_combo only has 4 items (0,1,2,3)
+        lvl = cursor.blockFormat().headingLevel()
+        self.style_combo.setCurrentIndex(min(lvl, 3))
+        self.style_combo.blockSignals(False)
+        
         align = self.editor.alignment()
         for l, a, i in self._align_options: 
             if align == a: self.align_btn.setText(i); break
