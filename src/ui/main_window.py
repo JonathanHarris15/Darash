@@ -85,33 +85,37 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         self._link_button_timer.start(200)
 
     def _update_link_buttons(self):
-        for btn in self.split_link_buttons:
-            btn.setParent(None)
-            btn.deleteLater()
-        self.split_link_buttons.clear()
-        
-        active_panels = []
-        for p in self.center_panels:
-            try:
-                if not p.isVisible() or p.isFloating(): continue
-                if not p.visibleRegion().isEmpty():
-                    active_panels.append(p)
-            except RuntimeError:
-                pass
-                
-        active_panels.sort(key=lambda p: p.geometry().x())
-        
-        from src.ui.components.reading_view_panel import ReadingViewPanel
-        from src.ui.components.split_link_button import SplitLinkButton
-        
-        for i in range(len(active_panels) - 1):
-            left = active_panels[i]
-            right = active_panels[i+1]
-            if isinstance(left.widget(), ReadingViewPanel) and isinstance(right.widget(), ReadingViewPanel):
-                btn = SplitLinkButton(left, right, self.link_manager, self.center_workspace)
-                self.split_link_buttons.append(btn)
-                btn.reposition()
-                btn.raise_()
+        try:
+            for btn in self.split_link_buttons:
+                try:
+                    btn.setParent(None)
+                    btn.deleteLater()
+                except RuntimeError: pass
+            self.split_link_buttons.clear()
+            
+            active_panels = []
+            for p in self.center_panels:
+                try:
+                    if not p.isVisible() or p.isFloating(): continue
+                    if not p.visibleRegion().isEmpty():
+                        active_panels.append(p)
+                except RuntimeError:
+                    pass
+                    
+            active_panels.sort(key=lambda p: p.geometry().x())
+            
+            from src.ui.components.reading_view_panel import ReadingViewPanel
+            from src.ui.components.split_link_button import SplitLinkButton
+            
+            for i in range(len(active_panels) - 1):
+                left = active_panels[i]
+                right = active_panels[i+1]
+                if isinstance(left.widget(), ReadingViewPanel) and isinstance(right.widget(), ReadingViewPanel):
+                    btn = SplitLinkButton(left, right, self.link_manager, self.center_workspace)
+                    self.split_link_buttons.append(btn)
+                    btn.reposition()
+                    btn.raise_()
+        except RuntimeError: pass
 
     def setup_docks(self):
         from PySide6.QtWidgets import QTabWidget
@@ -339,6 +343,9 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
             self.release_note_manager.increment_view_count()
 
     def closeEvent(self, event):
+        if hasattr(self, '_tab_update_timer'): self._tab_update_timer.stop()
+        if hasattr(self, '_link_button_timer'): self._link_button_timer.stop()
+        
         import json
         settings = QSettings("JehuReader", "MainWindow")
         from src.ui.components.reading_view_panel import ReadingViewPanel

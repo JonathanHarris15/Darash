@@ -14,7 +14,9 @@ class MainWindowPanelsMixin:
         self.dock_manager._clean_center_panels()
 
     def _update_dock_tabs(self):
-        self.dock_manager._update_dock_tabs()
+        try:
+            self.dock_manager._update_dock_tabs()
+        except Exception: pass
 
     def add_reading_view(self, object_name=None):
         from src.scene.reader_scene import ReaderScene

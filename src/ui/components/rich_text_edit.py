@@ -86,11 +86,22 @@ class RichTextEdit(QTextEdit):
 
     def _change_indent(self, delta: int):
         _BULLET_CYCLE = [QTextListFormat.ListDisc, QTextListFormat.ListCircle, QTextListFormat.ListSquare]
+        _NUMBER_CYCLE = [QTextListFormat.ListDecimal, QTextListFormat.ListLowerAlpha, QTextListFormat.ListLowerRoman]
+        
         cursor = self.textCursor(); lst = cursor.currentList()
         if lst:
             fmt = QTextListFormat(lst.format())
             new_indent = max(1, fmt.indent() + delta); fmt.setIndent(new_indent)
-            if fmt.style() in _BULLET_CYCLE: fmt.setStyle(_BULLET_CYCLE[(new_indent - 1) % len(_BULLET_CYCLE)])
+            
+            # Update style based on cycle
+            if fmt.style() in _BULLET_CYCLE:
+                fmt.setStyle(_BULLET_CYCLE[(new_indent - 1) % len(_BULLET_CYCLE)])
+            elif fmt.style() in _NUMBER_CYCLE:
+                fmt.setStyle(_NUMBER_CYCLE[(new_indent - 1) % len(_NUMBER_CYCLE)])
+            elif fmt.style() in (QTextListFormat.ListUpperAlpha, QTextListFormat.ListUpperRoman):
+                # If it's another numbered style, bring it into the standard hierarchy
+                fmt.setStyle(_NUMBER_CYCLE[(new_indent - 1) % len(_NUMBER_CYCLE)])
+                
             block = cursor.block(); doc = self.document(); merged = False
             for adj_block in (block.previous(), block.next()):
                 if not adj_block.isValid(): continue

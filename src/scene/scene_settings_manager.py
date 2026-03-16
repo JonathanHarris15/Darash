@@ -70,22 +70,22 @@ class SceneSettingsManager:
 
     def update_fonts(self):
         scene = self.scene
-        scene.font = QFont(scene.font_family, scene.font_size)
+        scene.font = QFont(scene.font_family, max(1, scene.font_size))
         scene.header_font = QFont(Theme.FONT_UI, Theme.SIZE_HEADER, QFont.Bold)
         scene.chapter_font = QFont(Theme.FONT_UI, Theme.SIZE_CHAPTER, QFont.Bold)
-        scene.verse_num_font = QFont(scene.font_family, scene.verse_num_font_size)
-        scene.verse_mark_font = QFont(scene.font_family, scene.verse_mark_size)
+        scene.verse_num_font = QFont(scene.font_family, max(1, scene.verse_num_font_size))
+        scene.verse_mark_font = QFont(scene.font_family, max(1, scene.verse_mark_size))
 
     def apply_layout_changes(self):
         scene = self.scene
-        scene.font_size = scene.target_font_size
+        scene.font_size = max(1, scene.target_font_size)
         scene.line_spacing = scene.target_line_spacing
         scene.font_family = scene.target_font_family
-        scene.verse_num_font_size = scene.target_verse_num_size
+        scene.verse_num_font_size = max(1, scene.target_verse_num_size)
         scene.side_margin = scene.target_side_margin
         scene.tab_size = scene.target_tab_size
         scene.arrow_opacity = scene.target_arrow_opacity
-        scene.verse_mark_size = scene.target_verse_mark_size
+        scene.verse_mark_size = max(1, scene.target_verse_mark_size)
         scene.logical_mark_opacity = scene.target_logical_mark_opacity
         scene.sentence_break_enabled = scene.target_sentence_break_enabled
         scene.primary_translation = scene.target_primary_translation

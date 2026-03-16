@@ -83,30 +83,35 @@ class MainWindowDockManager:
         if hasattr(self.mw, '_update_link_buttons'): self.mw._update_link_buttons()
 
     def _update_dock_tabs(self):
-        for tb in self.mw.findChildren(QTabBar):
-            if not getattr(tb, '_jehu_closable_setup', False):
-                tb.setTabsClosable(True); tb.tabCloseRequested.connect(self._on_native_tab_close); tb._jehu_closable_setup = True
-            for i in range(tb.count()):
-                if tb.tabText(i).strip() == '': tb.setTabVisible(i, False)
+        try:
+            for tb in self.mw.findChildren(QTabBar):
+                try:
+                    if not getattr(tb, '_jehu_closable_setup', False):
+                        tb.setTabsClosable(True)
+                        tb.tabCloseRequested.connect(lambda idx, t=tb: self._on_native_tab_close(idx, t))
+                        tb._jehu_closable_setup = True
+                    for i in range(tb.count()):
+                        if tb.tabText(i).strip() == '': tb.setTabVisible(i, False)
+                except RuntimeError: pass
 
-        self._clean_center_panels()
-        for p in self.mw.center_panels:
-            try:
-                p.parent(); siblings = self.mw.center_workspace.tabifiedDockWidgets(p)
-                is_tabified = len(siblings) > 0
-                if is_tabified != getattr(p, '_title_bar_tabified', None):
-                    p._title_bar_tabified = is_tabified
-                    p.setTitleBarWidget(QWidget() if is_tabified else None)
-            except RuntimeError: pass
+            self._clean_center_panels()
+            for p in self.mw.center_panels:
+                try:
+                    p.parent(); siblings = self.mw.center_workspace.tabifiedDockWidgets(p)
+                    is_tabified = len(siblings) > 0
+                    if is_tabified != getattr(p, '_title_bar_tabified', None):
+                        p._title_bar_tabified = is_tabified
+                        p.setTitleBarWidget(QWidget() if is_tabified else None)
+                except RuntimeError: pass
 
-        for p in [self.mw.left_dock, self.mw.right_dock]:
-            try:
-                p.parent(); tb = p.titleBarWidget()
-                if tb and hasattr(tb, 'is_pseudo_tab'): tb.setVisible(p.isVisible() and not p.isFloating())
-            except RuntimeError: pass
+            for p in [self.mw.left_dock, self.mw.right_dock]:
+                try:
+                    p.parent(); tb = p.titleBarWidget()
+                    if tb and hasattr(tb, 'is_pseudo_tab'): tb.setVisible(p.isVisible() and not p.isFloating())
+                except RuntimeError: pass
+        except RuntimeError: pass
 
-    def _on_native_tab_close(self, index):
-        tb = self.mw.sender()
+    def _on_native_tab_close(self, index, tb):
         if not isinstance(tb, QTabBar): return
         title = tb.tabText(index).replace('&', '').strip()
         
