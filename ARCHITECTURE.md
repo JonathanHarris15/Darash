@@ -147,7 +147,7 @@
 | `snake_path_finder.py` | `SnakePathFinder` | Algorithm for computing snaking arrow paths that navigate around text blocks |
 | `menu_utils.py` | — | Helpers for building and styling `QMenu` instances consistently |
 | `path_utils.py` | — | Centralized cross-platform path resolution for resources and user data |
-| `update_manager.py` | `UpdateManager` | Handles version checking via GitHub API, downloads updates, and performs self-replacement on Windows |
+| `update_manager.py` | `UpdateManager` | Handles version checking via GitHub API, downloads updates (SSL secured via `certifi`), and performs self-replacement on Windows |
 
 ---
 

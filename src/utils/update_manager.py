@@ -4,6 +4,8 @@ import subprocess
 import urllib.request
 import json
 import tempfile
+import ssl
+import certifi
 from src.core.constants import APP_VERSION, GITHUB_API_LATEST_RELEASE
 
 class UpdateManager:
@@ -17,7 +19,10 @@ class UpdateManager:
             req = urllib.request.Request(GITHUB_API_LATEST_RELEASE)
             req.add_header('User-Agent', 'Jehu-Reader-Updater')
             
-            with urllib.request.urlopen(req, timeout=10) as response:
+            # Use certifi's CA bundle for SSL verification (critical for macOS)
+            context = ssl.create_default_context(cafile=certifi.where())
+            
+            with urllib.request.urlopen(req, timeout=10, context=context) as response:
                 if response.status == 200:
                     return json.loads(response.read().decode('utf-8')), None
         except Exception as e:
@@ -85,7 +90,11 @@ class UpdateManager:
             # Download new file
             req = urllib.request.Request(download_url)
             req.add_header('User-Agent', 'Jehu-Reader-Updater')
-            with urllib.request.urlopen(req) as response, open(new_file_path, 'wb') as out_file:
+            
+            # Use certifi's CA bundle for SSL verification
+            context = ssl.create_default_context(cafile=certifi.where())
+            
+            with urllib.request.urlopen(req, context=context) as response, open(new_file_path, 'wb') as out_file:
                 out_file.write(response.read())
 
             if sys.platform == "win32":
