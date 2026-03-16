@@ -366,6 +366,8 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
                     self.close()
         else:
             QMessageBox.information(self, "Up to Date", f"You are running the latest version (v{APP_VERSION}).")
+
+    def _show_release_notes(self):
         from src.ui.components.release_note_dialog import ReleaseNoteDialog
         content = self.release_note_manager.get_current_release_note()
         version = self.release_note_manager.version
