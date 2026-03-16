@@ -21,6 +21,8 @@ class SceneInputHandler(QObject):
         if key == Qt.Key_A and not s.is_drawing_arrow and not event.isAutoRepeat(): self.study_handler.start_arrow_drawing(); return True
         if key == Qt.Key_Q: self.study_handler.handle_strongs_lookup(); return True
         if key == Qt.Key_D: self.d_key_pressed = True; return False
+        if key == Qt.Key_Up: return s.outline_manager.cycle_divider_at_pos(getattr(s, "last_mouse_scene_pos", QPointF()), 120)
+        if key == Qt.Key_Down: return s.outline_manager.cycle_divider_at_pos(getattr(s, "last_mouse_scene_pos", QPointF()), -120)
         if Qt.Key_1 <= key <= Qt.Key_9: s._apply_symbol_at_mouse(str(key - Qt.Key_0)); return True
         return False
 

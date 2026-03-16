@@ -28,7 +28,7 @@ class OutlinePanel(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(4)
         
-        # 1. Header with Formatting Options & Edit Toggle
+        # 1. Header with Edit Toggle & Send to Note
         header_layout = QHBoxLayout()
         
         self.edit_btn = QPushButton("Edit Outline in Reader")
@@ -38,12 +38,22 @@ class OutlinePanel(QWidget):
         self.edit_btn.clicked.connect(self._on_edit_toggled)
         header_layout.addWidget(self.edit_btn)
         
-        header_layout.addStretch()
+        self.send_to_note_btn = QPushButton("Send to Note")
+        self.send_to_note_btn.setFixedHeight(24)
+        self.send_to_note_btn.setStyleSheet(f"""
+            QPushButton {{ 
+                background-color: {Theme.BG_TERTIARY}; 
+                color: {Theme.TEXT_PRIMARY}; 
+                border: 1px solid {Theme.BORDER_DEFAULT}; 
+                border-radius: 4px; 
+                padding: 0px 8px; 
+            }}
+            QPushButton:hover {{ background-color: {Theme.BORDER_LIGHT}; }}
+        """)
+        self.send_to_note_btn.clicked.connect(self._on_send_to_note)
+        header_layout.addWidget(self.send_to_note_btn)
         
-        self.ref_format_combo = QComboBox()
-        self.ref_format_combo.addItems(["Book C:V", "C:V", "v#"])
-        self.ref_format_combo.currentIndexChanged.connect(self.refresh)
-        header_layout.addWidget(self.ref_format_combo)
+        header_layout.addStretch()
         layout.addLayout(header_layout)
 
         # 2. Title Edit Bar
@@ -77,6 +87,15 @@ class OutlinePanel(QWidget):
         
         self.scroll_area.setWidget(self.container)
         layout.addWidget(self.scroll_area)
+
+        # 4. Bottom bar for formatting
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addStretch()
+        self.ref_format_combo = QComboBox()
+        self.ref_format_combo.addItems(["Book C:V", "C:V", "v#"])
+        self.ref_format_combo.currentIndexChanged.connect(self.refresh)
+        bottom_layout.addWidget(self.ref_format_combo)
+        layout.addLayout(bottom_layout)
         
         self.title_save_timer = QTimer(self)
         self.title_save_timer.setSingleShot(True)
@@ -88,6 +107,67 @@ class OutlinePanel(QWidget):
     def _on_edit_toggled(self, checked):
         if checked: self.editRequested.emit(self.root_node_id)
         else: self.editRequested.emit("") # Turn off
+
+    def _on_send_to_note(self):
+        """Converts the current outline to a rich-text note and adds it to the StudyManager."""
+        if not self.root_node_id: return
+        root = self.outline_manager.get_node(self.root_node_id)
+        if not root: return
+        
+        title = root.get("title", "Outline Note")
+        
+        # Build HTML content mirroring ExportManager logic
+        html = f"<h1>{title}</h1>"
+        
+        def format_ref(start, end):
+            if not start or not end: return ""
+            def parse(ref):
+                m = re.match(r"(.*) (\d+):(\d+)([a-zA-Z]+)?", str(ref))
+                return m.groups() if m else (None, None, None, None)
+            s_book, s_chap, s_v, s_p = parse(start)
+            e_book, e_chap, e_v, e_p = parse(end)
+            s_v_full = f"{s_v}{s_p if s_p else ''}"
+            e_v_full = f"{e_v}{e_p if e_p else ''}"
+            if not s_book: return f"{start}-{end}"
+            if s_book == e_book:
+                if s_chap == e_chap:
+                    if s_v_full == e_v_full: return f"{s_book} {s_chap}:{s_v_full}"
+                    return f"{s_book} {s_chap}:{s_v_full}-{e_v_full}"
+                return f"{s_book} {s_chap}:{s_v_full}-{e_chap}:{e_v_full}"
+            return f"{start}-{end}"
+
+        def get_list_type(level):
+            if level == 1: return "1" # Decimal
+            if level == 2: return "a" # Lower Alpha
+            if level == 3: return "i" # Lower Roman
+            return "1"
+
+        content_parts = []
+        def traverse(node, level):
+            ref = format_ref(node["range"]["start"], node["range"]["end"])
+            summary = node.get("summary", "").strip()
+            content = f"<b>[{ref}]</b> {summary}" if ref else summary
+            
+            nonlocal content_parts
+            if level == 0:
+                if content: content_parts.append(f"<p>{content}</p>")
+            else:
+                content_parts.append(f"<li>{content}</li>")
+            
+            children = node.get("children", [])
+            if children:
+                ltype = get_list_type(level + 1)
+                content_parts.append(f"<ol type='{ltype}'>")
+                for child in children:
+                    traverse(child, level + 1)
+                content_parts.append("</ol>")
+                
+        traverse(root, 0)
+        html += "".join(content_parts)
+        
+        # Save to study manager as a standalone note
+        self.outline_manager.study_manager.add_standalone_note(title=title, text=html)
+        self.outlineChanged.emit() # This will trigger StudyPanel refresh via MainWindow connections
 
     def update_active_state(self, is_active):
         self.edit_btn.blockSignals(True); self.edit_btn.setChecked(is_active); self.edit_btn.blockSignals(False)

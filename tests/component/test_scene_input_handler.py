@@ -51,3 +51,18 @@ def test_input_handler_wheel_accumulator(mock_scene):
     # 120 / 30 = 4 steps. Accumulator should be 0 after processing.
     assert mock_scene._wheel_accumulator == 0
     assert mock_scene.state_manager.scroll_timer.start.call_count == 1
+
+def test_input_handler_arrow_keys_cycle_level(mock_scene):
+    handler = SceneInputHandler(mock_scene)
+    mock_scene.last_mouse_scene_pos = QPointF(100, 100)
+    mock_scene.outline_manager.cycle_divider_at_pos.return_value = True
+    
+    # Test Up Arrow
+    up_event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Up, Qt.NoModifier)
+    assert handler.handle_key_press(up_event) is True
+    mock_scene.outline_manager.cycle_divider_at_pos.assert_called_with(QPointF(100, 100), 120)
+    
+    # Test Down Arrow
+    down_event = QKeyEvent(QKeyEvent.KeyPress, Qt.Key_Down, Qt.NoModifier)
+    assert handler.handle_key_press(down_event) is True
+    mock_scene.outline_manager.cycle_divider_at_pos.assert_called_with(QPointF(100, 100), -120)

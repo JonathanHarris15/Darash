@@ -193,6 +193,7 @@ Mirrors `src/` structure. Add new test files here as features are built.
 | `tests/component/scene/test_scene_regression.py` | `ReaderScene` | **Foolproof event delegation protection** (wheel/key events) |
 | `tests/integration/test_reader_pipeline.py` | `VerseLoader` -> `LayoutEngine` | **End-to-End Pipeline Verification** (Fixes packing regressions) |
 | `tests/component/test_scene_input_handler.py` | `SceneInputHandler` | Key/wheel delegation and accumulator logic |
+| `tests/component/ui/components/test_outline_panel.py` | `OutlinePanel` | Cell-based editor, 'Send to Note' logic |
 | `tests/component/test_study_tree_populator.py` | `StudyTreePopulator` | Tree hierarchy population and section validation |
 | `tests/e2e/test_app_startup.py` | `MainWindow` | Full app import and window initialization smoke test |
 | `tests/integration/scene/test_ghost_arrows.py` | `SceneOverlayManager`, `SceneInputHandler` | Ghost arrow rendering, hover coordination, and deletion logic |
