@@ -108,9 +108,14 @@ class MainWindowDockManager:
     def _on_native_tab_close(self, index):
         tb = self.mw.sender()
         if not isinstance(tb, QTabBar): return
-        title = tb.tabText(index).replace('&', '')
+        title = tb.tabText(index).replace('&', '').strip()
+        
+        # Find the dock that matches this title.
+        # We search center panels and side docks. 
+        # We don't check p.isVisible() because inactive tabs are not visible.
         for p in self.mw.center_panels + [self.mw.left_dock, self.mw.right_dock]:
             try:
-                if p.isVisible() and p.windowTitle().replace('&', '') == title:
-                    p.close(); break
+                if p.windowTitle().replace('&', '').strip() == title:
+                    p.close()
+                    break
             except RuntimeError: pass
