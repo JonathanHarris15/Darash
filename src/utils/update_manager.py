@@ -19,20 +19,22 @@ class UpdateManager:
             
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:
-                    return json.loads(response.read().decode('utf-8'))
+                    return json.loads(response.read().decode('utf-8')), None
         except Exception as e:
-            print(f"[UpdateManager] Failed to fetch release info: {e}")
-        return None
+            error_msg = str(e)
+            print(f"[UpdateManager] Failed to fetch release info: {error_msg}")
+            return None, error_msg
+        return None, "Unexpected response status"
 
     @staticmethod
     def check_for_updates():
         """
         Compares the local version with the latest GitHub release.
-        Returns the release info dictionary if a newer version is available, else None.
+        Returns (relese_info, error_msg).
         """
-        release_info = UpdateManager.get_latest_release_info()
+        release_info, error_msg = UpdateManager.get_latest_release_info()
         if not release_info:
-            return None
+            return None, error_msg
 
         latest_tag = release_info.get('tag_name', '').lstrip('v')
         if not latest_tag:
@@ -50,9 +52,9 @@ class UpdateManager:
         except (ValueError, IndexError):
             # Fallback to string comparison if versions aren't perfectly formatted
             if latest_tag > APP_VERSION:
-                return release_info
+                return release_info, None
 
-        return None
+        return None, None
 
     @staticmethod
     def start_update(release_info):

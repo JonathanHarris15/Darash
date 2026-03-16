@@ -30,7 +30,7 @@ def main():
     app.setStyleSheet(Theme.get_global_stylesheet())
     
     # Check for updates
-    release_info = UpdateManager.check_for_updates()
+    release_info, error_msg = UpdateManager.check_for_updates()
     if release_info:
         from PySide6.QtWidgets import QMessageBox
         msg = QMessageBox()

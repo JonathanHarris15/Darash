@@ -342,9 +342,9 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         from src.utils.update_manager import UpdateManager
         from PySide6.QtWidgets import QMessageBox
         
-        info = UpdateManager.get_latest_release_info()
+        info, error_msg = UpdateManager.get_latest_release_info()
         if not info:
-            QMessageBox.critical(self, "Update Check Failed", "Could not connect to GitHub to check for updates.")
+            QMessageBox.critical(self, "Update Check Failed", f"Could not connect to GitHub to check for updates.\n\nError: {error_msg}")
             return
             
         latest_tag = info.get('tag_name', 'v?').lstrip('v')
