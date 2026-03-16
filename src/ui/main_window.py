@@ -332,8 +332,40 @@ class MainWindow(QMainWindow, MainWindowLayoutMixin, MainWindowPanelsMixin):
         release_notes_act = QAction("Release Notes...", self)
         release_notes_act.triggered.connect(self._show_release_notes)
         help_menu.addAction(release_notes_act)
+        
+        help_menu.addSeparator()
+        update_act = QAction("Check for Updates...", self)
+        update_act.triggered.connect(self._check_for_updates_manual)
+        help_menu.addAction(update_act)
 
-    def _show_release_notes(self):
+    def _check_for_updates_manual(self):
+        from src.utils.update_manager import UpdateManager
+        from PySide6.QtWidgets import QMessageBox
+        
+        info = UpdateManager.get_latest_release_info()
+        if not info:
+            QMessageBox.critical(self, "Update Check Failed", "Could not connect to GitHub to check for updates.")
+            return
+            
+        latest_tag = info.get('tag_name', 'v?').lstrip('v')
+        from src.core.constants import APP_VERSION
+        
+        def to_tuple(v):
+            try: return tuple(map(int, (v.split('.'))))
+            except: return (0,0,0)
+
+        if to_tuple(latest_tag) > to_tuple(APP_VERSION):
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowTitle("Update Available")
+            msg.setText(f"A new version (v{latest_tag}) is available.")
+            msg.setInformativeText(f"Current version: v{APP_VERSION}\n\nWould you like to download and install it now?")
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            if msg.exec() == QMessageBox.Yes:
+                if UpdateManager.start_update(info):
+                    self.close()
+        else:
+            QMessageBox.information(self, "Up to Date", f"You are running the latest version (v{APP_VERSION}).")
         from src.ui.components.release_note_dialog import ReleaseNoteDialog
         content = self.release_note_manager.get_current_release_note()
         version = self.release_note_manager.version

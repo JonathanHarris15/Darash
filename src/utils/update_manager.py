@@ -38,6 +38,8 @@ class UpdateManager:
         if not latest_tag:
             return None
 
+        print(f"[UpdateManager] Local version: {APP_VERSION}, Latest on GitHub: {latest_tag}")
+
         try:
             # Simple semantic version comparison (major.minor.patch)
             def to_tuple(v):
